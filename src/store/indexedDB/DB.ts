@@ -14,7 +14,7 @@ import { DISABLED_ENCRYPTION_STORES } from '@/config/encryptionConfig';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.14.0';
+const CURRENT_DB_VERSION = '1.15.0';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -135,6 +135,9 @@ export class DB {
           // New reference tables used by RTL publications
           if (!db.objectStoreNames.contains('statuses')) {
             db.createObjectStore('statuses', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('cleaning_statuses')) {
+            db.createObjectStore('cleaning_statuses', { keyPath: 'id' });
           }
           if (!db.objectStoreNames.contains('priorities')) {
             db.createObjectStore('priorities', { keyPath: 'id' });

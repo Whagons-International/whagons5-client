@@ -115,6 +115,20 @@ export interface Status {
     deleted_at?: string | Date | null;
 }
 
+export interface CleaningStatus {
+    id: number;
+    name: string;
+    code: string;
+    color: string;
+    icon?: string | null;
+    order: number;
+    is_initial: boolean;
+    is_clean_state: boolean;
+    description?: string | null;
+    created_at?: string | Date;
+    updated_at?: string | Date;
+}
+
 export interface Priority {
     id: number;
     name: string;
@@ -131,6 +145,10 @@ export interface Spot {
     parent_id?: number | null;
     spot_type_id: number;
     is_branch: boolean;
+    cleaning_status_id?: number | null;
+    current_cleaning_task_id?: number | null;
+    last_cleaned_by?: number | null;
+    last_cleaned_at?: string | Date | null;
     created_at?: string | Date;
     updated_at?: string | Date;
     deleted_at?: string | Date | null;

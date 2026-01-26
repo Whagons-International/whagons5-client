@@ -50,6 +50,7 @@ import { ComplianceStandardDetail } from '@/pages/compliance/ComplianceStandardD
 import SharedWithMe from '@/pages/shared/SharedWithMe';
 import BroadcastsPage from '@/pages/broadcasts/BroadcastsPage';
 import ActivityMonitor from '@/pages/activity/ActivityMonitor';
+import Cleaning from '../pages/cleaning/Cleaning';
 
 
 const pages = [
@@ -99,6 +100,7 @@ export const HomeRoutes = () => {
           <Route path="/boards/:boardId" element={<BoardDetail />} />
           <Route path="/broadcasts" element={<BroadcastsPage />} />
           <Route path="/activity" element={<ActivityMonitor />} />
+          <Route path="/cleaning" element={<Cleaning />} />
           <Route path="/gamification" element={<GamificationComingSoon />} />
           <Route path="/analytics" element={<AnalyticsComingSoon />} />
           <Route path="/motivation" element={<MotivationComingSoon />} />

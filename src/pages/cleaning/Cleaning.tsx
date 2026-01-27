@@ -4,19 +4,10 @@ import { Search, Droplet, Clock, User, Filter } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { RootState, AppDispatch } from '@/store/store';
 import { genericActions, genericInternalActions } from '@/store/genericSlices';
 import { Spot, CleaningStatus } from '@/store/types';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -24,7 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 
@@ -49,10 +39,6 @@ function Cleaning() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
   const [showActiveTaskFilter, setShowActiveTaskFilter] = useState(false);
-  const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
-  const [isChangeStatusDialogOpen, setIsChangeStatusDialogOpen] = useState(false);
-  const [newStatusId, setNewStatusId] = useState<number | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Load data on mount
   useEffect(() => {
@@ -78,6 +64,22 @@ function Cleaning() {
     if (!userId) return '';
     const user = users.find((u: any) => u.id === userId);
     return user?.name || `User ${userId}`;
+  };
+
+  // Convert hex color to rgba with opacity for background
+  const getBackgroundColor = (color: string | null | undefined): string => {
+    if (!color) return 'rgba(243, 244, 246, 0.3)'; // Default gray with opacity
+    
+    // If color is already rgba, return as is
+    if (color.startsWith('rgba')) return color;
+    
+    // Convert hex to rgba with 0.2 opacity
+    const hex = color.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    
+    return `rgba(${r}, ${g}, ${b}, 0.2)`;
   };
 
   // Filter spots
@@ -121,49 +123,35 @@ function Cleaning() {
     return [...cleaningStatuses].sort((a: CleaningStatus, b: CleaningStatus) => a.order - b.order);
   }, [cleaningStatuses]);
 
-  // Handle spot click
-  const handleSpotClick = (spot: Spot) => {
-    setSelectedSpot(spot);
-    setNewStatusId(spot.cleaning_status_id || null);
-    setIsChangeStatusDialogOpen(true);
-  };
-
   // Handle status change
-  const handleStatusChange = async () => {
-    if (!selectedSpot || newStatusId === selectedSpot.cleaning_status_id) {
-      setIsChangeStatusDialogOpen(false);
+  const handleStatusChange = async (spot: Spot, newStatusId: number | null) => {
+    if (newStatusId === spot.cleaning_status_id) {
       return;
     }
 
-    setIsSubmitting(true);
     try {
       await dispatch(
         genericActions.spots.updateAsync({
-          id: selectedSpot.id,
+          id: spot.id,
           updates: { cleaning_status_id: newStatusId },
         }) as any
       );
-      setIsChangeStatusDialogOpen(false);
-      setSelectedSpot(null);
-      setNewStatusId(null);
     } catch (error) {
       console.error('Failed to update cleaning status:', error);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
   const loading = spotsLoading || statusesLoading;
 
   return (
-    <div className="p-6 space-y-6 bg-background text-foreground min-h-screen">
+    <div className="p-4 space-y-4 bg-background text-foreground min-h-screen">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
         <div className="flex-1">
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--brand-primary)' }}>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--brand-primary)' }}>
             {t('cleaning.title', 'Cleaning Management')}
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground text-sm mt-0.5">
             {t('cleaning.description', 'Manage and track cleaning status of spots')}
           </p>
         </div>
@@ -171,8 +159,8 @@ function Cleaning() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="py-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             {/* Search */}
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
@@ -233,63 +221,111 @@ function Cleaning() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredSpots.map((spot: Spot) => {
             const cleaningStatus = getCleaningStatus(spot.cleaning_status_id);
-            const hasActiveTask = !!spot.current_cleaning_task_id;
             const statusColor = cleaningStatus?.color || '#6b7280';
             const statusName = cleaningStatus?.name || t('cleaning.status.none', 'No Status');
+            const statusCode = cleaningStatus?.code || null;
+            const backgroundColor = getBackgroundColor(statusColor);
 
             return (
               <Card
                 key={spot.id}
-                className="cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => handleSpotClick(spot)}
+                className="hover:shadow-lg transition-shadow relative"
                 style={{
-                  borderLeft: `4px solid ${statusColor}`,
+                  backgroundColor: backgroundColor,
                 }}
               >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <CardTitle className="text-lg">{spot.name}</CardTitle>
-                    {hasActiveTask && (
-                      <Badge variant="secondary" className="ml-2">
-                        <Droplet className="w-3 h-3 mr-1" />
-                        {t('cleaning.active-task', 'Active')}
-                      </Badge>
-                    )}
+                <CardHeader className="pb-1 pt-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-base font-bold mb-0 truncate">{spot.name}</CardTitle>
+                      <p className="text-xs text-gray-600">Suite VIP</p>
+                    </div>
+                    <div className="shrink-0">
+                      <Select
+                        value={spot.cleaning_status_id ? String(spot.cleaning_status_id) : 'none'}
+                        onValueChange={(value) => {
+                          const newStatusId = value === 'none' ? null : parseInt(value);
+                          handleStatusChange(spot, newStatusId);
+                        }}
+                      >
+                        <SelectTrigger 
+                          className="h-7 w-auto min-w-[100px] text-xs border-0 rounded-sm"
+                          style={{
+                            backgroundColor: statusColor,
+                            color: '#fff',
+                          }}
+                        >
+                          <SelectValue>
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate font-medium">{statusName.toUpperCase()}</span>
+                            </div>
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-gray-400" />
+                              {t('cleaning.status.none', 'No Status')}
+                            </div>
+                          </SelectItem>
+                          {sortedCleaningStatuses.map((status: CleaningStatus) => (
+                            <SelectItem key={status.id} value={String(status.id)}>
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="w-3 h-3 rounded-full"
+                                  style={{ backgroundColor: status.color }}
+                                />
+                                {status.name}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  {/* Status Badge */}
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: statusColor }}
-                    />
-                    <span className="text-sm font-medium">{statusName}</span>
-                  </div>
+                <CardContent className="space-y-2 pt-2">
+                  {/* Status-specific content */}
+                  {statusCode === 'SUCIA' && (
+                    <div className="text-sm text-gray-600">
+                      Sin asignar
+                    </div>
+                  )}
+                  {statusCode === 'LIMPIANDO' && (
+                    <div className="text-sm text-gray-600">
+                      Limpiando...
+                    </div>
+                  )}
+                  {statusCode === 'LIMPIA' && (
+                    <div className="text-sm text-gray-600">
+                      Lista para check-in
+                    </div>
+                  )}
+                  {statusCode === 'INSPECCIONADA' && (
+                    <div className="text-sm text-gray-600">
+                      Aprobada por supervisor
+                    </div>
+                  )}
+                  {!statusCode && (
+                    <div className="text-sm text-gray-600">
+                      Sin estado asignado
+                    </div>
+                  )}
 
-                  {/* Last Cleaned Info */}
-                  {spot.last_cleaned_at && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="w-4 h-4" />
+                  {/* Last Cleaned Section */}
+                  <div className="pt-1.5 border-t border-gray-200">
+                    <p className="text-xs text-gray-600 mb-0.5">
+                      Última limpieza
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <Clock className="w-3 h-3" />
                       <span>
-                        {t('cleaning.last-cleaned', 'Last cleaned')}:{' '}
-                        {dayjs(spot.last_cleaned_at).fromNow()}
+                        {spot.last_cleaned_at
+                          ? dayjs(spot.last_cleaned_at).fromNow()
+                          : 'Nunca'}
                       </span>
                     </div>
-                  )}
-
-                  {/* Last Cleaned By */}
-                  {spot.last_cleaned_by && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <User className="w-4 h-4" />
-                      <span>{getUserName(spot.last_cleaned_by)}</span>
-                    </div>
-                  )}
-
-                  {/* Click hint */}
-                  <p className="text-xs text-muted-foreground pt-2 border-t">
-                    {t('cleaning.click-to-change', 'Click to change status')}
-                  </p>
+                  </div>
                 </CardContent>
               </Card>
             );
@@ -307,71 +343,6 @@ function Cleaning() {
           </CardContent>
         </Card>
       )}
-
-      {/* Change Status Dialog */}
-      <Dialog open={isChangeStatusDialogOpen} onOpenChange={setIsChangeStatusDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {t('cleaning.dialog.title', 'Change Cleaning Status')}
-            </DialogTitle>
-            <DialogDescription>
-              {selectedSpot && (
-                <>
-                  {t('cleaning.dialog.description', 'Select a new cleaning status for')}{' '}
-                  <strong>{selectedSpot.name}</strong>
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <Label>{t('cleaning.dialog.status-label', 'Cleaning Status')}</Label>
-            <Select
-              value={newStatusId ? String(newStatusId) : 'none'}
-              onValueChange={(value) => setNewStatusId(value === 'none' ? null : parseInt(value))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t('cleaning.dialog.select-status', 'Select status')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">
-                  {t('cleaning.status.none', 'No Status')}
-                </SelectItem>
-                {sortedCleaningStatuses.map((status: CleaningStatus) => (
-                  <SelectItem key={status.id} value={String(status.id)}>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: status.color }}
-                      />
-                      {status.name}
-                      {status.description && (
-                        <span className="text-xs text-muted-foreground ml-2">
-                          - {status.description}
-                        </span>
-                      )}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsChangeStatusDialogOpen(false)}
-              disabled={isSubmitting}
-            >
-              {t('common.cancel', 'Cancel')}
-            </Button>
-            <Button onClick={handleStatusChange} disabled={isSubmitting}>
-              {isSubmitting
-                ? t('common.saving', 'Saving...')
-                : t('common.save', 'Save')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -1,10 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Search, Droplet, Clock, User, Filter } from 'lucide-react';
+import { Search, Droplet, Clock, User, Filter, LayoutGrid, Grid3x3 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faBroom } from '@fortawesome/free-solid-svg-icons';
 import { RootState, AppDispatch } from '@/store/store';
 import { genericActions, genericInternalActions } from '@/store/genericSlices';
 import { Spot, CleaningStatus } from '@/store/types';
@@ -39,6 +41,7 @@ function Cleaning() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
   const [showActiveTaskFilter, setShowActiveTaskFilter] = useState(false);
+  const [viewMode, setViewMode] = useState<'full' | 'compact'>('full');
 
   // Load data on mount
   useEffect(() => {
@@ -123,6 +126,28 @@ function Cleaning() {
     return [...cleaningStatuses].sort((a: CleaningStatus, b: CleaningStatus) => a.order - b.order);
   }, [cleaningStatuses]);
 
+  // Calculate counts for each status
+  const statusCounts = useMemo(() => {
+    const counts: Record<number | 'none', number> = { none: 0 };
+    
+    // Initialize counts for each status
+    sortedCleaningStatuses.forEach((status: CleaningStatus) => {
+      counts[status.id] = 0;
+    });
+
+    // Count filtered spots by status
+    filteredSpots.forEach((spot: Spot) => {
+      const statusId = spot.cleaning_status_id || 'none';
+      if (counts[statusId] !== undefined) {
+        counts[statusId]++;
+      } else {
+        counts['none']++;
+      }
+    });
+
+    return counts;
+  }, [filteredSpots, sortedCleaningStatuses]);
+
   // Handle status change
   const handleStatusChange = async (spot: Spot, newStatusId: number | null) => {
     if (newStatusId === spot.cleaning_status_id) {
@@ -146,36 +171,34 @@ function Cleaning() {
   return (
     <div className="p-4 space-y-4 bg-background text-foreground min-h-screen">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--brand-primary)' }}>
-            {t('cleaning.title', 'Cleaning Management')}
-          </h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            {t('cleaning.description', 'Manage and track cleaning status of spots')}
-          </p>
+      <div className="flex items-center gap-3">
+        <div className="text-emerald-500 text-3xl">
+          <FontAwesomeIcon icon={faBroom} />
         </div>
+        <h1 className="text-2xl font-bold" style={{ color: 'var(--brand-primary)' }}>
+          {t('cleaning.title', 'Cleaning Management')}
+        </h1>
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardContent className="py-2">
+      <Card className="!py-2">
+        <CardContent className="py-1.5">
           <div className="flex flex-col sm:flex-row gap-2">
             {/* Search */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <div className="w-full sm:w-64 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-foreground/80 w-5 h-5 z-10" />
               <Input
                 placeholder={t('cleaning.search.placeholder', 'Search spots...')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-11 h-9 border-2 focus-visible:border-ring focus-visible:ring-2"
               />
             </div>
 
             {/* Status Filter */}
-            <div className="w-full sm:w-64">
+            <div className="w-full sm:w-56">
               <Select value={selectedStatusFilter} onValueChange={setSelectedStatusFilter}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue placeholder={t('cleaning.filters.status', 'Filter by status')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -200,14 +223,76 @@ function Cleaning() {
             <Button
               variant={showActiveTaskFilter ? 'default' : 'outline'}
               onClick={() => setShowActiveTaskFilter(!showActiveTaskFilter)}
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto shrink-0 h-9"
             >
               <Filter className="w-4 h-4 mr-2" />
               {t('cleaning.filters.active-tasks', 'Active Tasks')}
             </Button>
+
+            {/* View Mode Toggle */}
+            <div className="flex gap-1 border rounded-md p-1 shrink-0">
+              <Button
+                variant={viewMode === 'full' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('full')}
+                className="h-7 px-2"
+                title="Vista completa"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'compact' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('compact')}
+                className="h-7 px-2"
+                title="Vista compacta"
+              >
+                <Grid3x3 className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Status Summary */}
+      {!loading && (
+        <Card className="!py-2">
+          <CardContent className="py-2">
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              {sortedCleaningStatuses.map((status: CleaningStatus) => {
+                const isSelected = selectedStatusFilter === String(status.id);
+                return (
+                  <div
+                    key={status.id}
+                    className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity px-3 py-1.5 rounded-md"
+                    style={{
+                      backgroundColor: isSelected ? `${status.color}20` : 'transparent',
+                    }}
+                    onClick={() => {
+                      if (isSelected) {
+                        setSelectedStatusFilter('all');
+                      } else {
+                        setSelectedStatusFilter(String(status.id));
+                      }
+                    }}
+                  >
+                    <div
+                      className="w-3 h-3 rounded-full shrink-0"
+                      style={{ backgroundColor: status.color }}
+                    />
+                    <span className="text-sm font-medium text-foreground">
+                      {status.name}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      ({statusCounts[status.id] || 0})
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Loading State */}
       {loading && (
@@ -234,7 +319,7 @@ function Cleaning() {
                   backgroundColor: backgroundColor,
                 }}
               >
-                <CardHeader className="pb-1 pt-2">
+                <CardHeader className={viewMode === 'compact' ? 'pb-2 pt-2' : 'pb-1 pt-2'}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <CardTitle className="text-base font-bold mb-0 truncate">{spot.name}</CardTitle>
@@ -249,7 +334,7 @@ function Cleaning() {
                         }}
                       >
                         <SelectTrigger 
-                          className="h-7 w-auto min-w-[100px] text-xs border-0 rounded-sm"
+                          className={viewMode === 'compact' ? 'h-8 w-auto min-w-[100px] text-xs border-0 rounded-sm' : 'h-7 w-auto min-w-[100px] text-xs border-0 rounded-sm'}
                           style={{
                             backgroundColor: statusColor,
                             color: '#fff',
@@ -284,49 +369,51 @@ function Cleaning() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-2 pt-2">
-                  {/* Status-specific content */}
-                  {statusCode === 'SUCIA' && (
-                    <div className="text-sm text-gray-600">
-                      Sin asignar
-                    </div>
-                  )}
-                  {statusCode === 'LIMPIANDO' && (
-                    <div className="text-sm text-gray-600">
-                      Limpiando...
-                    </div>
-                  )}
-                  {statusCode === 'LIMPIA' && (
-                    <div className="text-sm text-gray-600">
-                      Lista para check-in
-                    </div>
-                  )}
-                  {statusCode === 'INSPECCIONADA' && (
-                    <div className="text-sm text-gray-600">
-                      Aprobada por supervisor
-                    </div>
-                  )}
-                  {!statusCode && (
-                    <div className="text-sm text-gray-600">
-                      Sin estado asignado
-                    </div>
-                  )}
+                {viewMode === 'full' && (
+                  <CardContent className="space-y-2 pt-2">
+                    {/* Status-specific content */}
+                    {statusCode === 'SUCIA' && (
+                      <div className="text-sm text-gray-600">
+                        Sin asignar
+                      </div>
+                    )}
+                    {statusCode === 'LIMPIANDO' && (
+                      <div className="text-sm text-gray-600">
+                        Limpiando...
+                      </div>
+                    )}
+                    {statusCode === 'LIMPIA' && (
+                      <div className="text-sm text-gray-600">
+                        Lista para check-in
+                      </div>
+                    )}
+                    {statusCode === 'INSPECCIONADA' && (
+                      <div className="text-sm text-gray-600">
+                        Aprobada por supervisor
+                      </div>
+                    )}
+                    {!statusCode && (
+                      <div className="text-sm text-gray-600">
+                        Sin estado asignado
+                      </div>
+                    )}
 
-                  {/* Last Cleaned Section */}
-                  <div className="pt-1.5 border-t border-gray-200">
-                    <p className="text-xs text-gray-600 mb-0.5">
-                      Última limpieza
-                    </p>
-                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                      <Clock className="w-3 h-3" />
-                      <span>
-                        {spot.last_cleaned_at
-                          ? dayjs(spot.last_cleaned_at).fromNow()
-                          : 'Nunca'}
-                      </span>
+                    {/* Last Cleaned Section */}
+                    <div className="pt-1.5 border-t border-gray-200">
+                      <p className="text-xs text-gray-600 mb-0.5">
+                        Última limpieza
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <Clock className="w-3 h-3" />
+                        <span>
+                          {spot.last_cleaned_at
+                            ? dayjs(spot.last_cleaned_at).fromNow()
+                            : 'Nunca'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
+                  </CardContent>
+                )}
               </Card>
             );
           })}

@@ -327,7 +327,6 @@ export default function ActivityMonitor() {
     if (taskLogs.length === 0 || users.length === 0) return;
 
     const historicalActivities: ActivityEvent[] = taskLogs
-      .slice(0, 100) // Limit to last 100
       .map((log: any) => {
         const logUser = users.find((u: any) => u.id === log.user_id);
         const userName = logUser?.name || logUser?.email || `User ${log.user_id}`;
@@ -361,7 +360,8 @@ export default function ActivityMonitor() {
           },
         };
       })
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+      .slice(0, 100);
 
     // Only set if we don't have real-time activities yet
     setActivities(prev => {

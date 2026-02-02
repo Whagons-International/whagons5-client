@@ -2,7 +2,7 @@ import { auth } from '@/firebase/firebaseConfig';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.17.1';
+const CURRENT_DB_VERSION = '1.18.0';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -350,6 +350,11 @@ export class DB {
           // Tenant availability cache (keyed by tenant name)
           if (!db.objectStoreNames.contains('tenant_availability')) {
             db.createObjectStore('tenant_availability', { keyPath: 'tenantName' });
+          }
+
+          // Whiteboards (Excalidraw data per workspace)
+          if (!db.objectStoreNames.contains('whiteboards')) {
+            db.createObjectStore('whiteboards', { keyPath: 'workspaceId' });
           }
         };
 

@@ -77,13 +77,6 @@ export function useWorkspaceDragDrop(params: {
     const overId = Number(over.id);
     const previous = headerKpiCardsRef.current;
 
-    // If either card is a fallback (negative ID), skip API call but allow visual reorder
-    if (activeId < 0 || overId < 0) {
-      console.log('[Workspace KPI] Fallback cards involved, skipping persistence');
-      return;
-    }
-
-    // Both cards are database cards - proceed with reorder
     const oldIndex = previous.findIndex((c) => Number(c.id) === activeId);
     const newIndex = previous.findIndex((c) => Number(c.id) === overId);
     
@@ -99,6 +92,12 @@ export function useWorkspaceDragDrop(params: {
 
     // Optimistically update UI
     setHeaderKpiCards(newOrder);
+
+    // If either card is a fallback (negative ID), skip API persistence but keep visual reorder
+    if (activeId < 0 || overId < 0) {
+      console.log('[Workspace KPI] Fallback cards involved, skipping persistence');
+      return;
+    }
 
     try {
       const reorderData = newOrder.map((c, index) => ({

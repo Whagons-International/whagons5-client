@@ -70,10 +70,6 @@ const coreKeys = [
   'complianceRequirements',
   'complianceMappings',
   'complianceAudits',
-  // Schedule Management
-  'scheduleTemplates',
-  'scheduleTemplateDays',
-  'userSchedules',
 ] as const;
 
 export class DataManager {

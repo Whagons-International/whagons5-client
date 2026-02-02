@@ -181,6 +181,15 @@ const getDefaultPluginsConfig = (): PluginConfig[] => [
     iconColor: '#10b981', // emerald-500
     route: '/hotel-analytics',
   },
+  {
+    id: 'working-hours',
+    enabled: true,
+    pinned: false,
+    name: 'Working Hours',
+    icon: FileText, // Using FileText as Calendar icon, can be changed later
+    iconColor: '#f97316', // orange-500
+    route: '/working-hours',
+  },
 ];
 
 const loadPluginsConfig = (): PluginConfig[] => {
@@ -189,10 +198,18 @@ const loadPluginsConfig = (): PluginConfig[] => {
     if (stored) {
       const parsed = JSON.parse(stored);
       // Merge with defaults to handle new plugins
+      // Only use 'enabled' and 'pinned' from stored config, always use defaults for route/icon/etc
       const defaults = getDefaultPluginsConfig();
       return defaults.map(defaultPlugin => {
-        const stored = parsed.find((p: PluginConfig) => p.id === defaultPlugin.id);
-        return stored ? { ...defaultPlugin, ...stored } : defaultPlugin;
+        const storedPlugin = parsed.find((p: PluginConfig) => p.id === defaultPlugin.id);
+        if (storedPlugin) {
+          return {
+            ...defaultPlugin,
+            enabled: storedPlugin.enabled ?? defaultPlugin.enabled,
+            pinned: storedPlugin.pinned ?? defaultPlugin.pinned,
+          };
+        }
+        return defaultPlugin;
       });
     }
   } catch (error) {

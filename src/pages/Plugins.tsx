@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse, faClock, faFileAlt, faChartBar, faChartLine, faGripVertical, faCog, faLock, faCheck, faStar, faHammer, faBell, faPlus, faPuzzlePiece, faEdit, faTrash, faLink, faTrophy, faRocket, faHotel } from '@fortawesome/free-solid-svg-icons';
+import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse, faClock, faFileAlt, faChartBar, faChartLine, faGripVertical, faCog, faLock, faCheck, faStar, faHammer, faBell, faPlus, faPuzzlePiece, faEdit, faTrash, faLink, faTrophy, faRocket, faHotel, faCalendar } from '@fortawesome/free-solid-svg-icons';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { getPluginsConfig, subscribeToPluginsConfig } from '@/components/AppSidebar';
 import { Pin, X } from 'lucide-react';
@@ -198,6 +198,7 @@ function PluginCardDisplay({
 			analytics: 'hover:border-blue-500/40 hover:shadow-blue-500/20',
 			motivation: 'hover:border-yellow-500/40 hover:shadow-yellow-500/20',
 			'hotel-analytics': 'hover:border-emerald-500/40 hover:shadow-emerald-500/20',
+			'working-hours': 'hover:border-orange-500/40 hover:shadow-orange-500/20',
 		};
 		
 		return borderColors[pluginId] || 'hover:border-gray-500/40 hover:shadow-gray-500/20';
@@ -873,6 +874,25 @@ function Plugins() {
 					'Improve guest satisfaction through faster response times'
 				]
 			},
+			'working-hours': {
+				features: [
+					'Define flexible working schedules (fixed, rotating, flexible)',
+					'Import public holidays automatically from country APIs',
+					'Configure overtime rules with multipliers for different scenarios',
+					'Assign schedules to users, teams, or job positions with priority',
+					'Manage time-off requests with approval workflows',
+					'Track time-off balances and allowances',
+					'Country-specific labor law compliance',
+					'Calculate expected working hours considering holidays and time-off'
+				],
+				benefits: [
+					'Ensure compliance with labor laws and regulations',
+					'Automate time-off request and approval processes',
+					'Track employee schedules and availability accurately',
+					'Manage holidays and special schedules efficiently',
+					'Calculate overtime automatically based on rules'
+				]
+			},
 		};
 
 		return {
@@ -905,6 +925,10 @@ function Plugins() {
 		}
 		if (pluginId === 'hotel-analytics') {
 			navigate('/settings/hotel-analytics');
+			return;
+		}
+		if (pluginId === 'working-hours') {
+			navigate('/settings/working-hours');
 			return;
 		}
 		if (isEnabled) {
@@ -1069,6 +1093,14 @@ function Plugins() {
 				description: t('plugins.hotelAnalytics.description', 'Comprehensive reports for hotel operations'),
 				icon: faHotel,
 				color: 'text-emerald-500',
+				configurable: true,
+			},
+			{
+				id: 'working-hours',
+				title: t('plugins.workingHours.title', 'Working Hours'),
+				description: t('plugins.workingHours.description', 'Define working schedules, manage holidays, and handle time-off requests'),
+				icon: faCalendar,
+				color: 'text-orange-500',
 				configurable: true,
 			},
 		];

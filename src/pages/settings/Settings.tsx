@@ -33,7 +33,8 @@ import {
   faChartLine,
   faStar as faStarSolid,
   faFileAlt,
-  faLink
+  faLink,
+  faClock
 } from "@fortawesome/free-solid-svg-icons";
 import { faStar as faStarRegular } from "@fortawesome/free-regular-svg-icons";
 import { RootState } from "@/store/store";
@@ -51,6 +52,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { useLanguage } from "@/providers/LanguageProvider";
 import { genericActions } from "@/store/genericSlices";
+import { useWorkingHoursPlugin } from "@/hooks/usePluginEnabled";
 
 
 const STORAGE_KEYS = {
@@ -270,6 +272,9 @@ function Settings() {
   const dispatch = useDispatch();
   const { t } = useLanguage();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // Plugin checks
+  const { isEnabled: isWorkingHoursEnabled } = useWorkingHoursPlugin();
   
   // Unified search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -522,15 +527,24 @@ function Settings() {
       description: t('settings.cards.integrations.description', 'Manage webhooks, API keys, and external integrations'),
       color: 'text-indigo-500'
     },
-    {
+    // Working Hours Plugin - only show if plugin is enabled
+    ...(isWorkingHoursEnabled ? [{
       id: 'schedules',
-      title: t('settings.cards.schedules.title', 'Schedules'),
+      title: t('settings.cards.workingSchedules.title', 'Working Schedules'),
       icon: faCalendar,
       count: 0,
-      description: t('settings.cards.schedules.description', 'Manage schedules and time-based workflows'),
+      description: t('settings.cards.workingSchedules.description', 'Manage working hours and schedules'),
       color: 'text-orange-500'
     },
-  ], [counts.slas, counts.forms, counts.workflows, t]);
+    {
+      id: 'time-off-types',
+      title: t('settings.cards.timeOffTypes.title', 'Time-Off Types'),
+      icon: faClock,
+      count: 0,
+      description: t('settings.cards.timeOffTypes.description', 'Configure vacation and leave types'),
+      color: 'text-purple-500'
+    }] : []),
+  ], [counts.slas, counts.forms, counts.workflows, isWorkingHoursEnabled, t]);
 
   // Order state management
   const [basicOrder, setBasicOrder] = useState<string[]>(() => {
@@ -1155,7 +1169,10 @@ function Settings() {
         navigate('/settings/users');
         break;
       case 'schedules':
-        navigate('/settings/schedules');
+        navigate('/settings/working-schedules');
+        break;
+      case 'time-off-types':
+        navigate('/settings/time-off-types');
         break;
       case 'integrations':
         navigate('/integrations');

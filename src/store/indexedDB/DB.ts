@@ -14,7 +14,7 @@ import { DISABLED_ENCRYPTION_STORES } from '@/config/encryptionConfig';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.14.0';
+const CURRENT_DB_VERSION = '1.15.0';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -270,6 +270,57 @@ export class DB {
             store.createIndex('user_id', 'user_id', { unique: false });
             store.createIndex('is_enabled', 'is_enabled', { unique: false });
             store.createIndex('position', 'position', { unique: false });
+          }
+
+          // Working Hours Plugin
+          if (!db.objectStoreNames.contains('country_configs')) {
+            const store = db.createObjectStore('country_configs', { keyPath: 'id' });
+            store.createIndex('country_code', 'country_code', { unique: true });
+          }
+          if (!db.objectStoreNames.contains('overtime_rules')) {
+            const store = db.createObjectStore('overtime_rules', { keyPath: 'id' });
+            store.createIndex('country_config_id', 'country_config_id', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('overtime_multipliers')) {
+            const store = db.createObjectStore('overtime_multipliers', { keyPath: 'id' });
+            store.createIndex('overtime_rule_id', 'overtime_rule_id', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('holiday_calendars')) {
+            const store = db.createObjectStore('holiday_calendars', { keyPath: 'id' });
+            store.createIndex('country_config_id', 'country_config_id', { unique: false });
+            store.createIndex('calendar_year', 'calendar_year', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('holidays')) {
+            const store = db.createObjectStore('holidays', { keyPath: 'id' });
+            store.createIndex('holiday_calendar_id', 'holiday_calendar_id', { unique: false });
+            store.createIndex('date', 'date', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('working_schedules')) {
+            const store = db.createObjectStore('working_schedules', { keyPath: 'id' });
+            store.createIndex('is_default', 'is_default', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('working_schedule_days')) {
+            const store = db.createObjectStore('working_schedule_days', { keyPath: 'id' });
+            store.createIndex('working_schedule_id', 'working_schedule_id', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('working_schedule_breaks')) {
+            const store = db.createObjectStore('working_schedule_breaks', { keyPath: 'id' });
+            store.createIndex('working_schedule_day_id', 'working_schedule_day_id', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('schedule_assignments')) {
+            const store = db.createObjectStore('schedule_assignments', { keyPath: 'id' });
+            store.createIndex('working_schedule_id', 'working_schedule_id', { unique: false });
+            store.createIndex('assignable_type', 'assignable_type', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('time_off_types')) {
+            const store = db.createObjectStore('time_off_types', { keyPath: 'id' });
+            store.createIndex('code', 'code', { unique: true });
+          }
+          if (!db.objectStoreNames.contains('time_off_requests')) {
+            const store = db.createObjectStore('time_off_requests', { keyPath: 'id' });
+            store.createIndex('user_id', 'user_id', { unique: false });
+            store.createIndex('status', 'status', { unique: false });
+            store.createIndex('time_off_type_id', 'time_off_type_id', { unique: false });
           }
 
           // Custom Fields & Values

@@ -1,12 +1,12 @@
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
-import * as XLSX from "xlsx";
 import type { SchedulerEvent, SchedulerResource } from "../types/scheduler";
 
 export async function exportToPDF(
   element: HTMLElement,
   filename: string = "scheduler.pdf"
 ): Promise<void> {
+  const html2canvas = (await import("html2canvas")).default;
+  const { default: jsPDF } = await import("jspdf");
+
   const canvas = await html2canvas(element, {
     scale: 2,
     useCORS: true,
@@ -33,6 +33,8 @@ export async function exportToPNG(
   element: HTMLElement,
   filename: string = "scheduler.png"
 ): Promise<void> {
+  const html2canvas = (await import("html2canvas")).default;
+
   const canvas = await html2canvas(element, {
     scale: 2,
     useCORS: true,
@@ -45,11 +47,13 @@ export async function exportToPNG(
   link.click();
 }
 
-export function exportToExcel(
+export async function exportToExcel(
   events: SchedulerEvent[],
   resources: SchedulerResource[],
   filename: string = "scheduler.xlsx"
-): void {
+): Promise<void> {
+  const XLSX = await import("xlsx");
+
   // Create resource map for lookup
   const resourceMap = new Map(resources.map((r) => [r.id, r]));
 

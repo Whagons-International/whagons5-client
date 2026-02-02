@@ -1,11 +1,12 @@
 import type { Task, Status } from '@/store/types';
-import * as XLSX from 'xlsx';
 
-export function exportToExcel(
+export async function exportToExcel(
   tasks: Task[],
   statuses: Status[],
   filename: string
 ) {
+  const XLSX = await import('xlsx');
+
   // Prepare data for Excel
   const data = tasks.map((task) => {
     const status = statuses.find((s) => s.id === task.status_id);

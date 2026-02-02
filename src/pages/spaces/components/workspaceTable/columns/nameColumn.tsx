@@ -158,7 +158,7 @@ export function createNameColumn(opts: ColumnBuilderOptions, latestNoteByTaskId:
           )}
         </div>
       );
-      const shouldShowHoverDescription = !!description && (density === 'compact' || density === 'comfortable');
+      const shouldShowHoverDescription = !!description && !showDescriptions;
       if (shouldShowHoverDescription) {
         return (
           <TooltipProvider>

@@ -658,3 +658,19 @@ export class RealTimeListener {
     this.debugLog(`Debug logging ${enabled ? 'enabled' : 'disabled'}`);
   }
 }
+
+// Singleton instance for global access (e.g., for status indicators)
+// Note: This is separate from instances created in AuthProvider/ActivityMonitor
+// but can be used to check if any RTL connection is active
+let globalRtlInstance: RealTimeListener | null = null;
+
+export function getGlobalRtl(): RealTimeListener {
+  if (!globalRtlInstance) {
+    globalRtlInstance = new RealTimeListener();
+  }
+  return globalRtlInstance;
+}
+
+export function setGlobalRtl(instance: RealTimeListener): void {
+  globalRtlInstance = instance;
+}

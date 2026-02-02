@@ -386,6 +386,10 @@ export class DB {
           if (!db.objectStoreNames.contains('tenant_availability')) {
             db.createObjectStore('tenant_availability', { keyPath: 'tenantName' });
           }
+          // Whiteboards (keyed by workspaceId)
+          if (!db.objectStoreNames.contains('whiteboards')) {
+            db.createObjectStore('whiteboards', { keyPath: 'workspaceId' });
+          }
           // Keys store for per-store Content Encryption Keys (CEKs)
           if (!db.objectStoreNames.contains('cache_keys')) {
             const ks = db.createObjectStore('cache_keys', { keyPath: 'store' });
@@ -609,7 +613,8 @@ export class DB {
       | 'workspace_chat'
       | 'exceptions'
       | 'board_attachments'
-      | 'avatars',
+      | 'avatars'
+      | 'whiteboards',
     mode: IDBTransactionMode = 'readonly'
   ) {
     if (DB.deleting) throw new Error('DB deletion in progress');
@@ -678,7 +683,8 @@ export class DB {
       | 'workspace_chat'
       | 'exceptions'
       | 'board_attachments'
-      | 'avatars',
+      | 'avatars'
+      | 'whiteboards',
     mode: IDBTransactionMode = 'readwrite'
   ) {
     if (!DB.inited) throw new Error('DB not initialized');

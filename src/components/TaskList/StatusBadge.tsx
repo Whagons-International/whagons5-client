@@ -26,7 +26,8 @@ export function StatusBadge({
   
   // Soften true red colors for "pending" statuses - use a safer amber tone instead
   const nameLower = (meta.name || '').toLowerCase();
-  const isPendingStatus = nameLower.includes('pending') || nameLower.includes('waiting') || nameLower.includes('todo');
+  // Support both English and Spanish status names
+  const isPendingStatus = nameLower.includes('pending') || nameLower.includes('waiting') || nameLower.includes('todo') || nameLower.includes('pendiente') || nameLower.includes('espera');
   const PENDING_AMBER = 'var(--accent-warning, #F59E0B)';
 
   // Precise regex to match only true red hex hues: #e[0-9a-f]xxxx, #f[0-7]xxxx, #dcxxxx, #ddxxxx, and explicit #ff0000
@@ -49,9 +50,14 @@ export function StatusBadge({
   
   const icon = meta.icon && typeof getStatusIcon === "function" ? getStatusIcon(meta.icon) : null;
 
+  // Check if status name is long enough to need two-line display
+  // Only wrap if: has multiple words AND total length > 14 characters
+  const words = (meta.name || '').trim().split(/\s+/);
+  const needsWrap = words.length > 1 && (meta.name || '').length > 14;
+
   const inner = (
     <span
-      className={"inline-flex items-center gap-2 rounded-[6px] px-3 py-1.5 text-[12px] font-medium leading-none border cursor-pointer " + (className || "")}
+      className={`inline-flex items-center gap-2 rounded-[6px] px-3 py-1.5 font-medium border cursor-pointer ${needsWrap ? 'text-[10px]' : 'text-[12px]'} ${className || ""}`}
       style={{
         background: `color-mix(in oklab, ${color} 12%, #101014 88%)`,
         borderColor: 'oklch(from var(--color-border) l c h / 0.45)',
@@ -60,11 +66,17 @@ export function StatusBadge({
       aria-label={`Status: ${meta.name}`}
     >
       {icon ? (
-        <FontAwesomeIcon icon={icon} className="text-[10px]" style={{ color: '#F3F4F6' }} />
+        <FontAwesomeIcon icon={icon} className="text-[10px] flex-shrink-0" style={{ color: '#F3F4F6' }} />
       ) : (
-        <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+        <span className="inline-block h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
       )}
-      <span className="truncate max-w-[140px] lowercase">{meta.name}</span>
+      {needsWrap ? (
+        <span className="leading-tight lowercase text-center whitespace-normal block">
+          {words[0]}<br />{words.slice(1).join(' ')}
+        </span>
+      ) : (
+        <span className="truncate max-w-[140px] lowercase whitespace-normal">{meta.name}</span>
+      )}
     </span>
   );
 

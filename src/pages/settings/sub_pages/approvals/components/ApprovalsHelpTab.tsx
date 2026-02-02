@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBook,
@@ -12,8 +13,11 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 export const ApprovalsHelpTab = () => {
+  const { t } = useLanguage();
+  const ta = useCallback((key: string, fallback: string) => t(`settings.approvals.help.${key}`, fallback), [t]);
   return (
     <div className="h-full min-h-0 overflow-y-auto p-6 space-y-6 pb-12">
       {/* Header */}
@@ -23,8 +27,8 @@ export const ApprovalsHelpTab = () => {
             <FontAwesomeIcon icon={faBook} className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Approvals Documentation</h1>
-            <p className="text-muted-foreground mt-1">Complete guide to configuring and using task approvals</p>
+            <h1 className="text-3xl font-bold text-foreground">{ta("title", "Documentación de Aprobaciones")}</h1>
+            <p className="text-muted-foreground mt-1">{ta("subtitle", "Guía completa para configurar y usar las aprobaciones de tareas")}</p>
           </div>
         </div>
       </div>
@@ -34,33 +38,32 @@ export const ApprovalsHelpTab = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
             <FontAwesomeIcon icon={faInfoCircle} className="w-5 h-5" />
-            What are Approvals?
+            {ta("whatAreApprovals.title", "¿Qué son las Aprobaciones?")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <p className="text-foreground">
-            Approvals allow you to require specific users or roles to review and approve tasks before they can proceed. This ensures
-            proper oversight and control over critical operations.
+            {ta("whatAreApprovals.description", "Las aprobaciones te permiten requerir que usuarios o roles específicos revisen y aprueben tareas antes de que puedan continuar. Esto asegura una supervisión y control adecuados sobre operaciones críticas.")}
           </p>
           <div className="grid md:grid-cols-2 gap-3 mt-4">
             <div className="p-3 bg-white dark:bg-gray-900 rounded-md border border-blue-200 dark:border-blue-800">
-              <div className="font-semibold text-blue-900 dark:text-blue-100 mb-1">Use Cases</div>
+              <div className="font-semibold text-blue-900 dark:text-blue-100 mb-1">{ta("whatAreApprovals.useCases", "Casos de Uso")}</div>
               <ul className="text-muted-foreground space-y-1 text-xs list-disc list-inside">
-                <li>Expense approvals</li>
-                <li>Work order authorization</li>
-                <li>Policy compliance checks</li>
-                <li>Quality control reviews</li>
-                <li>Budget approvals</li>
+                <li>{ta("whatAreApprovals.useCases.expense", "Aprobaciones de gastos")}</li>
+                <li>{ta("whatAreApprovals.useCases.workOrder", "Autorización de órdenes de trabajo")}</li>
+                <li>{ta("whatAreApprovals.useCases.compliance", "Verificaciones de cumplimiento de políticas")}</li>
+                <li>{ta("whatAreApprovals.useCases.quality", "Revisiones de control de calidad")}</li>
+                <li>{ta("whatAreApprovals.useCases.budget", "Aprobaciones de presupuesto")}</li>
               </ul>
             </div>
             <div className="p-3 bg-white dark:bg-gray-900 rounded-md border border-blue-200 dark:border-blue-800">
-              <div className="font-semibold text-blue-900 dark:text-blue-100 mb-1">Benefits</div>
+              <div className="font-semibold text-blue-900 dark:text-blue-100 mb-1">{ta("whatAreApprovals.benefits", "Beneficios")}</div>
               <ul className="text-muted-foreground space-y-1 text-xs list-disc list-inside">
-                <li>Enforce business rules</li>
-                <li>Maintain audit trails</li>
-                <li>Prevent unauthorized actions</li>
-                <li>Ensure compliance</li>
-                <li>Improve accountability</li>
+                <li>{ta("whatAreApprovals.benefits.enforce", "Hacer cumplir reglas de negocio")}</li>
+                <li>{ta("whatAreApprovals.benefits.audit", "Mantener registros de auditoría")}</li>
+                <li>{ta("whatAreApprovals.benefits.prevent", "Prevenir acciones no autorizadas")}</li>
+                <li>{ta("whatAreApprovals.benefits.compliance", "Asegurar cumplimiento")}</li>
+                <li>{ta("whatAreApprovals.benefits.accountability", "Mejorar la responsabilidad")}</li>
               </ul>
             </div>
           </div>
@@ -72,9 +75,9 @@ export const ApprovalsHelpTab = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
             <FontAwesomeIcon icon={faCheckCircle} className="w-5 h-5" />
-            Quick Start Guide
+            {ta("quickStart.title", "Guía de Inicio Rápido")}
           </CardTitle>
-          <CardDescription>Follow these steps to set up your first approval</CardDescription>
+          <CardDescription>{ta("quickStart.description", "Sigue estos pasos para configurar tu primera aprobación")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3">
@@ -83,10 +86,9 @@ export const ApprovalsHelpTab = () => {
                 1
               </div>
               <div className="flex-1">
-                <div className="font-semibold text-foreground mb-1">Create Approval Configuration</div>
+                <div className="font-semibold text-foreground mb-1">{ta("quickStart.step1.title", "Crear Configuración de Aprobación")}</div>
                 <p className="text-sm text-muted-foreground">
-                  Click <Badge variant="outline" className="mx-1">Add Approval</Badge> and fill in the General tab with a name and
-                  description. Then configure the Rules tab with your approval type, trigger, and requirements.
+                  Haz clic en <Badge variant="outline" className="mx-1">{t("settings.approvals.headerActions.add", "Agregar aprobación")}</Badge> y completa la pestaña General con un nombre y descripción. Luego configura la pestaña Reglas con tu tipo de aprobación, disparador y requisitos.
                 </p>
               </div>
             </div>
@@ -96,10 +98,9 @@ export const ApprovalsHelpTab = () => {
                 2
               </div>
               <div className="flex-1">
-                <div className="font-semibold text-foreground mb-1">Assign Approvers</div>
+                <div className="font-semibold text-foreground mb-1">{ta("quickStart.step2.title", "Asignar Aprobadores")}</div>
                 <p className="text-sm text-muted-foreground">
-                  Click the <Badge variant="outline" className="mx-1">Approvers</Badge> button in the Actions column. Add users or roles
-                  who can approve tasks. You can mark approvers as required or optional.
+                  Haz clic en el botón <Badge variant="outline" className="mx-1">{t("settings.approvals.actions.manageApprovers", "Aprobadores")}</Badge> en la columna Acciones. Agrega usuarios o roles que puedan aprobar tareas. Puedes marcar aprobadores como requeridos u opcionales.
                 </p>
               </div>
             </div>
@@ -109,11 +110,9 @@ export const ApprovalsHelpTab = () => {
                 3
               </div>
               <div className="flex-1">
-                <div className="font-semibold text-foreground mb-1">Assign to Category or Template</div>
+                <div className="font-semibold text-foreground mb-1">{ta("quickStart.step3.title", "Asignar a Categoría o Plantilla")}</div>
                 <p className="text-sm text-muted-foreground">
-                  Go to <Badge variant="outline" className="mx-1">Settings → Categories</Badge> or{" "}
-                  <Badge variant="outline" className="mx-1">Settings → Templates</Badge> and assign your approval to the appropriate
-                  category or template. Tasks created with that category/template will require approval.
+                  Ve a <Badge variant="outline" className="mx-1">{t("settings.categories.title", "Categorías")}</Badge> o <Badge variant="outline" className="mx-1">{t("settings.templates.title", "Plantillas")}</Badge> y asigna tu aprobación a la categoría o plantilla apropiada. Las tareas creadas con esa categoría/plantilla requerirán aprobación.
                 </p>
               </div>
             </div>
@@ -123,10 +122,9 @@ export const ApprovalsHelpTab = () => {
                 4
               </div>
               <div className="flex-1">
-                <div className="font-semibold text-foreground mb-1">Create Tasks</div>
+                <div className="font-semibold text-foreground mb-1">{ta("quickStart.step4.title", "Crear Tareas")}</div>
                 <p className="text-sm text-muted-foreground">
-                  When you create a task with the assigned category or template, the approval workflow will automatically start (if
-                  trigger is set to &quot;ON_CREATE&quot;) or can be triggered manually.
+                  {ta("quickStart.step4.description", "Cuando crees una tarea con la categoría o plantilla asignada, el flujo de aprobación comenzará automáticamente (si el disparador está configurado como \"AL_CREAR\") o se puede activar manualmente.")}
                 </p>
               </div>
             </div>
@@ -137,40 +135,40 @@ export const ApprovalsHelpTab = () => {
       {/* Approval Types */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">Approval Types</CardTitle>
-          <CardDescription>Choose how approvers review tasks</CardDescription>
+          <CardTitle className="flex items-center gap-2">{ta("approvalTypes.title", "Tipos de Aprobación")}</CardTitle>
+          <CardDescription>{ta("approvalTypes.description", "Elige cómo los aprobadores revisan las tareas")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <div className="p-4 border-2 border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50/50 dark:bg-blue-950/20">
               <div className="flex items-center gap-2 mb-2">
                 <Badge className="bg-blue-600">S</Badge>
-                <span className="font-semibold text-foreground">Sequential</span>
+                <span className="font-semibold text-foreground">{ta("approvalTypes.sequential.title", "Secuencial")}</span>
               </div>
               <p className="text-sm text-muted-foreground mb-3">
-                Approvers review tasks one after another in order. Each approver must complete their review before the next one can begin.
+                {ta("approvalTypes.sequential.description", "Los aprobadores revisan las tareas uno tras otro en orden. Cada aprobador debe completar su revisión antes de que el siguiente pueda comenzar.")}
               </p>
-              <div className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">Best for:</div>
+              <div className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">{ta("approvalTypes.sequential.bestFor", "Ideal para:")}</div>
               <ul className="text-xs text-muted-foreground list-disc list-inside space-y-1">
-                <li>Hierarchical approval chains</li>
-                <li>Department → Manager → Director</li>
-                <li>When order matters</li>
+                <li>{ta("approvalTypes.sequential.bestFor.hierarchical", "Cadenas de aprobación jerárquicas")}</li>
+                <li>{ta("approvalTypes.sequential.bestFor.department", "Departamento → Gerente → Director")}</li>
+                <li>{ta("approvalTypes.sequential.bestFor.order", "Cuando el orden importa")}</li>
               </ul>
             </div>
 
             <div className="p-4 border-2 border-emerald-200 dark:border-emerald-800 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20">
               <div className="flex items-center gap-2 mb-2">
                 <Badge className="bg-emerald-600">P</Badge>
-                <span className="font-semibold text-foreground">Parallel</span>
+                <span className="font-semibold text-foreground">{ta("approvalTypes.parallel.title", "Paralela")}</span>
               </div>
               <p className="text-sm text-muted-foreground mb-3">
-                All approvers can review simultaneously. The approval completes when the required number of approvals is reached.
+                {ta("approvalTypes.parallel.description", "Todos los aprobadores pueden revisar simultáneamente. La aprobación se completa cuando se alcanza el número requerido de aprobaciones.")}
               </p>
-              <div className="text-xs font-medium text-emerald-700 dark:text-emerald-300 mb-1">Best for:</div>
+              <div className="text-xs font-medium text-emerald-700 dark:text-emerald-300 mb-1">{ta("approvalTypes.parallel.bestFor", "Ideal para:")}</div>
               <ul className="text-xs text-muted-foreground list-disc list-inside space-y-1">
-                <li>Team-based approvals</li>
-                <li>Multiple stakeholders</li>
-                <li>Faster turnaround needed</li>
+                <li>{ta("approvalTypes.parallel.bestFor.team", "Aprobaciones basadas en equipos")}</li>
+                <li>{ta("approvalTypes.parallel.bestFor.stakeholders", "Múltiples partes interesadas")}</li>
+                <li>{ta("approvalTypes.parallel.bestFor.faster", "Cuando se necesita respuesta más rápida")}</li>
               </ul>
             </div>
           </div>
@@ -180,8 +178,8 @@ export const ApprovalsHelpTab = () => {
       {/* Trigger Types */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">Trigger Types</CardTitle>
-          <CardDescription>When should the approval workflow start?</CardDescription>
+          <CardTitle className="flex items-center gap-2">{ta("triggerTypes.title", "Tipos de Disparador")}</CardTitle>
+          <CardDescription>{ta("triggerTypes.description", "¿Cuándo debe comenzar el flujo de aprobación?")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3">
@@ -191,8 +189,7 @@ export const ApprovalsHelpTab = () => {
                 <span className="font-semibold text-foreground">ON_CREATE</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                Approval workflow starts automatically when a task is created with the assigned category or template. This is the most common
-                trigger type.
+                {ta("triggerTypes.onCreate.description", "El flujo de aprobación comienza automáticamente cuando se crea una tarea con la categoría o plantilla asignada. Este es el tipo de disparador más común.")}
               </p>
             </div>
 
@@ -202,7 +199,7 @@ export const ApprovalsHelpTab = () => {
                 <span className="font-semibold text-foreground">MANUAL</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                Approval must be started manually by a user with appropriate permissions. Useful when you want to control exactly when approvals begin.
+                {ta("triggerTypes.manual.description", "La aprobación debe iniciarse manualmente por un usuario con permisos apropiados. Útil cuando quieres controlar exactamente cuándo comienzan las aprobaciones.")}
               </p>
             </div>
 
@@ -212,10 +209,10 @@ export const ApprovalsHelpTab = () => {
                 <span className="font-semibold text-foreground">CONDITIONAL</span>
               </div>
               <p className="text-sm text-muted-foreground mb-2">
-                Approval starts when specific conditions are met. You can configure conditions based on task fields or custom fields.
+                {ta("triggerTypes.conditional.description", "La aprobación comienza cuando se cumplen condiciones específicas. Puedes configurar condiciones basadas en campos de tarea o campos personalizados.")}
               </p>
               <div className="text-xs text-muted-foreground bg-background p-2 rounded border">
-                <strong>Example:</strong> Start approval when task status equals &quot;Pending Review&quot; or when a custom field &quot;Amount&quot; is greater than $1000.
+                <strong>Ejemplo:</strong> {ta("triggerTypes.conditional.example", "Iniciar aprobación cuando el estado de la tarea es igual a \"Pendiente de Revisión\" o cuando un campo personalizado \"Monto\" es mayor a $1000.")}
               </div>
             </div>
 
@@ -225,10 +222,10 @@ export const ApprovalsHelpTab = () => {
                 <span className="font-semibold text-foreground">ON_COMPLETE</span>
               </div>
               <p className="text-sm text-muted-foreground mb-2">
-                Approval is triggered when a task transitions to a finished/completed status. Useful for QA sign-off, deliverable acceptance, or supervisor verification before final completion.
+                {ta("triggerTypes.onComplete.description", "La aprobación se activa cuando una tarea transiciona a un estado finalizado/completado. Útil para firma de QA, aceptación de entregables o verificación del supervisor antes de la finalización.")}
               </p>
               <div className="text-xs text-muted-foreground bg-background p-2 rounded border">
-                <strong>Example:</strong> Require manager approval before a task can be marked as Done. The task will remain in &quot;pending approval&quot; state until approved.
+                <strong>Ejemplo:</strong> {ta("triggerTypes.onComplete.example", "Requerir aprobación del gerente antes de que una tarea pueda marcarse como Hecho. La tarea permanecerá en estado \"pendiente de aprobación\" hasta que sea aprobada.")}
               </div>
             </div>
           </div>
@@ -238,8 +235,8 @@ export const ApprovalsHelpTab = () => {
       {/* Approval Statuses */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">Approval Statuses</CardTitle>
-          <CardDescription>Understanding task approval states</CardDescription>
+          <CardTitle className="flex items-center gap-2">{ta("approvalStatuses.title", "Estados de Aprobación")}</CardTitle>
+          <CardDescription>{ta("approvalStatuses.description", "Entendiendo los estados de aprobación de tareas")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 gap-3">
@@ -248,9 +245,9 @@ export const ApprovalsHelpTab = () => {
                 <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300">
                   pending
                 </Badge>
-                <span className="font-medium text-foreground">Pending</span>
+                <span className="font-medium text-foreground">{ta("approvalStatuses.pending.title", "Pendiente")}</span>
               </div>
-              <p className="text-xs text-muted-foreground">Waiting for approver(s) to review</p>
+              <p className="text-xs text-muted-foreground">{ta("approvalStatuses.pending.description", "Esperando que el/los aprobador(es) revisen")}</p>
             </div>
 
             <div className="p-3 border rounded-lg bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
@@ -258,9 +255,9 @@ export const ApprovalsHelpTab = () => {
                 <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
                   approved
                 </Badge>
-                <span className="font-medium text-foreground">Approved</span>
+                <span className="font-medium text-foreground">{ta("approvalStatuses.approved.title", "Aprobada")}</span>
               </div>
-              <p className="text-xs text-muted-foreground">All required approvers have approved</p>
+              <p className="text-xs text-muted-foreground">{ta("approvalStatuses.approved.description", "Todos los aprobadores requeridos han aprobado")}</p>
             </div>
 
             <div className="p-3 border rounded-lg bg-red-50/50 dark:bg-red-950/20 border-red-200 dark:border-red-800">
@@ -268,9 +265,9 @@ export const ApprovalsHelpTab = () => {
                 <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300">
                   rejected
                 </Badge>
-                <span className="font-medium text-foreground">Rejected</span>
+                <span className="font-medium text-foreground">{ta("approvalStatuses.rejected.title", "Rechazada")}</span>
               </div>
-              <p className="text-xs text-muted-foreground">One or more approvers rejected the task</p>
+              <p className="text-xs text-muted-foreground">{ta("approvalStatuses.rejected.description", "Uno o más aprobadores rechazaron la tarea")}</p>
             </div>
 
             <div className="p-3 border rounded-lg bg-gray-50/50 dark:bg-gray-950/20 border-gray-200 dark:border-gray-800">
@@ -278,9 +275,9 @@ export const ApprovalsHelpTab = () => {
                 <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-300">
                   cancelled
                 </Badge>
-                <span className="font-medium text-foreground">Cancelled</span>
+                <span className="font-medium text-foreground">{ta("approvalStatuses.cancelled.title", "Cancelada")}</span>
               </div>
-              <p className="text-xs text-muted-foreground">Approval workflow was cancelled</p>
+              <p className="text-xs text-muted-foreground">{ta("approvalStatuses.cancelled.description", "El flujo de aprobación fue cancelado")}</p>
             </div>
           </div>
         </CardContent>
@@ -289,50 +286,48 @@ export const ApprovalsHelpTab = () => {
       {/* Configuration Options */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">Configuration Options</CardTitle>
-          <CardDescription>Fine-tune your approval workflow</CardDescription>
+          <CardTitle className="flex items-center gap-2">{ta("configOptions.title", "Opciones de Configuración")}</CardTitle>
+          <CardDescription>{ta("configOptions.description", "Ajusta tu flujo de aprobación")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3">
             <div className="p-3 border rounded-lg">
               <div className="font-semibold text-foreground mb-1 flex items-center gap-2">
                 <FontAwesomeIcon icon={faUsers} className="w-4 h-4 text-blue-600" />
-                Require All Approvers
+                {ta("configOptions.requireAll.title", "Requerir Todos los Aprobadores")}
               </div>
               <p className="text-sm text-muted-foreground">
-                When enabled, all assigned approvers must approve. When disabled, you can set a minimum number of approvals required (useful
-                for parallel approvals).
+                {ta("configOptions.requireAll.description", "Cuando está habilitado, todos los aprobadores asignados deben aprobar. Cuando está deshabilitado, puedes establecer un número mínimo de aprobaciones requeridas (útil para aprobaciones paralelas).")}
               </p>
             </div>
 
             <div className="p-3 border rounded-lg">
               <div className="font-semibold text-foreground mb-1 flex items-center gap-2">
                 <FontAwesomeIcon icon={faExclamationTriangle} className="w-4 h-4 text-red-600" />
-                Require Rejection Comment
+                {ta("configOptions.requireComment.title", "Requerir Comentario de Rechazo")}
               </div>
               <p className="text-sm text-muted-foreground">
-                When enabled, approvers must provide a comment explaining why they rejected the task. This helps maintain clear communication and
-                audit trails.
+                {ta("configOptions.requireComment.description", "Cuando está habilitado, los aprobadores deben proporcionar un comentario explicando por qué rechazaron la tarea. Esto ayuda a mantener una comunicación clara y registros de auditoría.")}
               </p>
             </div>
 
             <div className="p-3 border rounded-lg">
               <div className="font-semibold text-foreground mb-1 flex items-center gap-2">
                 <FontAwesomeIcon icon={faLock} className="w-4 h-4 text-amber-600" />
-                Block Editing During Approval
+                {ta("configOptions.blockEditing.title", "Bloquear Edición Durante Aprobación")}
               </div>
               <p className="text-sm text-muted-foreground">
-                Prevents task modifications while approval is pending. This ensures approvers review the exact task state and prevents mid-review changes.
+                {ta("configOptions.blockEditing.description", "Previene modificaciones de tareas mientras la aprobación está pendiente. Esto asegura que los aprobadores revisen el estado exacto de la tarea y previene cambios durante la revisión.")}
               </p>
             </div>
 
             <div className="p-3 border rounded-lg">
               <div className="font-semibold text-foreground mb-1 flex items-center gap-2">
                 <FontAwesomeIcon icon={faClock} className="w-4 h-4 text-purple-600" />
-                Deadline
+                {ta("configOptions.deadline.title", "Plazo")}
               </div>
               <p className="text-sm text-muted-foreground">
-                Set a deadline for approval completion. Can be specified in hours (e.g., 24 hours) or as a specific date. Helps ensure timely reviews.
+                {ta("configOptions.deadline.description", "Establece un plazo para la finalización de la aprobación. Puede especificarse en horas (ej., 24 horas) o como una fecha específica. Ayuda a asegurar revisiones oportunas.")}
               </p>
             </div>
           </div>
@@ -344,41 +339,41 @@ export const ApprovalsHelpTab = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-purple-900 dark:text-purple-100">
             <FontAwesomeIcon icon={faSquareCheck} className="w-5 h-5" />
-            Assigning Approvals to Tasks
+            {ta("assigning.title", "Asignar Aprobaciones a Tareas")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3">
             <div className="p-4 bg-white dark:bg-gray-900 rounded-lg border border-purple-200 dark:border-purple-800">
               <div className="font-semibold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
-                <Badge className="bg-purple-600">Option 1</Badge>
-                Category-Based Approval
+                <Badge className="bg-purple-600">Opción 1</Badge>
+                {ta("assigning.option1.title", "Aprobación Basada en Categoría")}
               </div>
               <p className="text-sm text-muted-foreground mb-2">
-                Assign an approval to a category. All tasks created with that category will require approval.
+                {ta("assigning.option1.description", "Asigna una aprobación a una categoría. Todas las tareas creadas con esa categoría requerirán aprobación.")}
               </p>
               <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
-                <strong>Steps:</strong> Settings → Categories → Edit Category → Select Approval → Save
+                <strong>Pasos:</strong> {ta("assigning.option1.steps", "Configuración → Categorías → Editar Categoría → Seleccionar Aprobación → Guardar")}
               </div>
             </div>
 
             <div className="p-4 bg-white dark:bg-gray-900 rounded-lg border border-purple-200 dark:border-purple-800">
               <div className="font-semibold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
-                <Badge className="bg-purple-600">Option 2</Badge>
-                Template-Based Approval
+                <Badge className="bg-purple-600">Opción 2</Badge>
+                {ta("assigning.option2.title", "Aprobación Basada en Plantilla")}
               </div>
               <p className="text-sm text-muted-foreground mb-2">
-                Assign an approval to a template. Tasks created from that template will require approval.
+                {ta("assigning.option2.description", "Asigna una aprobación a una plantilla. Las tareas creadas desde esa plantilla requerirán aprobación.")}
               </p>
               <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
-                <strong>Steps:</strong> Settings → Templates → Edit Template → Rules Tab → Select Approval → Save
+                <strong>Pasos:</strong> {ta("assigning.option2.steps", "Configuración → Plantillas → Editar Plantilla → Pestaña Reglas → Seleccionar Aprobación → Guardar")}
               </div>
             </div>
 
             <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-              <div className="text-xs font-semibold text-amber-900 dark:text-amber-100 mb-1">💡 Tip</div>
+              <div className="text-xs font-semibold text-amber-900 dark:text-amber-100 mb-1">{ta("assigning.tip", "💡 Consejo")}</div>
               <p className="text-xs text-muted-foreground">
-                If both category and template have approvals assigned, the template&apos;s approval typically takes precedence.
+                {ta("assigning.tip.description", "Si tanto la categoría como la plantilla tienen aprobaciones asignadas, la aprobación de la plantilla típicamente tiene precedencia.")}
               </p>
             </div>
           </div>
@@ -388,8 +383,8 @@ export const ApprovalsHelpTab = () => {
       {/* Example Workflow */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">Example: AC Repair Approval</CardTitle>
-          <CardDescription>Complete walkthrough for setting up an approval workflow</CardDescription>
+          <CardTitle className="flex items-center gap-2">{ta("example.title", "Ejemplo: Aprobación de Reparación de AC")}</CardTitle>
+          <CardDescription>{ta("example.description", "Guía paso a paso para configurar un flujo de aprobación")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3 text-sm">
@@ -398,8 +393,7 @@ export const ApprovalsHelpTab = () => {
                 1
               </div>
               <div>
-                <strong className="text-foreground">Create Approval:</strong> Name it &quot;Manager Approval for AC Repairs&quot;, set type to
-                Sequential, trigger to ON_CREATE, and enable &quot;Require all approvers&quot;.
+                <strong className="text-foreground">{ta("example.step1", "Crear Aprobación: Nómbrala \"Aprobación de Gerente para Reparaciones de AC\", establece el tipo como Secuencial, el disparador como AL_CREAR y habilita \"Requerir todos los aprobadores\".")}</strong>
               </div>
             </div>
 
@@ -408,8 +402,7 @@ export const ApprovalsHelpTab = () => {
                 2
               </div>
               <div>
-                <strong className="text-foreground">Assign Approvers:</strong> Click &quot;Approvers&quot; button, add the Manager role (or
-                specific manager users), mark as required.
+                <strong className="text-foreground">{ta("example.step2", "Asignar Aprobadores: Haz clic en el botón \"Aprobadores\", agrega el rol de Gerente (o usuarios gerentes específicos), marca como requerido.")}</strong>
               </div>
             </div>
 
@@ -418,8 +411,7 @@ export const ApprovalsHelpTab = () => {
                 3
               </div>
               <div>
-                <strong className="text-foreground">Assign to Category:</strong> Go to Categories, edit &quot;Maintenance&quot; category,
-                select the approval from the dropdown, save.
+                <strong className="text-foreground">{ta("example.step3", "Asignar a Categoría: Ve a Categorías, edita la categoría \"Mantenimiento\", selecciona la aprobación del menú desplegable, guarda.")}</strong>
               </div>
             </div>
 
@@ -428,8 +420,7 @@ export const ApprovalsHelpTab = () => {
                 4
               </div>
               <div>
-                <strong className="text-foreground">Create Task:</strong> Create &quot;Repair AC&quot; task with &quot;Maintenance&quot;
-                category. Approval workflow starts automatically, task status becomes &quot;pending&quot;.
+                <strong className="text-foreground">{ta("example.step4", "Crear Tarea: Crea la tarea \"Reparar AC\" con la categoría \"Mantenimiento\". El flujo de aprobación comienza automáticamente, el estado de la tarea se convierte en \"pendiente\".")}</strong>
               </div>
             </div>
 
@@ -438,8 +429,7 @@ export const ApprovalsHelpTab = () => {
                 5
               </div>
               <div>
-                <strong className="text-foreground">Manager Reviews:</strong> Manager receives notification, reviews task, approves or rejects.
-                Task status updates to &quot;approved&quot; or &quot;rejected&quot; accordingly.
+                <strong className="text-foreground">{ta("example.step5", "Gerente Revisa: El gerente recibe notificación, revisa la tarea, aprueba o rechaza. El estado de la tarea se actualiza a \"aprobada\" o \"rechazada\" en consecuencia.")}</strong>
               </div>
             </div>
           </div>
@@ -451,7 +441,7 @@ export const ApprovalsHelpTab = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-green-900 dark:text-green-100">
             <FontAwesomeIcon icon={faCheckCircle} className="w-5 h-5" />
-            Best Practices
+            {ta("bestPractices.title", "Mejores Prácticas")}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -459,37 +449,37 @@ export const ApprovalsHelpTab = () => {
             <li className="flex gap-2">
               <span className="text-green-600 dark:text-green-400">✓</span>
               <span className="text-muted-foreground">
-                <strong className="text-foreground">Use clear names:</strong> Name approvals descriptively so users understand their purpose.
+                <strong className="text-foreground">{ta("bestPractices.clearNames", "Usa nombres claros: Nombra las aprobaciones de manera descriptiva para que los usuarios entiendan su propósito.")}</strong>
               </span>
             </li>
             <li className="flex gap-2">
               <span className="text-green-600 dark:text-green-400">✓</span>
               <span className="text-muted-foreground">
-                <strong className="text-foreground">Set deadlines:</strong> Always set reasonable deadlines to ensure timely approvals.
+                <strong className="text-foreground">{ta("bestPractices.setDeadlines", "Establece plazos: Siempre establece plazos razonables para asegurar aprobaciones oportunas.")}</strong>
               </span>
             </li>
             <li className="flex gap-2">
               <span className="text-green-600 dark:text-green-400">✓</span>
               <span className="text-muted-foreground">
-                <strong className="text-foreground">Require comments:</strong> Enable rejection comments to maintain clear communication.
+                <strong className="text-foreground">{ta("bestPractices.requireComments", "Requerir comentarios: Habilita comentarios de rechazo para mantener una comunicación clara.")}</strong>
               </span>
             </li>
             <li className="flex gap-2">
               <span className="text-green-600 dark:text-green-400">✓</span>
               <span className="text-muted-foreground">
-                <strong className="text-foreground">Use roles when possible:</strong> Assign approvals to roles rather than individual users for easier maintenance.
+                <strong className="text-foreground">{ta("bestPractices.useRoles", "Usa roles cuando sea posible: Asigna aprobaciones a roles en lugar de usuarios individuales para facilitar el mantenimiento.")}</strong>
               </span>
             </li>
             <li className="flex gap-2">
               <span className="text-green-600 dark:text-green-400">✓</span>
               <span className="text-muted-foreground">
-                <strong className="text-foreground">Test workflows:</strong> Create test tasks to verify approval workflows work as expected.
+                <strong className="text-foreground">{ta("bestPractices.testWorkflows", "Prueba flujos: Crea tareas de prueba para verificar que los flujos de aprobación funcionen como se espera.")}</strong>
               </span>
             </li>
             <li className="flex gap-2">
               <span className="text-green-600 dark:text-green-400">✓</span>
               <span className="text-muted-foreground">
-                <strong className="text-foreground">Document conditions:</strong> If using conditional triggers, document the conditions clearly for future reference.
+                <strong className="text-foreground">{ta("bestPractices.documentConditions", "Documenta condiciones: Si usas disparadores condicionales, documenta las condiciones claramente para referencia futura.")}</strong>
               </span>
             </li>
           </ul>
@@ -499,29 +489,28 @@ export const ApprovalsHelpTab = () => {
       {/* Troubleshooting */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">Troubleshooting</CardTitle>
-          <CardDescription>Common issues and solutions</CardDescription>
+          <CardTitle className="flex items-center gap-2">{ta("troubleshooting.title", "Solución de Problemas")}</CardTitle>
+          <CardDescription>{ta("troubleshooting.description", "Problemas comunes y soluciones")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="p-3 border rounded-lg bg-muted/30">
-            <div className="font-semibold text-foreground mb-1">Approval not starting automatically</div>
+            <div className="font-semibold text-foreground mb-1">{ta("troubleshooting.notStarting.title", "La aprobación no comienza automáticamente")}</div>
             <p className="text-sm text-muted-foreground">
-              Check that the trigger type is set to &quot;ON_CREATE&quot; and the approval is assigned to the task&apos;s category or template.
-              Ensure the approval is marked as &quot;Active&quot;.
+              {ta("troubleshooting.notStarting.description", "Verifica que el tipo de disparador esté configurado como \"AL_CREAR\" y que la aprobación esté asignada a la categoría o plantilla de la tarea. Asegúrate de que la aprobación esté marcada como \"Activa\".")}
             </p>
           </div>
 
           <div className="p-3 border rounded-lg bg-muted/30">
-            <div className="font-semibold text-foreground mb-1">Approvers not receiving notifications</div>
+            <div className="font-semibold text-foreground mb-1">{ta("troubleshooting.noNotifications.title", "Los aprobadores no reciben notificaciones")}</div>
             <p className="text-sm text-muted-foreground">
-              Verify that approvers are correctly assigned to the approval. Check user notification settings and ensure the approval workflow has started.
+              {ta("troubleshooting.noNotifications.description", "Verifica que los aprobadores estén correctamente asignados a la aprobación. Revisa la configuración de notificaciones del usuario y asegúrate de que el flujo de aprobación haya comenzado.")}
             </p>
           </div>
 
           <div className="p-3 border rounded-lg bg-muted/30">
-            <div className="font-semibold text-foreground mb-1">Task stuck in pending status</div>
+            <div className="font-semibold text-foreground mb-1">{ta("troubleshooting.stuckPending.title", "La tarea está atascada en estado pendiente")}</div>
             <p className="text-sm text-muted-foreground">
-              Ensure all required approvers have reviewed the task. Check if any approvers are missing or if the approval requirements are configured correctly.
+              {ta("troubleshooting.stuckPending.description", "Asegúrate de que todos los aprobadores requeridos hayan revisado la tarea. Verifica si falta algún aprobador o si los requisitos de aprobación están configurados correctamente.")}
             </p>
           </div>
         </CardContent>
@@ -530,7 +519,7 @@ export const ApprovalsHelpTab = () => {
       {/* Footer */}
       <div className="pt-6 border-t text-sm text-muted-foreground flex items-center gap-2">
         <FontAwesomeIcon icon={faCircleQuestion} className="w-4 h-4" />
-        Need more help? Ask an admin or check your organization&apos;s SOPs.
+        {ta("footer", "¿Necesitas más ayuda? Pregunta a un administrador o consulta los POE de tu organización.")}
       </div>
     </div>
   );

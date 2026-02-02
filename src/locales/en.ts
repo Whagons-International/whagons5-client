@@ -84,6 +84,9 @@ export const enTranslations: Record<string, string> = {
   "workspace.statistics.noLocationData": "No location data available",
   "workspace.statistics.noTimeSeriesData": "No time series data available",
   
+  // Workspace search translations
+  "workspace.search.placeholder": "Search...",
+  
   // Workspace filter translations
   "workspace.filters.all": "All",
   "workspace.filters.allTasks": "All tasks",
@@ -100,7 +103,7 @@ export const enTranslations: Record<string, string> = {
   "workspace.filters.status": "Status",
   "workspace.filters.priority": "Priority",
   "workspace.filters.location": "Location",
-  "workspace.filters.owner": "Owner",
+  "workspace.filters.owner": "Assignee",
   "workspace.filters.tags": "Tags",
   "workspace.filters.due": "Due",
   "workspace.filters.textContains": "Text contains (name or description)",
@@ -108,7 +111,7 @@ export const enTranslations: Record<string, string> = {
   "workspace.filters.anyStatus": "Any status",
   "workspace.filters.anyPriority": "Any priority",
   "workspace.filters.anyLocation": "Any location",
-  "workspace.filters.anyOwner": "Any owner",
+  "workspace.filters.anyOwner": "Any assignee",
   "workspace.filters.anyTag": "Any tag",
   "workspace.filters.any": "Any",
   "workspace.filters.overdue": "Overdue",
@@ -118,7 +121,7 @@ export const enTranslations: Record<string, string> = {
   "workspace.filters.searchStatuses": "Search statuses...",
   "workspace.filters.searchPriorities": "Search priorities...",
   "workspace.filters.searchLocations": "Search locations...",
-  "workspace.filters.searchOwners": "Search owners...",
+  "workspace.filters.searchOwners": "Search assignees...",
   "workspace.filters.searchTags": "Search tags...",
   "workspace.filters.choosePreset": "Choose a preset...",
   "workspace.filters.noPresetsYet": "No presets yet",
@@ -188,7 +191,7 @@ export const enTranslations: Record<string, string> = {
   "workspace.columns.config": "Config",
   "workspace.columns.status": "Status",
   "workspace.columns.priority": "Priority",
-  "workspace.columns.owner": "Owner",
+  "workspace.columns.owner": "Assignee",
   "workspace.columns.due": "Due",
   "workspace.columns.location": "Location",
   "workspace.columns.lastModified": "Last modified",
@@ -239,7 +242,7 @@ export const enTranslations: Record<string, string> = {
   "workspace.settings.columns.configApprovals": "Config / approvals",
   "workspace.settings.columns.status": "Status",
   "workspace.settings.columns.priority": "Priority",
-  "workspace.settings.columns.owner": "Owner",
+  "workspace.settings.columns.owner": "Assignee",
   "workspace.settings.columns.dueDate": "Due date",
   "workspace.settings.columns.location": "Location",
   "workspace.settings.columns.lastModified": "Last modified",
@@ -251,6 +254,8 @@ export const enTranslations: Record<string, string> = {
   "sidebar.more": "More",
   "sidebar.less": "Less",
   "sidebar.activity": "Activity Monitor",
+  "sidebar.activityMonitor": "Activity Monitor",
+  "sidebar.todo": "Todo",
   "sidebar.compliance": "Standards and Norms",
   "sidebar.analytics": "Analytics",
   "sidebar.plugins": "Plugins",
@@ -1386,6 +1391,9 @@ export const enTranslations: Record<string, string> = {
   "settings.users.multiSelect.noGlobalRoles": "No global roles available",
   "settings.users.multiSelect.selectGlobalRolesOptional": "Select global roles (optional)...",
 
+  // Breadcrumbs
+  "breadcrumbs.activity": "Activity",
+  
   // Compliance / Standards translations
   "breadcrumbs.compliance": "Compliance",
   "breadcrumbs.standards": "Standards",

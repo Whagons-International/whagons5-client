@@ -68,39 +68,7 @@ import {
 import { arrayMove, SortableContext, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-// Puzzle piece SVG clip-path definitions with tabs extending OUTWARD
-// Using SVG with objectBoundingBox allows values outside 0-1 for outward tabs
-const PuzzleClipPaths = () => (
-  <svg width="0" height="0" style={{ position: 'absolute', pointerEvents: 'none' }}>
-    <defs>
-      {/* Type A: Tab extends RIGHT (outward to 1.15), notch on BOTTOM (inward) */}
-      <clipPath id="puzzle-piece-a" clipPathUnits="objectBoundingBox">
-        <path d="M 0 0 L 1 0 L 1 0.35 L 1.15 0.35 C 1.15 0.4, 1.15 0.5, 1.15 0.65 L 1 0.65 L 1 1 L 0.55 1 L 0.55 0.9 C 0.52 0.87, 0.5 0.87, 0.48 0.87 C 0.45 0.87, 0.42 0.9, 0.42 0.9 L 0.42 1 L 0 1 Z" />
-      </clipPath>
-      
-      {/* Type B: Tab extends BOTTOM (outward to 1.15), notch on LEFT (inward) */}
-      <clipPath id="puzzle-piece-b" clipPathUnits="objectBoundingBox">
-        <path d="M 0 0 L 1 0 L 1 1 L 0.55 1 L 0.55 0.9 C 0.52 0.87, 0.5 0.87, 0.48 0.87 C 0.45 0.87, 0.42 0.9, 0.42 0.9 L 0.42 1 L 0 1 L 0 0.65 L -0.15 0.65 C -0.15 0.5, -0.15 0.35, -0.15 0.35 L 0 0.35 Z" />
-      </clipPath>
-      
-      {/* Type C: Tab extends LEFT (outward from -0.15), notch on TOP (inward) */}
-      <clipPath id="puzzle-piece-c" clipPathUnits="objectBoundingBox">
-        <path d="M 0.42 0 L 0.42 -0.15 C 0.5 -0.15, 0.58 -0.15, 0.58 -0.15 L 0.58 0 L 1 0 L 1 1 L 0 1 L 0 0.65 L -0.15 0.65 C -0.15 0.5, -0.15 0.35, -0.15 0.35 L 0 0.35 L 0 0 Z" />
-      </clipPath>
-      
-      {/* Type D: Tab extends TOP (outward from -0.15), notch on RIGHT (inward) */}
-      <clipPath id="puzzle-piece-d" clipPathUnits="objectBoundingBox">
-        <path d="M 0 0 L 0.42 0 L 0.42 -0.15 C 0.5 -0.15, 0.58 -0.15, 0.58 -0.15 L 0.58 0 L 1 0 L 1 0.35 L 1.15 0.35 C 1.15 0.5, 1.15 0.65, 1.15 0.65 L 1 0.65 L 1 1 L 0 1 Z" />
-      </clipPath>
-    </defs>
-  </svg>
-);
 
-// Get puzzle clip-path URL based on card index
-const PUZZLE_IDS = ['puzzle-piece-a', 'puzzle-piece-b', 'puzzle-piece-c', 'puzzle-piece-d'];
-const getPuzzleClipPath = (index: number): string => {
-  return `url(#${PUZZLE_IDS[index % PUZZLE_IDS.length]})`;
-};
 
 // Report card data interface
 interface ReportCardData {
@@ -119,10 +87,9 @@ interface SortableReportCardProps {
   tab: string;
   isFavorite: boolean;
   onToggleFavorite: (reportId: string) => void;
-  index: number;
 }
 
-function SortableReportCard({ card, tab, isFavorite, onToggleFavorite, index }: SortableReportCardProps) {
+function SortableReportCard({ card, tab, isFavorite, onToggleFavorite }: SortableReportCardProps) {
   const { t } = useLanguage();
   const {
     attributes,
@@ -132,8 +99,6 @@ function SortableReportCard({ card, tab, isFavorite, onToggleFavorite, index }: 
     transition,
     isDragging,
   } = useSortable({ id: card.id });
-
-  const puzzleClipPath = getPuzzleClipPath(index);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -150,100 +115,61 @@ function SortableReportCard({ card, tab, isFavorite, onToggleFavorite, index }: 
     <div
       ref={setNodeRef}
       style={style}
-      className={`${isDragging ? "opacity-50" : ""}`}
+      className={`${isDragging ? "opacity-50 scale-105" : ""}`}
     >
-      {/* Outer wrapper with padding to accommodate outward puzzle tabs */}
-      <div 
-        className="relative"
-        style={{ 
-          padding: '20px',
-          overflow: 'visible',
-          width: '100%',
-          height: '100%',
+      <Card
+        className="group relative cursor-grab active:cursor-grabbing select-none transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md rounded-xl border border-black/[0.08] dark:border-white/[0.1] hover:border-black/[0.12] dark:hover:border-white/[0.15] h-[140px]"
+        onClick={card.onClick || (() => alert(`${t(card.titleKey)} - Coming soon!`))}
+        {...listeners}
+        {...attributes}
+        style={{
+          background: 'linear-gradient(to bottom, rgb(245, 245, 245), rgb(235, 235, 235))',
+          boxShadow: isDragging 
+            ? '0 12px 24px -8px rgba(0,0,0,0.15)' 
+            : '0 1px 2px rgba(0,0,0,0.04)',
         }}
       >
-        {/* Drop-shadow wrapper (follows clip-path shape) */}
-        <div
-          className="transition-all duration-300 group"
-          style={{
-            filter: isDragging 
-              ? `drop-shadow(0 10px 15px rgba(0,0,0,0.25))` 
-              : `drop-shadow(0 4px 8px rgba(0,0,0,0.15))`,
-            overflow: 'visible',
-            position: 'relative',
-            width: '120%',
-            height: '120%',
-            marginLeft: '-10%',
-            marginTop: '-10%',
-          }}
-        >
-          <Card
-            className={`transition-all duration-300 select-none hover:scale-[1.02] cursor-grab active:cursor-grabbing relative border-0 ${isDragging ? 'scale-[1.01]' : ''}`}
-            onClick={card.onClick || (() => alert(`${t(card.titleKey)} - Coming soon!`))}
-            {...listeners}
-            {...attributes}
-            style={{
-              width: '100%',
-              height: '200px',
-              clipPath: puzzleClipPath,
-              background: `linear-gradient(135deg, ${card.iconColor}35 0%, ${card.iconColor}20 50%, ${card.iconColor}08 100%)`,
-              overflow: 'visible',
-            }}
-          >
-            <CardHeader 
-              className="space-y-3" 
+        <CardHeader className="p-4 h-full flex flex-col">
+          <div className="flex items-start justify-between">
+            <div
+              className="flex items-center justify-center w-9 h-9 rounded-lg transition-transform duration-200 group-hover:scale-110"
               style={{ 
-                padding: '24px 28px 28px 28px',
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
+                backgroundColor: `${card.iconColor}15`,
               }}
             >
-              <div className="flex items-center justify-between">
-                <div
-                  className={`text-3xl group-hover:scale-110 transition-transform duration-200`}
-                  style={{ color: card.iconColor }}
-                >
-                  <FontAwesomeIcon icon={card.icon} />
-                </div>
-                <button
-                  type="button"
-                  className={`rounded-full p-2 transition text-sm ${
-                    isFavorite
-                      ? 'text-yellow-500'
-                      : 'text-muted-foreground hover:text-yellow-500 opacity-0 group-hover:opacity-100'
-                  }`}
-                  onClick={handleFavoriteClick}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  aria-label={isFavorite ? t("hotelAnalytics.unfavorite", "Remove from favorites") : t("hotelAnalytics.favorite", "Add to favorites")}
-                  title={isFavorite ? t("hotelAnalytics.unfavorite", "Remove from favorites") : t("hotelAnalytics.favorite", "Add to favorites")}
-                >
-                  <FontAwesomeIcon icon={isFavorite ? faStarSolid : faStarRegular} className="text-base" />
-                </button>
-              </div>
-              <div className="space-y-1" style={{ minHeight: '48px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                <CardTitle 
-                  className="text-base font-medium leading-tight" 
-                  style={{ 
-                    wordBreak: 'break-word', 
-                    overflowWrap: 'break-word',
-                    lineHeight: '1.3',
-                    paddingTop: '8px',
-                  }}
-                >
-                  {t(card.titleKey, card.id)}
-                </CardTitle>
-                {tab === "favorites" && card.category && (
-                  <span className="inline-block text-xs text-muted-foreground bg-muted/80 px-2 py-0.5 rounded mt-1">
-                    {t(`hotelAnalytics.tabs.${card.category}`, card.category)}
-                  </span>
-                )}
-              </div>
-            </CardHeader>
-          </Card>
-        </div>
-      </div>
+              <FontAwesomeIcon 
+                icon={card.icon} 
+                className="text-base"
+                style={{ color: card.iconColor }}
+              />
+            </div>
+            <button
+              type="button"
+              className={`rounded-full p-1 transition-all duration-200 ${
+                isFavorite
+                  ? 'text-amber-400'
+                  : 'text-muted-foreground/40 hover:text-amber-400 opacity-0 group-hover:opacity-100'
+              }`}
+              onClick={handleFavoriteClick}
+              onPointerDown={(e) => e.stopPropagation()}
+              aria-label={isFavorite ? t("hotelAnalytics.unfavorite", "Remove from favorites") : t("hotelAnalytics.favorite", "Add to favorites")}
+              title={isFavorite ? t("hotelAnalytics.unfavorite", "Remove from favorites") : t("hotelAnalytics.favorite", "Add to favorites")}
+            >
+              <FontAwesomeIcon icon={isFavorite ? faStarSolid : faStarRegular} className="text-sm" />
+            </button>
+          </div>
+          <div className="mt-auto">
+            <CardTitle className="text-sm font-medium text-foreground/90 leading-tight line-clamp-2">
+              {t(card.titleKey, card.id)}
+            </CardTitle>
+            {tab === "favorites" && card.category && (
+              <span className="inline-block text-xs text-muted-foreground mt-1.5 px-2 py-0.5 rounded-md bg-background/60">
+                {t(`hotelAnalytics.tabs.${card.category}`, card.category)}
+              </span>
+            )}
+          </div>
+        </CardHeader>
+      </Card>
     </div>
   );
 }
@@ -338,15 +264,14 @@ function ReportsGrid({ reports, tab, favoriteIds, onToggleFavorite }: ReportsGri
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={reportIds} strategy={rectSortingStrategy}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {orderedReports.map((report, index) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+            {orderedReports.map((report) => (
               <SortableReportCard
                 key={report.id}
                 card={report}
                 tab={tab}
                 isFavorite={favoriteSet.has(report.id)}
                 onToggleFavorite={onToggleFavorite}
-                index={index}
               />
             ))}
           </div>
@@ -851,15 +776,14 @@ function FavoritesReports({ favoriteIds, onToggleFavorite }: { favoriteIds: stri
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={reportIds} strategy={rectSortingStrategy}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {orderedReports.map((report, index) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+            {orderedReports.map((report) => (
               <SortableReportCard
                 key={report.id}
                 card={report}
                 tab="favorites"
                 isFavorite={true}
                 onToggleFavorite={onToggleFavorite}
-                index={index}
               />
             ))}
           </div>
@@ -979,9 +903,6 @@ function HotelAnalytics() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* SVG clip-path definitions for puzzle shapes */}
-      <PuzzleClipPaths />
-      
       {/* Header */}
       <div className="flex items-center gap-4">
         <div

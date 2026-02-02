@@ -25,7 +25,7 @@ function Home() {
     }
   });
   
-  const isSpanish = language === 'es-ES' || language.startsWith('es');
+  const isSpanish = language === 'es' || language.startsWith('es');
   
   const quotes = useMemo(() => {
     if (isSpanish) {

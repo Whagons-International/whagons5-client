@@ -37,10 +37,7 @@ import MotivationSettings from '@/pages/settings/sub_pages/motivation/Motivation
 import MotivationComingSoon from '@/pages/motivation/MotivationComingSoon';
 import HotelAnalytics from '@/pages/hotel-analytics/HotelAnalytics';
 import HotelAnalyticsSettings from '@/pages/settings/sub_pages/HotelAnalyticsSettings';
-import Boards from '@/pages/boards/Boards';
 import Home from '@/pages/home/Home';
-// Messages removed
-// Boards list page
 import BoardDetail from '@/pages/boards/BoardDetail';
 import TestPage from '@/pages/Testpage';
 import Plugins from '@/pages/Plugins';
@@ -97,7 +94,6 @@ export const HomeRoutes = () => {
           <Route path="/plugins/:pluginId/settings" element={<PluginSettings />} />
           <Route path="/admin/plugins" element={<PluginManagement />} />
           <Route path="/integrations" element={<Integrations />} />
-          <Route path="/boards" element={<Boards />} />
           <Route path="/boards/:boardId" element={<BoardDetail />} />
           <Route path="/broadcasts" element={<BroadcastsPage />} />
           <Route path="/activity" element={<ActivityMonitor />} />

@@ -267,6 +267,37 @@ export const PRESET_THEMES: ThemePreset[] = [
       surfaceSize: "40px 40px",
       sidebarSize: "20px 20px"
     }
+  },
+  {
+    id: "monochrome",
+    label: "Monochrome",
+    description: "Clean white-to-black gradient topbar with elegant grayscale palette",
+    light: {
+      gradient: "linear-gradient(130deg, oklch(0.99 0 0) 0%, oklch(0.70 0 0) 50%, oklch(0.20 0 0) 100%)",
+      palette: {
+        primary: "oklch(0.35 0 0)",
+        accent: "oklch(0.50 0 0)",
+        background: "oklch(0.99 0 0)",
+        text: "oklch(0.15 0 0)",
+        neutral: "oklch(0.94 0 0)",
+        sidebar: "oklch(0.97 0 0)",
+        navbar: "oklch(0.97 0 0)"
+      }
+    },
+    dark: {
+      gradient: "linear-gradient(130deg, oklch(0.95 0 0) 0%, oklch(0.50 0 0) 50%, oklch(0.10 0 0) 100%)",
+      palette: {
+        primary: "oklch(0.85 0 0)",
+        accent: "oklch(0.65 0 0)",
+        background: "oklch(0.12 0 0)",
+        text: "oklch(0.95 0 0)",
+        neutral: "oklch(0.20 0 0)",
+        sidebar: "oklch(0.08 0 0)",
+        navbar: "oklch(0.08 0 0)"
+      }
+    },
+    badge: "Minimal",
+    sidebarTone: "light"
   }
 ];
 

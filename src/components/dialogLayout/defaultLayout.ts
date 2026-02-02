@@ -45,18 +45,43 @@ export function getEffectiveLayout(
     // Start with the category's layout or the default
     const baseLayout = categoryLayout ?? { ...DEFAULT_DIALOG_LAYOUT };
     
-    // Ensure all tabs exist
+    // Merge tabs: preserve custom tabs while ensuring built-in tabs have defaults
+    const mergedTabs = {
+        ...DEFAULT_DIALOG_LAYOUT.tabs,
+        ...baseLayout.tabs,
+        // Ensure built-in tabs have defaults if missing
+        basic: baseLayout.tabs?.basic ?? DEFAULT_DIALOG_LAYOUT.tabs.basic,
+        dates: baseLayout.tabs?.dates ?? DEFAULT_DIALOG_LAYOUT.tabs.dates,
+        additional: baseLayout.tabs?.additional ?? DEFAULT_DIALOG_LAYOUT.tabs.additional,
+    };
+    
+    // Merge fields: preserve custom field keys while ensuring built-in fields have defaults
+    const mergedFields = {
+        ...DEFAULT_DIALOG_LAYOUT.fields,
+        ...baseLayout.fields,
+    };
+    
+    // Deep-copy arrays for each field key to avoid mutation
+    const clonedFields: DialogLayout['fields'] = {};
+    for (const key of Object.keys(mergedFields)) {
+        const fieldArray = mergedFields[key];
+        clonedFields[key] = fieldArray ? [...fieldArray] : undefined;
+    }
+    
+    // Ensure built-in field arrays exist with defaults if missing
+    if (!clonedFields.basic) {
+        clonedFields.basic = [...(DEFAULT_DIALOG_LAYOUT.fields.basic ?? [])];
+    }
+    if (!clonedFields.dates) {
+        clonedFields.dates = [...(DEFAULT_DIALOG_LAYOUT.fields.dates ?? [])];
+    }
+    if (!clonedFields.additional) {
+        clonedFields.additional = [...(DEFAULT_DIALOG_LAYOUT.fields.additional ?? [])];
+    }
+    
     const layout: DialogLayout = {
-        tabs: {
-            basic: baseLayout.tabs?.basic ?? { enabled: true, order: 0 },
-            dates: baseLayout.tabs?.dates ?? { enabled: true, order: 1 },
-            additional: baseLayout.tabs?.additional ?? { enabled: true, order: 2 },
-        },
-        fields: {
-            basic: [...(baseLayout.fields?.basic ?? DEFAULT_DIALOG_LAYOUT.fields.basic ?? [])],
-            dates: [...(baseLayout.fields?.dates ?? DEFAULT_DIALOG_LAYOUT.fields.dates ?? [])],
-            additional: [...(baseLayout.fields?.additional ?? DEFAULT_DIALOG_LAYOUT.fields.additional ?? [])],
-        },
+        tabs: mergedTabs,
+        fields: clonedFields,
     };
 
     // Get all custom field IDs currently in the layout

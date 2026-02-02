@@ -87,6 +87,12 @@ export function combineLocalDateAndTime(dateStr: string, timeStr: string): Date 
     .split(":")
     .map(Number);
 
+  // Validate parsed values are valid numbers
+  if (isNaN(year) || isNaN(month) || isNaN(day)) {
+    console.warn('[dateTime] Invalid date string:', dateStr);
+    return new Date(NaN); // Return invalid date to signal error
+  }
+
   return new Date(year, month - 1, day, hours, minutes, seconds);
 }
 

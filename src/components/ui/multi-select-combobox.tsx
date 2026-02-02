@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown, X } from "lucide-react"
+import { Check, ChevronsUpDown, X, Star, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +12,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from "@/components/ui/command"
 import {
   Popover,
@@ -19,14 +20,30 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 
+export interface MultiSelectOption {
+  value: string
+  label: string
+}
+
+export interface GroupedMultiSelectOptions {
+  favorites: MultiSelectOption[]
+  recent: MultiSelectOption[]
+  all: MultiSelectOption[]
+}
+
 interface MultiSelectComboboxProps {
-  options: Array<{ value: string; label: string }>
+  options: MultiSelectOption[]
   value?: string[]
   onValueChange?: (value: string[]) => void
   placeholder?: string
   searchPlaceholder?: string
   emptyText?: string
   className?: string
+  // Grouped options support
+  groupedOptions?: GroupedMultiSelectOptions
+  // Favorites support
+  favoriteValues?: string[]
+  onFavoriteToggle?: (value: string) => void
 }
 
 export function MultiSelectCombobox({
@@ -37,11 +54,17 @@ export function MultiSelectCombobox({
   searchPlaceholder = "Search...",
   emptyText = "No results found.",
   className,
+  groupedOptions,
+  favoriteValues = [],
+  onFavoriteToggle,
 }: MultiSelectComboboxProps) {
   const [open, setOpen] = React.useState(false)
 
+  // Use grouped options if provided, otherwise fall back to flat options
+  const allOptions = groupedOptions?.all ?? options
+
   const selectedValues = Array.isArray(value) ? value : []
-  const selectedOptions = options.filter((option) => selectedValues.includes(option.value))
+  const selectedOptions = allOptions.filter((option) => selectedValues.includes(option.value))
 
   const handleSelect = (optionValue: string) => {
     const newValue = selectedValues.includes(optionValue)
@@ -54,6 +77,114 @@ export function MultiSelectCombobox({
     e.stopPropagation()
     const newValue = selectedValues.filter((v) => v !== optionValue)
     onValueChange?.(newValue)
+  }
+
+  const handleFavoriteClick = (e: React.MouseEvent, optionValue: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onFavoriteToggle?.(optionValue)
+  }
+
+  const renderOption = (option: MultiSelectOption, showFavoriteIcon: boolean = true) => {
+    const isSelected = selectedValues.includes(option.value)
+    const isFavorited = favoriteValues.includes(option.value)
+    const hasFavoriteSupport = onFavoriteToggle !== undefined
+    // Use a unique search value that combines label and value to prevent duplicate highlights
+    const searchValue = `${option.label} ${option.value}`
+
+    return (
+      <CommandItem
+        key={option.value}
+        value={searchValue}
+        onSelect={() => handleSelect(option.value)}
+        className="group"
+      >
+        <Check
+          className={cn(
+            "mr-2 h-4 w-4 flex-shrink-0",
+            isSelected ? "opacity-100" : "opacity-0"
+          )}
+        />
+        <span className="flex-1 truncate">{option.label}</span>
+        {hasFavoriteSupport && showFavoriteIcon && (
+          <button
+            type="button"
+            onClick={(e) => handleFavoriteClick(e, option.value)}
+            className={cn(
+              "ml-2 p-0.5 rounded transition-opacity flex-shrink-0",
+              isFavorited 
+                ? "opacity-100 text-amber-500" 
+                : "opacity-0 group-hover:opacity-60 hover:!opacity-100 text-muted-foreground"
+            )}
+            aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
+          >
+            <Star 
+              className={cn("h-3.5 w-3.5", isFavorited && "fill-current")} 
+            />
+          </button>
+        )}
+      </CommandItem>
+    )
+  }
+
+  const renderGroupedContent = () => {
+    if (!groupedOptions) {
+      // No grouped options - render flat list
+      return (
+        <CommandGroup>
+          {options.map((option) => renderOption(option))}
+        </CommandGroup>
+      )
+    }
+
+    const { favorites, recent, all } = groupedOptions
+    const hasFavorites = favorites.length > 0
+    const hasRecent = recent.length > 0
+
+    return (
+      <>
+        {/* Favorites section */}
+        {hasFavorites && (
+          <>
+            <CommandGroup heading={
+              <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600">
+                <Star className="h-3 w-3 fill-current" />
+                Favorites
+              </span>
+            }>
+              {favorites.map((option) => renderOption(option))}
+            </CommandGroup>
+            {(hasRecent || all.length > 0) && <CommandSeparator />}
+          </>
+        )}
+
+        {/* Recent section */}
+        {hasRecent && (
+          <>
+            <CommandGroup heading={
+              <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                Recent
+              </span>
+            }>
+              {recent.map((option) => renderOption(option))}
+            </CommandGroup>
+            {all.length > 0 && <CommandSeparator />}
+          </>
+        )}
+
+        {/* All options */}
+        {all.length > 0 && (
+          <CommandGroup heading={
+            (hasFavorites || hasRecent) ? (
+              <span className="text-xs font-medium text-muted-foreground">All</span>
+            ) : undefined
+          }>
+            {all.map((option) => renderOption(option))}
+          </CommandGroup>
+        )}
+      </>
+    )
   }
 
   return (
@@ -82,7 +213,7 @@ export function MultiSelectCombobox({
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault()
-                          handleRemove(option.value, e as any)
+                          handleRemove(option.value, e as unknown as React.MouseEvent)
                         }
                       }}
                       onMouseDown={(e) => {
@@ -108,32 +239,10 @@ export function MultiSelectCombobox({
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
             <CommandEmpty>{emptyText}</CommandEmpty>
-            <CommandGroup>
-              {options.map((option) => {
-                const isSelected = selectedValues.includes(option.value)
-                // Use a unique search value that combines label and value to prevent duplicate highlights
-                const searchValue = `${option.label} ${option.value}`
-                return (
-                  <CommandItem
-                    key={option.value}
-                    value={searchValue}
-                    onSelect={() => handleSelect(option.value)}
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        isSelected ? "opacity-100" : "opacity-0"
-                      )}
-                    />
-                    {option.label}
-                  </CommandItem>
-                )
-              })}
-            </CommandGroup>
+            {renderGroupedContent()}
           </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
   )
 }
-

@@ -39,7 +39,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [quoteIndex, setQuoteIndex] = useState<number>(0);
   
-  const isSpanish = language === 'es-ES' || language.startsWith('es');
+  const isSpanish = language === 'es' || language.startsWith('es');
   
   const quotes = useMemo(() => {
     if (isSpanish) {

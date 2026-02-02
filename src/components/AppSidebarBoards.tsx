@@ -196,7 +196,7 @@ export function AppSidebarBoards({ boards, pathname }: AppSidebarBoardsProps) {
                             />
                           )}
                           <div className="flex items-center min-w-0 flex-1">
-                            <IconBadge color="#3b82f6" size={18}>
+                            <IconBadge color="#60a5fa" size={18}>
                               <FileText size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
                             </IconBadge>
                             {collapsed ? (

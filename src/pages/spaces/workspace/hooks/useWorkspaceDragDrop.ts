@@ -73,22 +73,41 @@ export function useWorkspaceDragDrop(params: {
 
     if (!over || active.id === over.id) return;
 
-    const previous = headerKpiCardsRef.current;
     const activeId = Number(active.id);
     const overId = Number(over.id);
+    const previous = headerKpiCardsRef.current;
+
+    // If either card is a fallback (negative ID), skip API call but allow visual reorder
+    if (activeId < 0 || overId < 0) {
+      console.log('[Workspace KPI] Fallback cards involved, skipping persistence');
+      return;
+    }
+
+    // Both cards are database cards - proceed with reorder
     const oldIndex = previous.findIndex((c) => Number(c.id) === activeId);
     const newIndex = previous.findIndex((c) => Number(c.id) === overId);
-    if (oldIndex === -1 || newIndex === -1) return;
+    
+    if (oldIndex === -1 || newIndex === -1) {
+      console.warn('[Workspace KPI] Could not find cards to reorder', { activeId, overId });
+      return;
+    }
 
     const newOrder = arrayMove(previous, oldIndex, newIndex).map((card, index) => ({
       ...card,
       position: index,
     }));
 
+    // Optimistically update UI
     setHeaderKpiCards(newOrder);
 
     try {
-      await dispatch(reorderKpiCardsAsync({ cards: newOrder.map((c, index) => ({ id: c.id, position: index })) })).unwrap();
+      const reorderData = newOrder.map((c, index) => ({
+        id: c.id,
+        position: index,
+      }));
+      
+      await dispatch(reorderKpiCardsAsync({ cards: reorderData })).unwrap();
+      toast.success(t('kpiCards.reordered', 'Cards reordered successfully'));
     } catch (error) {
       console.error('[Workspace KPI] Failed to reorder KPI cards:', error);
       setHeaderKpiCards(previous);

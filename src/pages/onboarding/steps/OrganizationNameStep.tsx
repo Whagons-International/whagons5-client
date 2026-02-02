@@ -64,7 +64,7 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
 
   // Dynamic loading messages
   const loadingMessages = useMemo(() => {
-    const isSpanish = language === 'es-ES' || language.startsWith('es');
+    const isSpanish = language === 'es' || language.startsWith('es');
     
     if (isSpanish) {
       return [

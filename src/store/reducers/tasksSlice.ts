@@ -135,6 +135,71 @@ export const removeTaskAsync = createAsyncThunk(
     }
 );
 
+// Async thunk for moving task (changing status) with optimistic updates
+export const moveTaskThunk = createAsyncThunk(
+    'tasks/moveTaskThunk',
+    async (
+        { taskId, newStatusId, previousStatusId }: { taskId: number; newStatusId: number; previousStatusId: number },
+        { dispatch, rejectWithValue }
+    ) => {
+        try {
+            // Get current task from cache for rollback
+            const task = await TasksCache.getTask(taskId.toString());
+            if (!task) {
+                throw new Error('Task not found');
+            }
+
+            // Optimistic update: dispatch local reducer to update Redux store
+            dispatch(updateTaskLocally({ id: taskId, updates: { status_id: newStatusId } }));
+
+            // Optimistic update: update TasksCache
+            await TasksCache.updateTask(taskId.toString(), {
+                ...task,
+                status_id: newStatusId,
+            });
+
+            // Call API
+            const response = await api.patch(`/tasks/${taskId}`, { status_id: newStatusId });
+            const payload = (response.data?.data ?? response.data?.row ?? response.data?.rows?.[0] ?? response.data) as any;
+            
+            // Merge with cached task to preserve all fields
+            const updatedTask = ensureTaskDefaults({
+                ...task,
+                ...payload,
+                status_id: newStatusId,
+                id: payload?.id ?? taskId,
+                updated_at: payload?.updated_at ?? response.data?.updated_at ?? new Date().toISOString(),
+            });
+
+            // Update IndexedDB with server response
+            await TasksCache.updateTask(taskId.toString(), updatedTask);
+
+            return updatedTask;
+        } catch (error: any) {
+            console.error('Failed to move task:', error);
+            
+            // Rollback: restore previous status in Redux
+            dispatch(updateTaskLocally({ id: taskId, updates: { status_id: previousStatusId } }));
+
+            // Rollback: restore previous status in TasksCache
+            const task = await TasksCache.getTask(taskId.toString());
+            if (task) {
+                await TasksCache.updateTask(taskId.toString(), {
+                    ...task,
+                    status_id: previousStatusId,
+                });
+            }
+
+            const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to move task. Changes reverted.';
+            // Preserve status code for permission checking
+            const errorWithStatus = new Error(errorMessage) as any;
+            errorWithStatus.response = error.response;
+            errorWithStatus.status = error.response?.status;
+            return rejectWithValue(errorWithStatus);
+        }
+    }
+);
+
 // Async thunk for restoring a deleted task
 export const restoreTaskAsync = createAsyncThunk(
     'tasks/restoreTaskAsync',
@@ -322,6 +387,22 @@ export const tasksSlice = createSlice({
         });
         builder.addCase(restoreTaskAsync.rejected, (state, action) => {
             state.loading = false;
+            state.error = action.payload as string;
+        });
+
+        // Move task (change status) - optimistic update handled via updateTaskLocally in thunk
+        builder.addCase(moveTaskThunk.pending, (state) => {
+            state.error = null;
+        });
+        builder.addCase(moveTaskThunk.fulfilled, (state, action) => {
+            // Replace optimistic update with real data from API
+            const index = state.value.findIndex(task => task.id === action.payload.id);
+            if (index !== -1) {
+                state.value[index] = ensureTaskDefaults(action.payload);
+            }
+        });
+        builder.addCase(moveTaskThunk.rejected, (state, action) => {
+            // Rollback already handled in thunk via updateTaskLocally
             state.error = action.payload as string;
         });
     }

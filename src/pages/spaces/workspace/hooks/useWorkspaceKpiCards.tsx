@@ -4,7 +4,64 @@ import type { RootState } from '@/store';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { BarChart3, Activity, TrendingUp } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faChartBar,
+  faChartLine,
+  faChartPie,
+  faListCheck,
+  faCheckCircle,
+  faClock,
+  faCalendarCheck,
+  faTasks,
+  faGauge,
+  faBullseye,
+  faTrophy,
+  faStar,
+  faFire,
+  faRocket,
+  faBolt,
+  faUsers,
+  faUserCheck,
+  faClipboardCheck,
+  faHashtag,
+  faPercent,
+  IconDefinition,
+} from '@fortawesome/free-solid-svg-icons';
 import { WorkspaceStats } from './useWorkspaceStats';
+
+// Icon mapping from string value to FontAwesome icon
+const FA_ICON_MAP: Record<string, IconDefinition> = {
+  faChartBar,
+  faChartLine,
+  faChartPie,
+  faListCheck,
+  faCheckCircle,
+  faClock,
+  faCalendarCheck,
+  faTasks,
+  faGauge,
+  faBullseye,
+  faTrophy,
+  faStar,
+  faFire,
+  faRocket,
+  faBolt,
+  faUsers,
+  faUserCheck,
+  faClipboardCheck,
+  faHashtag,
+  faPercent,
+};
+
+// Helper to get icon ReactNode from display_config
+const getIconFromConfig = (displayConfig: any, fallback: ReactNode): ReactNode => {
+  const iconValue = displayConfig?.icon;
+  if (iconValue && FA_ICON_MAP[iconValue]) {
+    return <FontAwesomeIcon icon={FA_ICON_MAP[iconValue]} className="h-5 w-5" />;
+  }
+  return fallback;
+};
 
 type KpiCardEntity = {
   id: number;
@@ -160,7 +217,7 @@ export function useWorkspaceKpiCards(params: {
       case 'trend':
         return {
           label: getDefaultLabel(defaultKey),
-          value: statsArePending ? '—' : `${completedLast7Days.toLocaleString()} ${t('workspace.stats.done', 'done')}`,
+          value: statsArePending ? '—' : completedLast7Days.toLocaleString(),
           icon: <TrendingUp className="h-5 w-5" />,
           accent: 'purple',
           sparkline: <TrendSparkline data={stats.trend} className="text-purple-600" />,
@@ -293,7 +350,7 @@ export function useWorkspaceKpiCards(params: {
             next.set(card.id, {
               label: card.name,
               value: statsArePending ? '—' : count.toLocaleString(),
-              icon: <BarChart3 className="h-5 w-5" />,
+              icon: getIconFromConfig(display, <BarChart3 className="h-5 w-5" />),
               accent,
               helperText,
               filterModel: Object.keys(filterModel).length > 0 ? filterModel : undefined,
@@ -311,7 +368,7 @@ export function useWorkspaceKpiCards(params: {
             next.set(card.id, {
               label: card.name,
               value: statsArePending ? '—' : `${pct.toLocaleString()}%`,
-              icon: <Activity className="h-5 w-5" />,
+              icon: getIconFromConfig(display, <Activity className="h-5 w-5" />),
               accent,
               helperText:
                 helperText ?? (denominator === 0 ? t('kpiCards.noDenominator', 'No data to compare') : undefined),
@@ -322,7 +379,7 @@ export function useWorkspaceKpiCards(params: {
               next.set(card.id, {
                 label: card.name,
                 value: '—',
-                icon: <TrendingUp className="h-5 w-5" />,
+                icon: getIconFromConfig(display, <TrendingUp className="h-5 w-5" />),
                 accent,
                 helperText: helperText ?? t('workspace.stats.noDoneStatus', 'No "done" status configured'),
               });
@@ -351,7 +408,7 @@ export function useWorkspaceKpiCards(params: {
             next.set(card.id, {
               label: card.name,
               value: statsArePending ? '—' : `${sum.toLocaleString()} ${t('workspace.stats.done', 'done')}`,
-              icon: <TrendingUp className="h-5 w-5" />,
+              icon: getIconFromConfig(display, <TrendingUp className="h-5 w-5" />),
               accent,
               sparkline: (
                 <TrendSparkline
@@ -399,7 +456,7 @@ export function useWorkspaceKpiCards(params: {
             next.set(card.id, {
               label: card.name,
               value: statsArePending ? '—' : count.toLocaleString(),
-              icon: <BarChart3 className="h-5 w-5" />,
+              icon: getIconFromConfig(display, <BarChart3 className="h-5 w-5" />),
               accent,
               helperText,
               filterModel: Object.keys(filterModel).length > 0 ? filterModel : undefined,
@@ -408,7 +465,7 @@ export function useWorkspaceKpiCards(params: {
             next.set(card.id, {
               label: card.name,
               value: '—',
-              icon: <BarChart3 className="h-5 w-5" />,
+              icon: getIconFromConfig(display, <BarChart3 className="h-5 w-5" />),
               accent,
               helperText: helperText ?? t('kpiCards.unsupportedType', 'Unsupported KPI card type'),
             });
@@ -429,30 +486,60 @@ export function useWorkspaceKpiCards(params: {
     // Using headerKpiCardsKey for stable comparison, actual cards accessed via ref
   }, [headerKpiCardsKey, workspaceIdNum, doneStatusId, statsArePending, t]);
 
+  // Check if we have default cards in the loaded cards
+  const hasDefaultCardsInLoaded = useMemo(() => {
+    return headerKpiCards.some((c) => c?.query_config?.is_default);
+  }, [headerKpiCards]);
+
   const headerCardsForRender = useMemo(() => {
-    const out: WorkspaceHeaderCard[] = [];
-    for (const card of headerKpiCards) {
-      const computed = defaultComputed.get(card.id) ?? customComputed.get(card.id);
-      if (!computed) continue;
-      out.push({ id: card.id, ...computed });
+    const defaults: WorkspaceHeaderCard[] = [];
+    const customs: WorkspaceHeaderCard[] = [];
+    
+    // Collect default cards (either from DB or fallbacks)
+    if (hasDefaultCardsInLoaded) {
+      // Use default cards from database, sorted by position
+      const defaultCardsFromDb = headerKpiCards
+        .filter((c) => c?.query_config?.is_default)
+        .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
+      
+      for (const card of defaultCardsFromDb) {
+        const computed = defaultComputed.get(card.id);
+        if (!computed) continue;
+        defaults.push({ id: card.id, ...computed });
+      }
+    } else {
+      // Use fallback default cards if none in database
+      defaults.push(
+        { id: -1, ...getDefaultCardData('total') },
+        { id: -2, ...getDefaultCardData('inProgress') },
+        { id: -3, ...getDefaultCardData('completedToday') },
+        { id: -4, ...getDefaultCardData('trend') }
+      );
     }
-    return out;
-  }, [headerKpiCards, defaultComputed, customComputed]);
+    
+    // Collect custom cards, sorted by position
+    const customCardsFromDb = headerKpiCards
+      .filter((c) => c && !c.query_config?.is_default)
+      .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
+    
+    for (const card of customCardsFromDb) {
+      const computed = customComputed.get(card.id);
+      if (!computed) continue;
+      customs.push({ id: card.id, ...computed });
+    }
+    
+    // Return defaults first, then customs
+    return [...defaults, ...customs];
+  }, [headerKpiCards, defaultComputed, customComputed, hasDefaultCardsInLoaded, doneStatusId, workingStatusIds, stats.total, stats.inProgress, stats.completedToday, stats.trend, statsArePending, completedLast7Days, trendDelta, t]);
 
-  const fallbackDefaultCards: WorkspaceHeaderCard[] = [
-    { id: -1, ...getDefaultCardData('total') },
-    { id: -2, ...getDefaultCardData('inProgress') },
-    { id: -3, ...getDefaultCardData('completedToday') },
-    { id: -4, ...getDefaultCardData('trend') },
-  ];
-
-  const headerCards = headerCardsForRender.length > 0 ? headerCardsForRender : fallbackDefaultCards;
+  const headerCards = headerCardsForRender;
 
   return {
     headerKpiCards,
     setHeaderKpiCards,
     headerCards,
-    canReorderHeaderKpis: headerKpiCards.length > 0,
+    // Allow dragging when there are cards (fallback cards will snap back since they can't persist)
+    canReorderHeaderKpis: headerCards.length > 0,
   };
 }
 

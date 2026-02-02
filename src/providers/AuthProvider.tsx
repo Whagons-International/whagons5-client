@@ -15,7 +15,7 @@ import { getTasksFromIndexedDB } from '../store/reducers/tasksSlice';
 import { fetchNotificationPreferences } from '../store/reducers/notificationPreferencesSlice';
 
 // Custom caches with advanced features
-import { RealTimeListener } from '@/store/realTimeListener/RTL';
+import { RealTimeListener, setGlobalRtl } from '@/store/realTimeListener/RTL';
 import {
   CryptoHandler,
   hasKEK,
@@ -398,6 +398,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 //   debug: true,
                 // }
               );
+              // Set as global instance for status indicators
+              setGlobalRtl(rtl);
               rtl.connectAndHold();
             } catch (err) {
               console.warn('AuthProvider: background hydration failed', err);

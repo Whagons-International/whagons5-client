@@ -73,9 +73,16 @@ export const RecurrenceEditor: React.FC<RecurrenceEditorProps> = ({
   const [previewDates, setPreviewDates] = useState<string[]>([]);
   const [humanReadable, setHumanReadable] = useState("");
 
+  // Track hydration state to prevent emitting defaults before initialRRule is parsed
+  const [isHydrated, setIsHydrated] = useState(false);
+
   // Parse initial RRule on mount
   useEffect(() => {
-    if (!initialRRule) return;
+    if (!initialRRule) {
+      // If no initialRRule, mark as hydrated immediately so defaults can be used
+      setIsHydrated(true);
+      return;
+    }
 
     try {
       const rule = RRule.fromString(initialRRule);
@@ -108,9 +115,13 @@ export const RecurrenceEditor: React.FC<RecurrenceEditorProps> = ({
       }
 
       // Set monthly options
-      if (options.bymonthday && Array.isArray(options.bymonthday)) {
+      if (options.bymonthday) {
+        // Normalize bymonthday: handle both array and single number
+        const normalizedMonthDay = Array.isArray(options.bymonthday) 
+          ? options.bymonthday[0] as number
+          : options.bymonthday as number;
         setMonthlyType("dayOfMonth");
-        setMonthDay(options.bymonthday[0] as number);
+        setMonthDay(normalizedMonthDay);
       } else if (options.bysetpos && options.byweekday) {
         setMonthlyType("dayOfWeek");
         const pos = Array.isArray(options.bysetpos) ? options.bysetpos[0] : options.bysetpos;
@@ -129,8 +140,13 @@ export const RecurrenceEditor: React.FC<RecurrenceEditorProps> = ({
       } else {
         setEndType("never");
       }
+
+      // Mark as hydrated after successfully parsing initialRRule
+      setIsHydrated(true);
     } catch (e) {
       console.warn("Failed to parse initial RRule:", e);
+      // Even on error, mark as hydrated to allow defaults
+      setIsHydrated(true);
     }
   }, [initialRRule]);
 
@@ -199,18 +215,24 @@ export const RecurrenceEditor: React.FC<RecurrenceEditorProps> = ({
       setPreviewDates(nextDates);
       setHumanReadable(readable);
 
-      // Call onChange with the RRule string (without DTSTART, as that's stored separately)
-      const rruleOnly = rruleString.split("\n").find(line => line.startsWith("FREQ=")) || rruleString;
-      onChange(rruleOnly, readable);
+      // Only call onChange after hydration is complete to prevent emitting defaults
+      // before initialRRule is parsed
+      if (isHydrated) {
+        // Call onChange with the RRule string (without DTSTART, as that's stored separately)
+        const rruleOnly = rruleString.split("\n").find(line => line.startsWith("FREQ=")) || rruleString;
+        onChange(rruleOnly, readable);
+      }
     } catch (e) {
       console.warn("Failed to build RRule:", e);
     }
-  }, [frequency, interval, selectedWeekdays, monthlyType, monthDay, monthOrdinal, monthWeekday, endType, count, untilDate, dtstart, onChange]);
+  }, [frequency, interval, selectedWeekdays, monthlyType, monthDay, monthOrdinal, monthWeekday, endType, count, untilDate, dtstart, onChange, isHydrated]);
 
-  // Rebuild RRule when any setting changes
+  // Rebuild RRule when any setting changes (only after hydration is complete)
   useEffect(() => {
-    buildRRule();
-  }, [buildRRule]);
+    if (isHydrated) {
+      buildRRule();
+    }
+  }, [buildRRule, isHydrated]);
 
   // Toggle weekday selection
   const toggleWeekday = (day: Weekday) => {

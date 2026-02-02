@@ -6,9 +6,9 @@ import {
   Plus,
   ChevronDown,
   Briefcase,
-  Layers,
   Inbox,
   Activity,
+  ListTodo,
 } from 'lucide-react';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
@@ -148,6 +148,26 @@ const WorkspaceLink = ({
     ? "bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]" 
     : "text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]";
   
+  // Render icon with or without colored badge based on iconColor prop
+  const renderIcon = () => {
+    if (iconColor) {
+      // Render with colored badge
+      return (
+        <WorkspaceIconBadge color={iconColor} size={18}>
+          <Icon className="w-[11px] h-[11px]" style={{ color: '#ffffff' }} />
+        </WorkspaceIconBadge>
+      );
+    } else {
+      // Render plain icon without colored background
+      return (
+        <Icon className="w-[14px] h-[14px]" style={{ 
+          color: isActive ? 'var(--sidebar-primary)' : 'var(--sidebar-text-primary)',
+          flexShrink: 0
+        }} />
+      );
+    }
+  };
+  
   if (collapsed) {
     return (
       <Link
@@ -161,9 +181,7 @@ const WorkspaceLink = ({
         }}
         title={label}
       >
-        <WorkspaceIconBadge color={iconColor || 'var(--sidebar-primary)'} size={18}>
-          <Icon className="w-[11px] h-[11px]" style={{ color: '#ffffff' }} />
-        </WorkspaceIconBadge>
+        {renderIcon()}
         <span className="sr-only">{label}</span>
       </Link>
     );
@@ -182,9 +200,7 @@ const WorkspaceLink = ({
         boxShadow: isActive ? 'inset 2px 0 0 var(--sidebar-primary)' : undefined,
       }}
     >
-      <WorkspaceIconBadge color={iconColor || 'var(--sidebar-primary)'} size={18}>
-        <Icon className="w-[11px] h-[11px]" style={{ color: '#ffffff' }} />
-      </WorkspaceIconBadge>
+      {renderIcon()}
       <span>{label}</span>
     </Link>
   );
@@ -208,7 +224,8 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
     zIndex: 'auto',
   };
 
-  const isActive = pathname === `/workspace/${workspace.id}`;
+  const workspacePath = `/workspace/${workspace.id}`;
+  const isActive = pathname === workspacePath || pathname.startsWith(`${workspacePath}/`);
   const buttonClass = collapsed
     ? `flex justify-center items-center ${isActive
         ? 'text-[var(--sidebar-primary)]'
@@ -399,6 +416,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
   const [workspaceType, setWorkspaceType] = useState('project');
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('none');
+  const [quickAccessOpen, setQuickAccessOpen] = useState(true);
 
   // Get teams and categories from Redux store
   const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
@@ -545,32 +563,39 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
 
   return (
     <Collapsible defaultOpen className="group/collapsible">
-      {/* Virtual workspaces */}
+      {/* Quick Access - Virtual workspaces */}
       {showEverythingButton && (
-        <div className={collapsed ? 'px-2 flex flex-col items-center gap-1 mb-1' : 'space-y-0.5 mb-1'}>
-          <WorkspaceLink 
-            to="/activity" 
-            icon={Activity} 
-            label={t('sidebar.activityMonitor', 'Activity Monitor')} 
-            pathname={pathname} 
-            collapsed={collapsed}
-            iconColor="#8b5cf6"
-          />
-          <WorkspaceLink 
-            to="/workspace/all" 
-            icon={Layers} 
-            label={t('sidebar.everything', 'Everything')} 
-            pathname={pathname} 
-            collapsed={collapsed} 
-          />
-          <WorkspaceLink 
-            to="/shared-with-me" 
-            icon={Inbox} 
-            label={t('sidebar.sharedWithMe', 'Shared')} 
-            pathname={pathname} 
-            collapsed={collapsed} 
-          />
-        </div>
+        <Collapsible open={quickAccessOpen} onOpenChange={setQuickAccessOpen} className="group/quick-access">
+          <div className={collapsed ? 'px-2 flex flex-col items-center gap-1 mb-1' : 'space-y-0.5 mb-1'}>
+            <CollapsibleTrigger asChild>
+              <WorkspaceLink 
+                to="/activity" 
+                icon={Activity} 
+                label={t('sidebar.activityMonitor', 'Activity Monitor')} 
+                pathname={pathname} 
+                collapsed={collapsed}
+              />
+            </CollapsibleTrigger>
+            <CollapsibleContent keepRendered={true} forceVisible={collapsed}>
+              <div className={collapsed ? 'flex flex-col items-center gap-1' : 'space-y-0.5'}>
+                <WorkspaceLink 
+                  to="/workspace/all" 
+                  icon={ListTodo} 
+                  label={t('sidebar.todo', 'Todo')} 
+                  pathname={pathname} 
+                  collapsed={collapsed} 
+                />
+                <WorkspaceLink 
+                  to="/shared-with-me" 
+                  icon={Inbox} 
+                  label={t('sidebar.sharedWithMe', 'Shared')} 
+                  pathname={pathname} 
+                  collapsed={collapsed} 
+                />
+              </div>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
       )}
 
       <SidebarGroup>
@@ -634,10 +659,11 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                 </div>
               </SortableContext>
               <DragOverlay zIndex={10000}>
-                {activeId ? (() => {
+              {activeId ? (() => {
                   const w = localWorkspaces.find((x) => String(x.id) === String(activeId));
                   if (!w) return null;
-                  const isActive = pathname === `/workspace/${w.id}`;
+                  const dragWorkspacePath = `/workspace/${w.id}`;
+                  const isActive = pathname === dragWorkspacePath || pathname.startsWith(`${dragWorkspacePath}/`);
                   return (
                     <div
                       className="rounded-[8px] shadow-lg"

@@ -1,4 +1,5 @@
 import { useRef, useMemo, useState, useEffect } from 'react';
+import { cn } from '@/lib/utils';
 import { useLocation } from 'react-router-dom';
 import { UrlTabs } from '@/components/ui/url-tabs';
 import { MessageSquare, FolderPlus, X, CheckCircle2, UserRound, CalendarDays, Flag, Trash2 } from 'lucide-react';
@@ -372,8 +373,8 @@ export const Workspace = () => {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="flex-shrink-0 flex items-start gap-3 -mt-1 mb-3">
-        {showHeaderKpis && (
+      {showHeaderKpis && (
+        <div className="flex-shrink-0 flex items-start gap-3 -mt-1 mb-3">
           <div className="flex-1 min-w-0">
             <DndContext
               sensors={kpiSensors}
@@ -387,7 +388,7 @@ export const Workspace = () => {
               {canReorderHeaderKpis ? (
                 <>
                   <SortableContext items={headerCards.map((c: any) => c.id)} strategy={rectSortingStrategy}>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 items-stretch">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 items-stretch">
                       {headerCards.map((card: any) => (
                         <SortableKpiCard
                           key={card.id}
@@ -419,7 +420,7 @@ export const Workspace = () => {
                   </DragOverlay>
                 </>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 items-stretch">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 items-stretch">
                   {headerCards.map((card: any) => (
                     <WorkspaceKpiCard
                       key={card.id}
@@ -437,46 +438,8 @@ export const Workspace = () => {
               )}
             </DndContext>
           </div>
-        )}
-
-        <div className={`flex-shrink-0 flex items-center gap-3 ${showHeaderKpis ? '' : 'ml-auto'}`}>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant={rightPanel ? 'secondary' : 'ghost'}
-                size="sm"
-                className="gap-2"
-                aria-label="Collaboration menu"
-              >
-                <MessageSquare className="w-4 h-4" strokeWidth={2.2} />
-                <span className="hidden sm:inline">{t('workspace.collab.collab', 'Collab')}</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel>{t('workspace.collab.collaboration', 'Collaboration')}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuCheckboxItem
-                checked={rightPanel === 'chat'}
-                onCheckedChange={() => toggleRightPanel('chat')}
-              >
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4" />
-                  <span>{t('workspace.collab.chat', 'Chat')}</span>
-                </div>
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={rightPanel === 'resources'}
-                onCheckedChange={() => toggleRightPanel('resources')}
-              >
-                <div className="flex items-center gap-2">
-                  <FolderPlus className="w-4 h-4" />
-                  <span>{t('workspace.collab.resources', 'Resources')}</span>
-                </div>
-              </DropdownMenuCheckboxItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
-      </div>
+      )}
 
       {/* Bulk actions toolbar */}
       {selectedIds.length > 0 && (
@@ -562,6 +525,46 @@ export const Workspace = () => {
                     </TabsTrigger>
                   </SortableTab>
                 )}
+                rightElement={
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant={rightPanel ? 'default' : 'outline'}
+                        size="sm"
+                        className={cn(
+                          "gap-2",
+                          !rightPanel && "border-primary/40 text-primary hover:bg-primary/10 hover:text-primary"
+                        )}
+                        aria-label="Collaboration menu"
+                      >
+                        <MessageSquare className="w-4 h-4" strokeWidth={2.2} />
+                        <span className="hidden sm:inline">{t('workspace.collab.collab', 'Colab')}</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuLabel>{t('workspace.collab.collaboration', 'Collaboration')}</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuCheckboxItem
+                        checked={rightPanel === 'chat'}
+                        onCheckedChange={() => toggleRightPanel('chat')}
+                      >
+                        <div className="flex items-center gap-2">
+                          <MessageSquare className="w-4 h-4" />
+                          <span>{t('workspace.collab.chat', 'Chat')}</span>
+                        </div>
+                      </DropdownMenuCheckboxItem>
+                      <DropdownMenuCheckboxItem
+                        checked={rightPanel === 'resources'}
+                        onCheckedChange={() => toggleRightPanel('resources')}
+                      >
+                        <div className="flex items-center gap-2">
+                          <FolderPlus className="w-4 h-4" />
+                          <span>{t('workspace.collab.resources', 'Resources')}</span>
+                        </div>
+                      </DropdownMenuCheckboxItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                }
               />
             </SortableContext>
           </DndContext>

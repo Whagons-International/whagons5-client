@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { Button } from '@/components/ui/button';
 import { 
   Pencil, 
@@ -19,50 +20,171 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/providers/LanguageProvider';
+import toast from 'react-hot-toast';
+import { AppDispatch, RootState } from '@/store/store';
+import { loadWhiteboard, saveWhiteboard, setPages, setCurrentPageIndex, setHistory } from '@/store/reducers/whiteboardSlice';
+import type { Page, DrawingElement, Point } from '@/store/indexedDB/WhiteboardCache';
 
 type Tool = 'select' | 'draw' | 'erase' | 'text' | 'rectangle' | 'circle' | 'line';
 
-interface Point {
-  x: number;
-  y: number;
-}
+// Validation function for imported whiteboard data
+const validateImportedPages = (data: unknown): data is Page[] => {
+  // Check if data is an array
+  if (!Array.isArray(data)) {
+    return false;
+  }
 
-interface DrawingElement {
-  id: string;
-  type: Tool;
-  points?: Point[];
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
-  text?: string;
-  color: string;
-  lineWidth: number;
-}
+  // Check if array is not empty (at least one page required)
+  if (data.length === 0) {
+    return false;
+  }
 
-interface Page {
-  id: string;
-  name: string;
-  elements: DrawingElement[];
-}
+  // Validate each page
+  for (const page of data) {
+    // Check if page is an object
+    if (typeof page !== 'object' || page === null) {
+      return false;
+    }
+
+    // Check required fields: id, name, elements
+    if (typeof (page as any).id !== 'string' || !(page as any).id) {
+      return false;
+    }
+    if (typeof (page as any).name !== 'string') {
+      return false;
+    }
+    if (!Array.isArray((page as any).elements)) {
+      return false;
+    }
+
+    // Validate each element in the page
+    for (const element of (page as any).elements) {
+      if (typeof element !== 'object' || element === null) {
+        return false;
+      }
+
+      // Check required fields: id, type, color, lineWidth
+      if (typeof element.id !== 'string' || !element.id) {
+        return false;
+      }
+      if (typeof element.type !== 'string') {
+        return false;
+      }
+      if (typeof element.color !== 'string') {
+        return false;
+      }
+      if (typeof element.lineWidth !== 'number' || element.lineWidth <= 0) {
+        return false;
+      }
+
+      // Validate points array if present
+      if (element.points !== undefined) {
+        if (!Array.isArray(element.points)) {
+          return false;
+        }
+        for (const point of element.points) {
+          if (typeof point !== 'object' || point === null) {
+            return false;
+          }
+          if (typeof point.x !== 'number' || typeof point.y !== 'number') {
+            return false;
+          }
+        }
+      }
+
+      // Validate numeric fields if present
+      if (element.x !== undefined && typeof element.x !== 'number') {
+        return false;
+      }
+      if (element.y !== undefined && typeof element.y !== 'number') {
+        return false;
+      }
+      if (element.width !== undefined && typeof element.width !== 'number') {
+        return false;
+      }
+      if (element.height !== undefined && typeof element.height !== 'number') {
+        return false;
+      }
+      if (element.text !== undefined && typeof element.text !== 'string') {
+        return false;
+      }
+    }
+  }
+
+  return true;
+};
 
 export default function WhiteboardViewTab({ workspaceId }: { workspaceId: string | undefined }) {
   const { t } = useLanguage();
+  const dispatch = useDispatch<AppDispatch>();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Redux state
+  const whiteboardState = useSelector((state: RootState) => state.whiteboard);
+  const pages = whiteboardState.data?.pages ?? [{ id: '1', name: 'Page 1', elements: [] }];
+  const currentPageIndex = whiteboardState.data?.currentPageIndex ?? 0;
+  const history = whiteboardState.data?.history ?? [];
+  
+  // Local UI state (not persisted)
   const [currentTool, setCurrentTool] = useState<Tool>('draw');
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentColor, setCurrentColor] = useState('#000000');
   const [lineWidth, setLineWidth] = useState(2);
-  const [pages, setPages] = useState<Page[]>([
-    { id: '1', name: 'Page 1', elements: [] }
-  ]);
-  const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [tempElement, setTempElement] = useState<DrawingElement | null>(null);
   const [startPoint, setStartPoint] = useState<Point | null>(null);
-  const [history, setHistory] = useState<Page[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
   const currentPage = pages[currentPageIndex];
+
+  // Load whiteboard on mount
+  useEffect(() => {
+    if (workspaceId) {
+      dispatch(loadWhiteboard(workspaceId));
+    }
+  }, [workspaceId, dispatch]);
+
+  // Initialize history index when pages load
+  useEffect(() => {
+    if (history.length > 0 && historyIndex === -1) {
+      setHistoryIndex(history.length - 1);
+    }
+  }, [history, historyIndex]);
+
+  // Debounced save function
+  const debouncedSave = useCallback(() => {
+    if (!workspaceId || !whiteboardState.data) return;
+    
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Set new timeout
+    saveTimeoutRef.current = setTimeout(() => {
+      dispatch(saveWhiteboard({
+        workspaceId,
+        payload: {
+          pages,
+          currentPageIndex,
+          history,
+        },
+      }));
+    }, 1000); // 1 second debounce
+  }, [workspaceId, pages, currentPageIndex, history, dispatch, whiteboardState.data]);
+
+  // Save whenever pages, currentPageIndex, or history changes
+  useEffect(() => {
+    if (whiteboardState.data && workspaceId) {
+      debouncedSave();
+    }
+    
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [pages, currentPageIndex, history, debouncedSave, whiteboardState.data, workspaceId]);
 
   // Initialize canvas
   useEffect(() => {
@@ -88,12 +210,7 @@ export default function WhiteboardViewTab({ workspaceId }: { workspaceId: string
     return () => window.removeEventListener('resize', resizeCanvas);
   }, []);
 
-  // Redraw canvas whenever elements change
-  useEffect(() => {
-    redrawCanvas();
-  }, [currentPage, tempElement]);
-
-  const redrawCanvas = () => {
+  const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -107,7 +224,12 @@ export default function WhiteboardViewTab({ workspaceId }: { workspaceId: string
       if (!element) return;
       drawElement(ctx, element as DrawingElement);
     });
-  };
+  }, [currentPage, tempElement]);
+
+  // Redraw canvas whenever elements change
+  useEffect(() => {
+    redrawCanvas();
+  }, [redrawCanvas]);
 
   const drawElement = (ctx: CanvasRenderingContext2D, element: DrawingElement) => {
     ctx.strokeStyle = element.color;
@@ -253,28 +375,30 @@ export default function WhiteboardViewTab({ workspaceId }: { workspaceId: string
       ...currentPage,
       elements: [...currentPage.elements, element]
     };
-    setPages(newPages);
+    dispatch(setPages(newPages));
     addToHistory(newPages);
   };
 
   const addToHistory = (newPages: Page[]) => {
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(JSON.parse(JSON.stringify(newPages)));
-    setHistory(newHistory);
+    dispatch(setHistory(newHistory));
     setHistoryIndex(newHistory.length - 1);
   };
 
   const undo = () => {
     if (historyIndex > 0) {
-      setHistoryIndex(historyIndex - 1);
-      setPages(JSON.parse(JSON.stringify(history[historyIndex - 1])));
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      dispatch(setPages(JSON.parse(JSON.stringify(history[newIndex]))));
     }
   };
 
   const redo = () => {
     if (historyIndex < history.length - 1) {
-      setHistoryIndex(historyIndex + 1);
-      setPages(JSON.parse(JSON.stringify(history[historyIndex + 1])));
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      dispatch(setPages(JSON.parse(JSON.stringify(history[newIndex]))));
     }
   };
 
@@ -285,7 +409,7 @@ export default function WhiteboardViewTab({ workspaceId }: { workspaceId: string
         ...currentPage,
         elements: []
       };
-      setPages(newPages);
+      dispatch(setPages(newPages));
       addToHistory(newPages);
     }
   };
@@ -297,8 +421,8 @@ export default function WhiteboardViewTab({ workspaceId }: { workspaceId: string
       elements: []
     };
     const newPages = [...pages, newPage];
-    setPages(newPages);
-    setCurrentPageIndex(pages.length);
+    dispatch(setPages(newPages));
+    dispatch(setCurrentPageIndex(pages.length));
     addToHistory(newPages);
   };
 
@@ -309,8 +433,8 @@ export default function WhiteboardViewTab({ workspaceId }: { workspaceId: string
     }
     if (confirm('Delete this page?')) {
       const newPages = pages.filter((_, i) => i !== currentPageIndex);
-      setPages(newPages);
-      setCurrentPageIndex(Math.max(0, currentPageIndex - 1));
+      dispatch(setPages(newPages));
+      dispatch(setCurrentPageIndex(Math.max(0, currentPageIndex - 1)));
       addToHistory(newPages);
     }
   };
@@ -337,11 +461,20 @@ export default function WhiteboardViewTab({ workspaceId }: { workspaceId: string
         reader.onload = (event) => {
           try {
             const imported = JSON.parse(event.target?.result as string);
-            setPages(imported);
-            setCurrentPageIndex(0);
+            
+            // Validate the imported data structure
+            if (!validateImportedPages(imported)) {
+              toast.error('Invalid whiteboard file format. Please ensure the file contains valid page data with id, name, and elements fields.');
+              return;
+            }
+
+            // Only update state if validation passes
+            dispatch(setPages(imported));
+            dispatch(setCurrentPageIndex(0));
             addToHistory(imported);
+            toast.success(`Successfully imported ${imported.length} page${imported.length !== 1 ? 's' : ''}`);
           } catch (error) {
-            alert('Failed to import whiteboard');
+            toast.error('Failed to parse whiteboard file. Please ensure it is valid JSON.');
           }
         };
         reader.readAsText(file);
@@ -473,7 +606,7 @@ export default function WhiteboardViewTab({ workspaceId }: { workspaceId: string
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setCurrentPageIndex(Math.max(0, currentPageIndex - 1))}
+          onClick={() => dispatch(setCurrentPageIndex(Math.max(0, currentPageIndex - 1)))}
           disabled={currentPageIndex === 0}
         >
           <ChevronLeft className="w-4 h-4" />
@@ -485,7 +618,7 @@ export default function WhiteboardViewTab({ workspaceId }: { workspaceId: string
               key={page.id}
               variant={index === currentPageIndex ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setCurrentPageIndex(index)}
+              onClick={() => dispatch(setCurrentPageIndex(index))}
             >
               {page.name}
             </Button>
@@ -503,7 +636,7 @@ export default function WhiteboardViewTab({ workspaceId }: { workspaceId: string
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setCurrentPageIndex(Math.min(pages.length - 1, currentPageIndex + 1))}
+          onClick={() => dispatch(setCurrentPageIndex(Math.min(pages.length - 1, currentPageIndex + 1)))}
           disabled={currentPageIndex === pages.length - 1}
         >
           <ChevronRight className="w-4 h-4" />

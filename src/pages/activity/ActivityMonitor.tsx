@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Activity as ActivityIcon } from 'lucide-react';
-import { useSelector } from 'react-redux';
-import { RootState } from '@/store/store';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState, AppDispatch } from '@/store/store';
 import { RealTimeListener } from '@/store/realTimeListener/RTL';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { genericInternalActions } from '@/store/genericSlices';
 
 // Import visualization components
 import ActivityCosmos from './visualizations/ActivityCosmos';
@@ -74,8 +75,10 @@ export default function ActivityMonitor() {
   const [isConnected, setIsConnected] = useState(false);
   const { user } = useAuth();
   const { t } = useLanguage();
+  const dispatch = useDispatch<AppDispatch>();
   const users = useSelector((s: RootState) => (s as any).users?.value as any[] || []);
   const priorities = useSelector((s: RootState) => (s as any).priorities?.value as any[] || []);
+  const taskLogs = useSelector((s: RootState) => (s as any).taskLogs?.value as any[] || []);
 
   // Build visualization options with translations
   const visualizationOptions = useMemo(() => 
@@ -281,7 +284,8 @@ export default function ActivityMonitor() {
 
     // Handle connection status
     const handleConnectionStatus = (status: any) => {
-      if (status.status === 'connected') {
+      console.log('ActivityMonitor: Connection status:', status);
+      if (status.status === 'connected' || status.status === 'authenticated') {
         setIsConnected(true);
       } else if (status.status === 'disconnected' || status.status === 'failed') {
         setIsConnected(false);
@@ -303,6 +307,73 @@ export default function ActivityMonitor() {
       rtl.disconnect();
     };
   }, [user, convertPublicationToActivity]);
+
+  // Load historical task logs on mount
+  useEffect(() => {
+    if (!user) return;
+    // First try to get from IndexedDB (fast)
+    dispatch(genericInternalActions.taskLogs.getFromIndexedDB({}));
+    // Then fetch from API to ensure we have latest data
+    dispatch(genericInternalActions.taskLogs.fetchFromAPI({}));
+  }, [user, dispatch]);
+
+  // Debug: log taskLogs changes
+  useEffect(() => {
+    console.log('ActivityMonitor: taskLogs updated, count:', taskLogs.length);
+  }, [taskLogs]);
+
+  // Convert task logs to activities for initial display
+  useEffect(() => {
+    if (taskLogs.length === 0 || users.length === 0) return;
+
+    const historicalActivities: ActivityEvent[] = taskLogs
+      .slice(0, 100) // Limit to last 100
+      .map((log: any) => {
+        const logUser = users.find((u: any) => u.id === log.user_id);
+        const userName = logUser?.name || logUser?.email || `User ${log.user_id}`;
+        
+        // Determine activity type from action
+        let activityType: ActivityEvent['type'] = 'task_updated';
+        if (log.action === 'created') activityType = 'task_created';
+        else if (log.action === 'status_changed') activityType = 'status_changed';
+        else if (log.action === 'assigned') activityType = 'user_assigned';
+        
+        // Build title based on action
+        let title = `Task ${log.action}`;
+        if (log.new_values?.name) {
+          title = `${log.action === 'created' ? 'Created' : 'Updated'} task: ${log.new_values.name}`;
+        }
+        
+        return {
+          id: log.uuid || `log-${log.id}`,
+          type: activityType,
+          userId: log.user_id,
+          userName,
+          timestamp: new Date(log.updated_at || log.created_at),
+          title,
+          description: log.new_values?.description || '',
+          priority: undefined,
+          metadata: {
+            task_id: log.task_id,
+            action: log.action,
+            old_values: log.old_values,
+            new_values: log.new_values,
+          },
+        };
+      })
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+    // Only set if we don't have real-time activities yet
+    setActivities(prev => {
+      if (prev.length === 0) {
+        return historicalActivities;
+      }
+      // Merge: keep real-time activities at the top, add historical ones that aren't duplicates
+      const existingIds = new Set(prev.map(a => a.id));
+      const newHistorical = historicalActivities.filter(a => !existingIds.has(a.id));
+      return [...prev, ...newHistorical].slice(0, 100);
+    });
+  }, [taskLogs, users]);
 
   const selectedOption = useMemo(
     () => visualizationOptions.find(opt => opt.value === selectedVisualization),

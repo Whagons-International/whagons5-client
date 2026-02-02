@@ -35,6 +35,7 @@ export interface ColumnBuilderOptions {
   taskAttachments: any[];
   approvalApprovers: any[];
   currentUserId?: number;
+  currentUserRoleIds?: number[];
   approvalMap: Record<number, any>;
   taskApprovalInstances: any[];
   onDeleteTask?: (id: number) => void;

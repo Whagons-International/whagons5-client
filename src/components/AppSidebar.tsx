@@ -25,6 +25,7 @@ import {
   Trophy, // Add Trophy icon for gamification
   LineChart, // Add LineChart icon for analytics
   Hotel, // Add Hotel icon for hotel analytics
+  HeartPulse, // Add HeartPulse icon for real-time status
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -48,6 +49,7 @@ import AppSidebarWorkspaces from './AppSidebarWorkspaces';
 import AppSidebarBoards from './AppSidebarBoards';
 import { genericCaches } from '@/store/genericSlices';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { getGlobalRtl } from '@/store/realTimeListener/RTL';
 import {
   DndContext,
   closestCenter,
@@ -487,6 +489,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   const [defaultIcon, setDefaultIcon] = useState<any>(null);
   const [pinnedBoards, setPinnedBoardsState] = useState<number[]>([]);
   const [pinnedBoardsOrder, setPinnedBoardsOrderState] = useState<number[]>([]);
+  const [rtlConnected, setRtlConnected] = useState(false);
   const hoverOpenTimerRef = useRef<number | null>(null);
   const hoverCloseTimerRef = useRef<number | null>(null);
   // const [boards, setBoards] = useState<{ id: string; name: string }[]>([]);
@@ -555,6 +558,29 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
 
 
   // Note: clearError action not available in generic slices
+
+  // Subscribe to RTL connection status
+  useEffect(() => {
+    const rtl = getGlobalRtl();
+    
+    // Check initial status
+    const status = rtl.connectionStatus;
+    setRtlConnected(status.connected);
+    
+    // Listen for status changes
+    const handleStatus = (data: { status: string }) => {
+      if (data.status === 'connected' || data.status === 'authenticated') {
+        setRtlConnected(true);
+      } else if (data.status === 'disconnected' || data.status === 'failed') {
+        setRtlConnected(false);
+      }
+    };
+    
+    rtl.on('connection:status', handleStatus);
+    return () => {
+      rtl.off('connection:status', handleStatus);
+    };
+  }, []);
 
   // Subscribe to pinned state changes
   useEffect(() => {
@@ -1066,8 +1092,17 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
         {/* Messages create board dialog removed */}
 
         {showExpandedContent && (
-          <div style={{ padding: '4px 16px', fontSize: '12px', color: 'var(--sidebar-text-tertiary)', fontWeight: 400, marginTop: '4px', flexShrink: 0 }}>
-            Version 5.0.0 <i>(beta)</i>
+          <div style={{ padding: '4px 16px', fontSize: '12px', color: 'var(--sidebar-text-tertiary)', fontWeight: 400, marginTop: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span 
+              title={rtlConnected ? 'Real-time connected' : 'Real-time disconnected'}
+              style={{ display: 'flex', alignItems: 'center' }}
+            >
+              <HeartPulse 
+                size={14} 
+                className={rtlConnected ? 'text-green-500 animate-heartbeat' : 'text-red-400 opacity-50'}
+              />
+            </span>
+            <span>Version 5.0.0 <i>(beta)</i></span>
           </div>
         )}
       </SidebarFooter>

@@ -22,7 +22,7 @@ import { faUpload, faXmark, faSpinner } from '@fortawesome/free-solid-svg-icons'
 import { uploadImageAsset, getAssetDisplayUrl, createImagePreview } from '@/lib/assetHelpers';
 import { ImageCropper } from '@/components/ImageCropper';
 import { RootState, AppDispatch } from '@/store/store';
-import { UserTeam, Team } from '@/store/types';
+import { UserTeam, Team, Role } from '@/store/types';
 import { UrlTabs } from '@/components/ui/url-tabs';
 import { 
   fetchNotificationPreferences, 
@@ -149,6 +149,7 @@ function Profile() {
     const [previousUserData, setPreviousUserData] = useState<ExtendedUser | null>(userData ? (userData as unknown as ExtendedUser) : null);
     const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
     const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[]; loading: boolean };
+    const { value: roles } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
     const [error, setError] = useState<string | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -616,22 +617,32 @@ function Profile() {
             // Extract role info from userData if teams are loaded with role info
             let role: { id: number; name: string; description: string | null } | null = null;
             if (ut.role_id) {
-                // Check if role info comes with userData teams (userData might have teams array with role_id)
-                const userDataTyped = userData ? (userData as unknown as ExtendedUser) : null;
-                const teamFromUserData = userDataTyped?.teams?.find((t) => t.id === ut.team_id);
-                if (teamFromUserData?.role_id === ut.role_id && teamFromUserData?.role_name) {
+                // First, try to look up role from Redux roles state
+                const roleFromStore = roles.find((r: Role) => r.id === ut.role_id);
+                if (roleFromStore) {
                     role = {
-                        id: ut.role_id,
-                        name: teamFromUserData.role_name,
-                        description: null
+                        id: roleFromStore.id,
+                        name: roleFromStore.name,
+                        description: roleFromStore.description || null
                     };
                 } else {
-                    // Fallback to showing role_id
-                    role = {
-                        id: ut.role_id,
-                        name: `Role #${ut.role_id}`,
-                        description: null
-                    };
+                    // Fallback: Check if role info comes with userData teams
+                    const userDataTyped = userData ? (userData as unknown as ExtendedUser) : null;
+                    const teamFromUserData = userDataTyped?.teams?.find((t) => t.id === ut.team_id);
+                    if (teamFromUserData?.role_id === ut.role_id && teamFromUserData?.role_name) {
+                        role = {
+                            id: ut.role_id,
+                            name: teamFromUserData.role_name,
+                            description: null
+                        };
+                    } else {
+                        // Final fallback to showing role_id
+                        role = {
+                            id: ut.role_id,
+                            name: `Role #${ut.role_id}`,
+                            description: null
+                        };
+                    }
                 }
             }
             

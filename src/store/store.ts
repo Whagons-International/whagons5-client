@@ -15,6 +15,9 @@ import uiStateReducer from "./reducers/uiStateSlice";
 // Notification preferences slice
 import notificationPreferencesReducer from "./reducers/notificationPreferencesSlice";
 
+// Whiteboard slice
+import whiteboardReducer from "./reducers/whiteboardSlice";
+
 // All other slices (30+ tables) handled by generic factory
 import { genericSlices } from "./genericSlices";
 
@@ -33,6 +36,9 @@ const appReducer = combineReducers({
 
     // Notification preferences
     notificationPreferences: notificationPreferencesReducer,
+
+    // Whiteboard state
+    whiteboard: whiteboardReducer,
 
     // All other slices (30+ tables) handled by generic factory
     ...genericSlices.reducers,

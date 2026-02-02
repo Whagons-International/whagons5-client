@@ -145,11 +145,12 @@ export const useApprovalsColumnDefs = ({
               icon: faUsers,
               label: (row: any) => {
                 const count = approverCountByApproval.get(Number(row?.id)) || 0;
-                return count > 0 ? formatTemplate(manageApproversWithCount, { count }) : manageApproversLabel;
+                // Always show count for consistency, even if 0
+                return formatTemplate(manageApproversWithCount, { count });
               },
               variant: "outline",
               onClick: (row: any) => openManageApprovers(row as Approval),
-              className: "p-1 h-7 relative flex items-center justify-center gap-1 min-w-[120px]",
+              className: "h-7 px-3 flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0",
             },
             {
               icon: faBolt,
@@ -160,7 +161,7 @@ export const useApprovalsColumnDefs = ({
                 const hasActions =
                   (row?.on_approved_actions && Array.isArray(row.on_approved_actions) && row.on_approved_actions.length > 0) ||
                   (row?.on_rejected_actions && Array.isArray(row.on_rejected_actions) && row.on_rejected_actions.length > 0);
-                return `p-1 h-7 relative flex items-center justify-center gap-1 min-w-[90px] ${
+                return `h-7 px-3 flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
                   hasActions ? "text-green-600 dark:text-green-500" : ""
                 }`;
               },

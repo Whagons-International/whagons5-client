@@ -35,8 +35,8 @@ import {
 import { normalizeDefaultUserIds } from './utils/fieldHelpers';
 import type { TaskDialogProps } from './types';
 import { celebrateTaskCompletion } from '@/utils/confetti';
-import { createStatusMap } from '../workspaceTable/utils/mappers';
 import { combineLocalDateAndTime, formatLocalDateTime } from '../scheduler/utils/dateTime';
+import { trackSelection, trackSelections } from '@/utils/taskCreationPreferences';
 
 type Props = TaskDialogProps & {
   clickTime?: number;
@@ -300,6 +300,11 @@ export default function TaskDialogContent({
   const combineDateAndTime = (date: string, time: string): string | null => {
     if (!date) return null;
     const combined = combineLocalDateAndTime(date, time || '00:00');
+    // Validate the resulting date is valid before formatting
+    if (isNaN(combined.getTime())) {
+      console.warn('[TaskDialog] Invalid date produced from:', { date, time });
+      return null;
+    }
     return formatLocalDateTime(combined);
   };
 
@@ -405,6 +410,19 @@ export default function TaskDialogContent({
           }
         }
         if (newTaskId) await syncTaskCustomFields(Number(newTaskId));
+
+        // Track selections for recent history (only on successful create)
+        if (computed.workspaceId) {
+          if (templateId) trackSelection(computed.workspaceId, 'templates', templateId);
+          if (categoryId) trackSelection(computed.workspaceId, 'categories', categoryId);
+          if (formState.spotId) trackSelection(computed.workspaceId, 'spots', formState.spotId);
+          if (formState.selectedUserIds.length > 0) {
+            trackSelections(computed.workspaceId, 'users', formState.selectedUserIds);
+          }
+          if (formState.selectedTagIds.length > 0) {
+            trackSelections(computed.workspaceId, 'tags', formState.selectedTagIds);
+          }
+        }
       }
 
       onOpenChange(false);

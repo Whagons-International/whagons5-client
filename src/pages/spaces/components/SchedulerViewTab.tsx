@@ -544,8 +544,8 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       if (task) {
         await TasksCache.updateTask(action.taskId.toString(), {
           ...task,
-          start_date: formatAsLocalTime(action.previousState.startDate),
-          due_date: formatAsLocalTime(action.previousState.endDate),
+          start_date: formatLocalDateTime(action.previousState.startDate),
+          due_date: formatLocalDateTime(action.previousState.endDate),
         });
       }
       updateUndoRedoState();
@@ -553,8 +553,8 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       // Try API call in background
       try {
         await api.patch(`/tasks/${action.taskId}`, {
-          start_date: formatAsLocalTime(action.previousState.startDate),
-          due_date: formatAsLocalTime(action.previousState.endDate),
+          start_date: formatLocalDateTime(action.previousState.startDate),
+          due_date: formatLocalDateTime(action.previousState.endDate),
         });
         toast.success("Undo successful");
       } catch (error) {
@@ -563,8 +563,8 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
           if (task) {
             await TasksCache.updateTask(action.taskId.toString(), {
               ...task,
-              start_date: formatAsLocalTime(action.newState.startDate),
-              due_date: formatAsLocalTime(action.newState.endDate),
+              start_date: formatLocalDateTime(action.newState.startDate),
+              due_date: formatLocalDateTime(action.newState.endDate),
             });
           }
         undoRedoManagerRef.current.redo();
@@ -582,8 +582,8 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       if (task) {
         await TasksCache.updateTask(action.taskId.toString(), {
           ...task,
-          start_date: formatAsLocalTime(action.newState.startDate),
-          due_date: formatAsLocalTime(action.newState.endDate),
+          start_date: formatLocalDateTime(action.newState.startDate),
+          due_date: formatLocalDateTime(action.newState.endDate),
         });
       }
       updateUndoRedoState();
@@ -591,8 +591,8 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       // Try API call in background
       try {
         await api.patch(`/tasks/${action.taskId}`, {
-          start_date: formatAsLocalTime(action.newState.startDate),
-          due_date: formatAsLocalTime(action.newState.endDate),
+          start_date: formatLocalDateTime(action.newState.startDate),
+          due_date: formatLocalDateTime(action.newState.endDate),
         });
         toast.success("Redo successful");
       } catch (error) {
@@ -601,8 +601,8 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
           if (task) {
             await TasksCache.updateTask(action.taskId.toString(), {
               ...task,
-              start_date: formatAsLocalTime(action.previousState.startDate),
-              due_date: formatAsLocalTime(action.previousState.endDate),
+              start_date: formatLocalDateTime(action.previousState.startDate),
+              due_date: formatLocalDateTime(action.previousState.endDate),
             });
           }
         undoRedoManagerRef.current.undo();

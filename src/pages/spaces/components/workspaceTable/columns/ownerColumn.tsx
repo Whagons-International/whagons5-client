@@ -1,5 +1,5 @@
 /**
- * Owner column definition with user avatars and assignment
+ * Assignee column definition with user avatars and assignment
  */
 
 import HoverPopover from '@/pages/spaces/components/HoverPopover';
@@ -23,7 +23,7 @@ export function createOwnerColumn(opts: ColumnBuilderOptions) {
   
   return {
     field: 'user_ids',
-    headerName: t('workspace.columns.owner', 'Owner'),
+    headerName: t('workspace.columns.owner', 'Assignee'),
     width: 140,
     filter: 'agSetColumnFilter',
     filterValueGetter: (p: any) => {

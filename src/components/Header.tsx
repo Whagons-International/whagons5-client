@@ -774,7 +774,7 @@ function Header() {
                         <div className="relative w-full">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
                             <Input
-                                placeholder="Search…"
+                                placeholder={t('workspace.search.placeholder', 'Search...')}
                                 className="h-9 pl-9 pr-9 rounded-[8px] border border-border/40 placeholder:text-muted-foreground/50 dark:bg-[#252b36] dark:border-[#2A2A2A] dark:placeholder-[#6B7280] focus-visible:border-[#6366F1]"
                                 value={searchText}
                                 onChange={(e) => dispatch(setSearchText(e.target.value))}

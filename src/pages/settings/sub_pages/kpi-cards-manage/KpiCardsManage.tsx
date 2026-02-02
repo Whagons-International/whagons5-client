@@ -3,7 +3,7 @@ import type { MouseEvent as ReactMouseEvent } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { AppDispatch, RootState } from '@/store/store';
-import { genericActions } from '@/store/genericSlices';
+import { genericActions, genericInternalActions } from '@/store/genericSlices';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -14,7 +14,59 @@ import {
   faChartBar,
   faArrowLeft,
   faCog,
+  faChartLine,
+  faChartPie,
+  faListCheck,
+  faCheckCircle,
+  faClock,
+  faCalendarCheck,
+  faTasks,
+  faGauge,
+  faBullseye,
+  faTrophy,
+  faStar,
+  faFire,
+  faRocket,
+  faBolt,
+  faUsers,
+  faUserCheck,
+  faClipboardCheck,
+  faHashtag,
+  faPercent,
+  IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
+
+// Icon mapping from string value to FontAwesome icon
+const FA_ICON_MAP: Record<string, IconDefinition> = {
+  faChartBar,
+  faChartLine,
+  faChartPie,
+  faListCheck,
+  faCheckCircle,
+  faClock,
+  faCalendarCheck,
+  faTasks,
+  faGauge,
+  faBullseye,
+  faTrophy,
+  faStar,
+  faFire,
+  faRocket,
+  faBolt,
+  faUsers,
+  faUserCheck,
+  faClipboardCheck,
+  faHashtag,
+  faPercent,
+};
+
+// Helper to get icon by value
+const getIconByValue = (value: string | undefined): IconDefinition => {
+  if (value && FA_ICON_MAP[value]) {
+    return FA_ICON_MAP[value];
+  }
+  return faChartBar;
+};
 import {
   DndContext,
   closestCenter,
@@ -115,7 +167,7 @@ function SortableKpiCard({ card, onEdit, onToggle, toggling }: {
           <div className="flex items-center gap-3">
             {/* Icon */}
             <div className={`text-2xl ${card.display_config?.color || 'text-blue-500'}`}>
-              <FontAwesomeIcon icon={faChartBar} />
+              <FontAwesomeIcon icon={getIconByValue(card.display_config?.icon)} />
             </div>
 
             {/* Info */}
@@ -166,10 +218,69 @@ export default function KpiCardsManage() {
   const [editingCard, setEditingCard] = useState<KpiCard | null>(null);
   const [toggling, setToggling] = useState<number | null>(null);
 
-  // Sort cards by position
+  // Ensure KPI cards are loaded from IndexedDB and refreshed from API
+  useEffect(() => {
+    dispatch(genericInternalActions.kpiCards.getFromIndexedDB(undefined));
+    dispatch(genericInternalActions.kpiCards.fetchFromAPI(undefined));
+  }, [dispatch]);
+
+  // Fallback default cards (shown when database has no default cards seeded)
+  const fallbackDefaultCards: KpiCard[] = useMemo(() => [
+    {
+      id: -1,
+      name: t('workspace.stats.total', 'Total'),
+      type: 'task_count',
+      query_config: { is_default: true, default_key: 'total', filters: [] },
+      display_config: { color: 'text-indigo-500', icon: 'faChartBar' },
+      position: 0,
+      is_enabled: true,
+    },
+    {
+      id: -2,
+      name: t('workspace.stats.inProgress', 'In progress'),
+      type: 'task_count',
+      query_config: { is_default: true, default_key: 'inProgress', filters: [] },
+      display_config: { color: 'text-amber-500', icon: 'faChartLine' },
+      position: 1,
+      is_enabled: true,
+    },
+    {
+      id: -3,
+      name: t('workspace.stats.completedToday', 'Completed today'),
+      type: 'task_count',
+      query_config: { is_default: true, default_key: 'completedToday', filters: [] },
+      display_config: { color: 'text-emerald-500', icon: 'faCheckCircle' },
+      position: 2,
+      is_enabled: true,
+    },
+    {
+      id: -4,
+      name: t('workspace.stats.sevenDayTrend', '7-day trend'),
+      type: 'trend',
+      query_config: { is_default: true, default_key: 'trend', filters: [], days: 7 },
+      display_config: { color: 'text-purple-500', icon: 'faChartLine' },
+      position: 3,
+      is_enabled: true,
+    },
+  ], [t]);
+
+  // Check if we have default cards in the database
+  const hasDefaultCardsInDb = kpiCards.some((c: KpiCard) => c.query_config?.is_default);
+
+  // Sort cards by position, include fallback defaults if needed
   const sortedCardsFromStore = useMemo(() => {
-    return [...kpiCards].sort((a, b) => a.position - b.position);
-  }, [kpiCards]);
+    const dbCards = [...kpiCards].sort((a, b) => a.position - b.position);
+    // If no default cards in DB, prepend fallback defaults
+    if (!hasDefaultCardsInDb && dbCards.length === 0) {
+      return [...fallbackDefaultCards, ...dbCards];
+    }
+    if (!hasDefaultCardsInDb) {
+      // Insert fallback defaults at their positions
+      const customCards = dbCards.filter((c: KpiCard) => !c.query_config?.is_default);
+      return [...fallbackDefaultCards, ...customCards];
+    }
+    return dbCards;
+  }, [kpiCards, hasDefaultCardsInDb, fallbackDefaultCards]);
 
   // Local order state to prevent "snap back" while we persist reorder to the API
   const [cards, setCards] = useState<KpiCard[]>([]);
@@ -198,34 +309,47 @@ export default function KpiCardsManage() {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
+    const activeId = Number(active.id);
+    const overId = Number(over.id);
     const previousCards = cardsRef.current;
-    const oldIndex = previousCards.findIndex(card => card.id === active.id);
-    const newIndex = previousCards.findIndex(card => card.id === over.id);
 
-    if (oldIndex !== -1 && newIndex !== -1) {
-      const newOrder = arrayMove(previousCards, oldIndex, newIndex).map((card, index) => ({
-        ...card,
-        position: index,
-      }));
+    // If either card is a fallback (negative ID), skip API call
+    if (activeId < 0 || overId < 0) {
+      console.log('[KpiCardsManage] Fallback cards involved, skipping persistence');
+      return;
+    }
 
-      // Optimistically update UI so it doesn't "snap back" while persisting
-      setCards(newOrder);
-      
-      // Update positions
-      const reorderData = newOrder.map((card, index) => ({
+    const oldIndex = previousCards.findIndex(card => card.id === activeId);
+    const newIndex = previousCards.findIndex(card => card.id === overId);
+
+    if (oldIndex === -1 || newIndex === -1) {
+      console.warn('[KpiCardsManage] Could not find cards to reorder', { activeId, overId });
+      return;
+    }
+
+    const newOrder = arrayMove(previousCards, oldIndex, newIndex).map((card, index) => ({
+      ...card,
+      position: index,
+    }));
+
+    // Optimistically update UI
+    setCards(newOrder);
+    
+    // Only send database cards (positive IDs) to the API
+    const reorderData = newOrder
+      .filter(card => card.id > 0)
+      .map((card, index) => ({
         id: card.id,
         position: index,
       }));
 
-      try {
-        await dispatch(reorderKpiCardsAsync({ cards: reorderData })).unwrap();
-        toast.success(t('kpiCards.reordered', 'Cards reordered successfully'));
-      } catch (error: any) {
-        console.error('Error reordering cards:', error);
-        // Rollback optimistic reorder
-        setCards(previousCards);
-        toast.error(t('errors.reorderFailed', 'Failed to reorder cards'));
-      }
+    try {
+      await dispatch(reorderKpiCardsAsync({ cards: reorderData })).unwrap();
+      toast.success(t('kpiCards.reordered', 'Cards reordered successfully'));
+    } catch (error: any) {
+      console.error('Error reordering cards:', error);
+      setCards(previousCards);
+      toast.error(t('errors.reorderFailed', 'Failed to reorder cards'));
     }
   };
 

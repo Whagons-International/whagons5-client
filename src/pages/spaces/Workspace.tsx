@@ -1,4 +1,5 @@
 import { useRef, useMemo, useState, useEffect } from 'react';
+import { cn } from '@/lib/utils';
 import { useLocation } from 'react-router-dom';
 import { UrlTabs } from '@/components/ui/url-tabs';
 import { MessageSquare, FolderPlus, X, CheckCircle2, UserRound, CalendarDays, Flag, Trash2 } from 'lucide-react';
@@ -310,7 +311,7 @@ export const Workspace = () => {
       tableRef.current?.setFilterModel?.(card.filterModel);
       dispatch(setFilterModel(card.filterModel));
       try {
-        localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify(card.filterModel));
+        localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify({ filterModel: card.filterModel, cardId: cardId }));
       } catch {}
       dispatch(setSearchText(''));
     }
@@ -335,8 +336,20 @@ export const Workspace = () => {
       const key = `wh_workspace_filters_${workspaceId}`;
       const saved = localStorage.getItem(key);
       if (saved && headerCards.length > 0) {
-        const filterModel = JSON.parse(saved);
-        // Try to find a matching card
+        const parsed = JSON.parse(saved);
+        // Support both new format { filterModel, cardId } and legacy format (plain filterModel)
+        const filterModel = parsed?.filterModel !== undefined ? parsed.filterModel : parsed;
+        const savedCardId = parsed?.cardId;
+        
+        // First try to match by saved card ID
+        if (savedCardId != null) {
+          const exactCard = headerCards.find((card: any) => card.id === savedCardId);
+          if (exactCard) {
+            setSelectedKpiCardId(exactCard.id);
+            return;
+          }
+        }
+        // Fallback: match by filter model
         const matchingCard = headerCards.find((card: any) => {
           if (!card.filterModel) return false;
           return JSON.stringify(card.filterModel) === JSON.stringify(filterModel);
@@ -372,8 +385,8 @@ export const Workspace = () => {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="flex-shrink-0 flex items-start gap-3 -mt-1 mb-3">
-        {showHeaderKpis && (
+      {showHeaderKpis && (
+        <div className="flex-shrink-0 flex items-start gap-3 -mt-1 mb-3">
           <div className="flex-1 min-w-0">
             <DndContext
               sensors={kpiSensors}
@@ -387,7 +400,7 @@ export const Workspace = () => {
               {canReorderHeaderKpis ? (
                 <>
                   <SortableContext items={headerCards.map((c: any) => c.id)} strategy={rectSortingStrategy}>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 items-stretch">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 items-stretch">
                       {headerCards.map((card: any) => (
                         <SortableKpiCard
                           key={card.id}
@@ -419,7 +432,7 @@ export const Workspace = () => {
                   </DragOverlay>
                 </>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 items-stretch">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 items-stretch">
                   {headerCards.map((card: any) => (
                     <WorkspaceKpiCard
                       key={card.id}
@@ -437,46 +450,8 @@ export const Workspace = () => {
               )}
             </DndContext>
           </div>
-        )}
-
-        <div className={`flex-shrink-0 flex items-center gap-3 ${showHeaderKpis ? '' : 'ml-auto'}`}>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant={rightPanel ? 'secondary' : 'ghost'}
-                size="sm"
-                className="gap-2"
-                aria-label="Collaboration menu"
-              >
-                <MessageSquare className="w-4 h-4" strokeWidth={2.2} />
-                <span className="hidden sm:inline">{t('workspace.collab.collab', 'Collab')}</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel>{t('workspace.collab.collaboration', 'Collaboration')}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuCheckboxItem
-                checked={rightPanel === 'chat'}
-                onCheckedChange={() => toggleRightPanel('chat')}
-              >
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4" />
-                  <span>{t('workspace.collab.chat', 'Chat')}</span>
-                </div>
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={rightPanel === 'resources'}
-                onCheckedChange={() => toggleRightPanel('resources')}
-              >
-                <div className="flex items-center gap-2">
-                  <FolderPlus className="w-4 h-4" />
-                  <span>{t('workspace.collab.resources', 'Resources')}</span>
-                </div>
-              </DropdownMenuCheckboxItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
-      </div>
+      )}
 
       {/* Bulk actions toolbar */}
       {selectedIds.length > 0 && (
@@ -562,25 +537,65 @@ export const Workspace = () => {
                     </TabsTrigger>
                   </SortableTab>
                 )}
+                rightElement={
+                  !rightPanel ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5 h-8 px-3 rounded-md font-medium text-xs text-muted-foreground hover:text-foreground hover:bg-muted"
+                      aria-label="Collaboration"
+                      onClick={() => setRightPanel('chat')}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">{t('workspace.collab.collab', 'Collab')}</span>
+                    </Button>
+                  ) : null
+                }
               />
             </SortableContext>
           </DndContext>
         </div>
         {rightPanel && (
-          <>
-            <div
-              className="w-1.5 cursor-col-resize bg-border hover:bg-primary/40"
-              onMouseDown={startResize}
-              title="Drag to resize"
-            />
-            <div className="border-l bg-background flex flex-col" style={{ width: rightPanelWidth, flex: '0 0 auto' }}>
-              <div className="flex items-center justify-between px-3 py-2 border-b">
-                <div className="text-sm font-medium">{rightPanel === 'chat' ? t('workspace.collab.chat', 'Chat') : t('workspace.collab.resources', 'Resources')}</div>
-                <Button variant="ghost" size="icon" aria-label="Close panel" onClick={() => setRightPanel(null)}>
-                  <X className="w-4 h-4" />
+            <div className="relative border-l bg-background flex flex-col" style={{ width: rightPanelWidth, flex: '0 0 auto' }}>
+              {/* Resize handle - invisible wide hit area on the left edge */}
+              <div
+                className="absolute left-0 top-0 bottom-0 w-3 -translate-x-1/2 cursor-col-resize z-10 group"
+                onMouseDown={startResize}
+              >
+                <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-px bg-transparent group-hover:bg-primary/40 transition-colors" />
+              </div>
+              <div className="flex items-center justify-between px-2 py-1.5 border-b">
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "h-7 px-2.5 text-xs font-medium rounded-md",
+                      rightPanel === 'chat' ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
+                    )}
+                    onClick={() => setRightPanel('chat')}
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
+                    {t('workspace.collab.chat', 'Chat')}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "h-7 px-2.5 text-xs font-medium rounded-md",
+                      rightPanel === 'resources' ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
+                    )}
+                    onClick={() => setRightPanel('resources')}
+                  >
+                    <FolderPlus className="w-3.5 h-3.5 mr-1.5" />
+                    {t('workspace.collab.resources', 'Resources')}
+                  </Button>
+                </div>
+                <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Close panel" onClick={() => setRightPanel(null)}>
+                  <X className="w-3.5 h-3.5" />
                 </Button>
               </div>
-              <div className="flex-1 min-h-0 overflow-auto p-2">
+              <div className="flex-1 min-h-0 overflow-auto">
                 {rightPanel === 'chat' ? (
                   <ChatTab workspaceId={id} />
                 ) : (
@@ -588,7 +603,6 @@ export const Workspace = () => {
                 )}
               </div>
             </div>
-          </>
         )}
       </div>
 

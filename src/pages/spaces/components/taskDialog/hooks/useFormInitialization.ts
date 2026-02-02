@@ -82,16 +82,31 @@ export function useFormInitialization(params: any) {
       // Extract date and time from start_date (avoid timezone conversion)
       if (task.start_date) {
         if (typeof task.start_date === 'string') {
-          const [datePart, timePart] = task.start_date.split('T');
-          setStartDate(datePart);
-          setStartTime(timePart?.substring(0, 5) || '');
+          // Handle both 'T' and space separators, and strip timezone info
+          const normalized = task.start_date.replace(' ', 'T').replace(/[zZ]|[+\-]\d{2}:?\d{2}$/, '');
+          const [datePart, timePart] = normalized.split('T');
+          // Validate datePart is in expected format before setting
+          if (datePart && /^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+            setStartDate(datePart);
+            setStartTime(timePart?.substring(0, 5) || '');
+          } else {
+            console.warn('[useFormInitialization] Invalid start_date format:', task.start_date);
+            setStartDate('');
+            setStartTime('');
+          }
         } else {
           const startDateObj = new Date(task.start_date);
-          const year = startDateObj.getFullYear();
-          const month = String(startDateObj.getMonth() + 1).padStart(2, '0');
-          const day = String(startDateObj.getDate()).padStart(2, '0');
-          setStartDate(`${year}-${month}-${day}`);
-          setStartTime(`${String(startDateObj.getHours()).padStart(2, '0')}:${String(startDateObj.getMinutes()).padStart(2, '0')}`);
+          if (!isNaN(startDateObj.getTime())) {
+            const year = startDateObj.getFullYear();
+            const month = String(startDateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(startDateObj.getDate()).padStart(2, '0');
+            setStartDate(`${year}-${month}-${day}`);
+            setStartTime(`${String(startDateObj.getHours()).padStart(2, '0')}:${String(startDateObj.getMinutes()).padStart(2, '0')}`);
+          } else {
+            console.warn('[useFormInitialization] Invalid start_date object:', task.start_date);
+            setStartDate('');
+            setStartTime('');
+          }
         }
       } else {
         setStartDate('');
@@ -101,16 +116,31 @@ export function useFormInitialization(params: any) {
       // Extract date and time from due_date (avoid timezone conversion)
       if (task.due_date) {
         if (typeof task.due_date === 'string') {
-          const [datePart, timePart] = task.due_date.split('T');
-          setDueDate(datePart);
-          setDueTime(timePart?.substring(0, 5) || '');
+          // Handle both 'T' and space separators, and strip timezone info
+          const normalized = task.due_date.replace(' ', 'T').replace(/[zZ]|[+\-]\d{2}:?\d{2}$/, '');
+          const [datePart, timePart] = normalized.split('T');
+          // Validate datePart is in expected format before setting
+          if (datePart && /^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+            setDueDate(datePart);
+            setDueTime(timePart?.substring(0, 5) || '');
+          } else {
+            console.warn('[useFormInitialization] Invalid due_date format:', task.due_date);
+            setDueDate('');
+            setDueTime('');
+          }
         } else {
           const dueDateObj = new Date(task.due_date);
-          const year = dueDateObj.getFullYear();
-          const month = String(dueDateObj.getMonth() + 1).padStart(2, '0');
-          const day = String(dueDateObj.getDate()).padStart(2, '0');
-          setDueDate(`${year}-${month}-${day}`);
-          setDueTime(`${String(dueDateObj.getHours()).padStart(2, '0')}:${String(dueDateObj.getMinutes()).padStart(2, '0')}`);
+          if (!isNaN(dueDateObj.getTime())) {
+            const year = dueDateObj.getFullYear();
+            const month = String(dueDateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dueDateObj.getDate()).padStart(2, '0');
+            setDueDate(`${year}-${month}-${day}`);
+            setDueTime(`${String(dueDateObj.getHours()).padStart(2, '0')}:${String(dueDateObj.getMinutes()).padStart(2, '0')}`);
+          } else {
+            console.warn('[useFormInitialization] Invalid due_date object:', task.due_date);
+            setDueDate('');
+            setDueTime('');
+          }
         }
       } else {
         setDueDate('');
@@ -141,32 +171,44 @@ export function useFormInitialization(params: any) {
       if (task?.start_date) {
         // Parse as string directly to avoid timezone conversion
         if (typeof task.start_date === 'string') {
-          const [datePart, timePart] = task.start_date.split('T');
-          initialStartDate = datePart;
-          initialStartTime = timePart?.substring(0, 5) || '';
+          // Handle both 'T' and space separators, and strip timezone info
+          const normalized = task.start_date.replace(' ', 'T').replace(/[zZ]|[+\-]\d{2}:?\d{2}$/, '');
+          const [datePart, timePart] = normalized.split('T');
+          if (datePart && /^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+            initialStartDate = datePart;
+            initialStartTime = timePart?.substring(0, 5) || '';
+          }
         } else {
           const startDateObj = new Date(task.start_date);
-          const year = startDateObj.getFullYear();
-          const month = String(startDateObj.getMonth() + 1).padStart(2, '0');
-          const day = String(startDateObj.getDate()).padStart(2, '0');
-          initialStartDate = `${year}-${month}-${day}`;
-          initialStartTime = `${String(startDateObj.getHours()).padStart(2, '0')}:${String(startDateObj.getMinutes()).padStart(2, '0')}`;
+          if (!isNaN(startDateObj.getTime())) {
+            const year = startDateObj.getFullYear();
+            const month = String(startDateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(startDateObj.getDate()).padStart(2, '0');
+            initialStartDate = `${year}-${month}-${day}`;
+            initialStartTime = `${String(startDateObj.getHours()).padStart(2, '0')}:${String(startDateObj.getMinutes()).padStart(2, '0')}`;
+          }
         }
       }
       
       if (task?.due_date) {
         // Parse as string directly to avoid timezone conversion
         if (typeof task.due_date === 'string') {
-          const [datePart, timePart] = task.due_date.split('T');
-          initialDueDate = datePart;
-          initialDueTime = timePart?.substring(0, 5) || '';
+          // Handle both 'T' and space separators, and strip timezone info
+          const normalized = task.due_date.replace(' ', 'T').replace(/[zZ]|[+\-]\d{2}:?\d{2}$/, '');
+          const [datePart, timePart] = normalized.split('T');
+          if (datePart && /^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+            initialDueDate = datePart;
+            initialDueTime = timePart?.substring(0, 5) || '';
+          }
         } else {
           const dueDateObj = new Date(task.due_date);
-          const year = dueDateObj.getFullYear();
-          const month = String(dueDateObj.getMonth() + 1).padStart(2, '0');
-          const day = String(dueDateObj.getDate()).padStart(2, '0');
-          initialDueDate = `${year}-${month}-${day}`;
-          initialDueTime = `${String(dueDateObj.getHours()).padStart(2, '0')}:${String(dueDateObj.getMinutes()).padStart(2, '0')}`;
+          if (!isNaN(dueDateObj.getTime())) {
+            const year = dueDateObj.getFullYear();
+            const month = String(dueDateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dueDateObj.getDate()).padStart(2, '0');
+            initialDueDate = `${year}-${month}-${day}`;
+            initialDueTime = `${String(dueDateObj.getHours()).padStart(2, '0')}:${String(dueDateObj.getMinutes()).padStart(2, '0')}`;
+          }
         }
       }
       

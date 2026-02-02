@@ -227,7 +227,7 @@ function PluginCardDisplay({
 				border-2 border-border/40
 				transition-all duration-300
 				${isDragging ? '' : 'hover:shadow-2xl hover:scale-105'}
-				${isEnabled ? borderColor : 'opacity-70'}
+				${isEnabled ? borderColor : 'grayscale opacity-60'}
 				h-[140px]
 			`}>
 				{/* Top corner badges */}
@@ -281,37 +281,25 @@ function PluginCardDisplay({
 				<div className="relative z-10 h-full flex flex-col items-center justify-center p-3">
 					{/* Large icon - protagonist */}
 					<div className={`
-						${plugin.color} 
+						${isEnabled ? plugin.color : 'text-muted-foreground'} 
 						text-[2.5rem]
 						mb-2
 						drop-shadow-2xl
 						transition-all duration-300
-						group-hover:scale-110 
-						group-hover:drop-shadow-[0_0_30px_currentColor]
-						filter group-hover:brightness-110
+						${isEnabled ? 'group-hover:scale-110 group-hover:drop-shadow-[0_0_30px_currentColor] filter group-hover:brightness-110' : ''}
 					`}>
 						<FontAwesomeIcon icon={plugin.icon} />
 					</div>
 
 					{/* Title */}
 					<h3 className={`
-						font-bold text-center mb-1
+						font-bold text-center
 						transition-all duration-300
 						${plugin.id === 'cleaning' ? 'text-base' : 'text-sm'}
+						${isEnabled ? '' : 'text-muted-foreground'}
 					`}>
 						{plugin.title}
 					</h3>
-
-					{/* Description - appears more visible on hover */}
-					<p className={`
-						text-xs text-center text-muted-foreground
-						line-clamp-2
-						opacity-60 group-hover:opacity-100
-						transition-opacity duration-300
-						px-1
-					`}>
-						{plugin.description}
-					</p>
 				</div>
 
 				{/* Subtle radial gradient on hover for depth */}
@@ -1244,7 +1232,7 @@ function Plugins() {
 						onDragEnd={handleDragEnd}
 					>
 						<SortableContext items={pluginIds} strategy={rectSortingStrategy}>
-							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+							<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
 								{orderedPlugins.map((plugin) => (
 									<SortablePluginCard
 										key={plugin.id}
@@ -1275,12 +1263,9 @@ function Plugins() {
 										<div className="text-muted-foreground/50 group-hover:text-primary transition-colors text-4xl mb-2">
 											<FontAwesomeIcon icon={faPlus} />
 										</div>
-										<h3 className="font-semibold text-sm text-center mb-1">
+										<h3 className="font-semibold text-sm text-center">
 											{t('plugins.addCustomPlugin', 'Add Custom Plugin')}
 										</h3>
-										<p className="text-xs text-center text-muted-foreground px-3">
-											{t('plugins.addCustomPluginDescription', 'Create a custom plugin for your needs')}
-										</p>
 									</div>
 								</div>
 							</div>

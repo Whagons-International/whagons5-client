@@ -1,7 +1,24 @@
 import { useEffect, useState } from 'react';
 
 export function useWorkspaceRightPanel() {
-  const [rightPanel, setRightPanel] = useState<'chat' | 'resources' | null>(null);
+  const [rightPanel, setRightPanelState] = useState<'chat' | 'resources' | null>(() => {
+    try {
+      const saved = localStorage.getItem('wh_workspace_right_panel');
+      if (saved === 'chat' || saved === 'resources') return saved;
+    } catch {}
+    return null;
+  });
+
+  const setRightPanel = (panel: 'chat' | 'resources' | null) => {
+    setRightPanelState(panel);
+    try {
+      if (panel) {
+        localStorage.setItem('wh_workspace_right_panel', panel);
+      } else {
+        localStorage.removeItem('wh_workspace_right_panel');
+      }
+    } catch {}
+  };
   const [rightPanelWidth, setRightPanelWidth] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('wh_workspace_right_panel_w');

@@ -309,6 +309,21 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     return () => window.removeEventListener('wh:rowDensityChanged', handler);
   }, []);
 
+  // Show description below name setting
+  const [showDescriptionBelowName, setShowDescriptionBelowName] = useState<boolean>(() => {
+    try { return (localStorage.getItem(`wh_workspace_show_description_${workspaceId || 'all'}`) ?? 'false') === 'true'; } catch { return false; }
+  });
+  useEffect(() => {
+    const handler = (e: any) => {
+      const detail = e?.detail;
+      if (detail?.showDescription !== undefined && (detail?.workspaceId === workspaceId || detail?.workspaceId === 'all')) {
+        setShowDescriptionBelowName(detail.showDescription);
+      }
+    };
+    window.addEventListener('wh:displayOptionsChanged', handler);
+    return () => window.removeEventListener('wh:displayOptionsChanged', handler);
+  }, [workspaceId]);
+
   const getRowStyle = useMemo(() => (_params: any) => undefined, []);
   
   // Apply animation class to newly created task rows
@@ -464,7 +479,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     getDoneStatusId,
     groupField: (useClientSide && groupBy !== 'none') ? groupBy : undefined,
     categoryMap,
-    showDescriptions: rowDensity !== 'compact',
+    showDescriptions: showDescriptionBelowName,
     density: rowDensity,
     t,
     approvalMap,
@@ -484,6 +499,14 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     taskAttachments,
     approvalApprovers,
     currentUserId: user?.id,
+    // Get current user's role IDs from the users data (includes global_roles from API)
+    currentUserRoleIds: (() => {
+      if (!user?.id) return [];
+      const currentUserData = userMap[Number(user.id)] || userMap[String(user.id)];
+      const globalRoles = currentUserData?.global_roles;
+      if (!Array.isArray(globalRoles)) return [];
+      return globalRoles.map((r: any) => typeof r === 'object' ? Number(r.id) : Number(r)).filter(Number.isFinite);
+    })(),
     onDeleteTask: handleDeleteTask,
     onLogTask: (id: number) => console.info('Log action selected (placeholder) for task', id),
     slaMap,
@@ -496,7 +519,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,
     metadataLoadedFlags.statusesLoaded, metadataLoadedFlags.prioritiesLoaded,
     metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,
-    filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, rowDensity, tagDisplayMode,
+    filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, rowDensity, showDescriptionBelowName, tagDisplayMode,
     approvalMap, approvalApprovers, stableTaskApprovalInstances, user?.id, slas, slaMap, roleMap,
     visibleColumns, workspaceCustomFields, taskCustomFieldValueMap, customFields, taskNotes, taskAttachments, handleDeleteTask,
     getDoneStatusId, handleOpenFormDialog,

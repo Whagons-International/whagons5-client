@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { MessageSquare, Send, Paperclip, Smile } from "lucide-react";
+import { Send, Paperclip, Smile } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { genericActions } from "@/store/genericSlices";
 import { useAuth } from "@/providers/AuthProvider";
@@ -12,6 +11,22 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getUserDisplayName, getUserInitials } from "./workspaceTable/utils/userUtils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
+import { uploadWorkspaceResource, getWorkspaceResourceUrl } from "@/api/workspaceResourcesApi";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faFile,
+  faFilePdf,
+  faFileWord,
+  faFileExcel,
+  faFilePowerpoint,
+  faFileImage,
+  faFileVideo,
+  faFileAudio,
+  faFileCode,
+  faFileZipper,
+  faFileCsv,
+  faFileLines,
+} from "@fortawesome/free-solid-svg-icons";
 
 interface WorkspaceChatMessage {
   id: number;
@@ -27,6 +42,53 @@ interface WorkspaceChatMessage {
     email: string;
     url_picture?: string;
   };
+}
+
+// Image extensions for inline display
+const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'];
+
+// Map file extensions to Font Awesome icons
+const getFileIcon = (filename: string) => {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  if (['pdf'].includes(ext)) return faFilePdf;
+  if (['doc', 'docx', 'odt', 'rtf'].includes(ext)) return faFileWord;
+  if (['xls', 'xlsx', 'ods'].includes(ext)) return faFileExcel;
+  if (['ppt', 'pptx', 'odp'].includes(ext)) return faFilePowerpoint;
+  if (IMAGE_EXTENSIONS.includes(ext)) return faFileImage;
+  if (['mp4', 'avi', 'mov', 'mkv', 'webm', 'wmv'].includes(ext)) return faFileVideo;
+  if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext)) return faFileAudio;
+  if (['js', 'ts', 'tsx', 'jsx', 'py', 'java', 'c', 'cpp', 'h', 'rb', 'go', 'rs', 'php', 'html', 'css', 'scss', 'json', 'xml', 'yaml', 'yml', 'sh', 'bash', 'sql'].includes(ext)) return faFileCode;
+  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(ext)) return faFileZipper;
+  if (['csv'].includes(ext)) return faFileCsv;
+  if (['txt', 'log', 'md'].includes(ext)) return faFileLines;
+  return faFile;
+};
+
+const getFileIconColor = (filename: string) => {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  if (['pdf'].includes(ext)) return 'text-red-500';
+  if (['doc', 'docx', 'odt', 'rtf'].includes(ext)) return 'text-blue-600';
+  if (['xls', 'xlsx', 'ods', 'csv'].includes(ext)) return 'text-green-600';
+  if (['ppt', 'pptx', 'odp'].includes(ext)) return 'text-orange-500';
+  if (IMAGE_EXTENSIONS.includes(ext)) return 'text-purple-500';
+  if (['mp4', 'avi', 'mov', 'mkv', 'webm', 'wmv'].includes(ext)) return 'text-pink-500';
+  if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext)) return 'text-yellow-600';
+  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(ext)) return 'text-amber-600';
+  return 'text-gray-500';
+};
+
+// Detect markdown link pattern [filename](url) used for file attachments
+const MARKDOWN_LINK_REGEX = /^\[(.+?)\]\((.+?)\)$/;
+
+function isImageUrl(url: string, filename: string): boolean {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  return IMAGE_EXTENSIONS.includes(ext);
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
 export default function ChatTab({ workspaceId }: { workspaceId: string | undefined }) {
@@ -81,11 +143,41 @@ export default function ChatTab({ workspaceId }: { workspaceId: string | undefin
       await dispatch(genericActions.workspaceChat.addAsync(chatMessage)).unwrap();
     } catch (error: any) {
       console.error("Failed to send message:", error);
-      // Restore input on error
       setInput(messageText);
 
       const errorMessage = error?.response?.data?.message || error?.message || t('workspace.collab.chat.failedToSend', 'Failed to send message. Please try again.');
       alert(`${t('workspace.collab.chat.error', 'Error')}: ${errorMessage}`);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !workspaceId || !user || isNaN(Number(workspaceId))) return;
+
+    const maxSize = 100 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert(`File size exceeds the maximum limit of ${Math.round(maxSize / 1024 / 1024)}MB.`);
+      e.target.value = '';
+      return;
+    }
+    e.target.value = '';
+
+    try {
+      // Upload as a workspace resource in the "chat_files" folder
+      const resource = await uploadWorkspaceResource(workspaceId, file, undefined, 'chat_files');
+      const fileUrl = getWorkspaceResourceUrl(resource);
+
+      // Send as a message with markdown link pattern: [filename](url)
+      const chatMessage = {
+        uuid: crypto.randomUUID(),
+        workspace_id: Number(workspaceId),
+        message: `[${file.name}](${fileUrl})`,
+        user_id: Number(user.id)
+      };
+      await dispatch(genericActions.workspaceChat.addAsync(chatMessage)).unwrap();
+    } catch (error: any) {
+      console.error("Failed to upload attachment:", error);
+      alert(`Error: ${error?.response?.data?.message || error?.message || 'Failed to upload attachment.'}`);
     }
   };
 
@@ -116,112 +208,153 @@ export default function ChatTab({ workspaceId }: { workspaceId: string | undefin
     }, 100);
   };
 
+  // Render a message - detect file attachments via markdown link pattern
+  const renderMessageContent = (msg: WorkspaceChatMessage, isMe: boolean) => {
+    const match = msg.message.match(MARKDOWN_LINK_REGEX);
+
+    if (match) {
+      const [, filename, url] = match;
+
+      // If it's an image, render inline
+      if (isImageUrl(url, filename)) {
+        return (
+          <div className={`rounded-lg overflow-hidden border bg-card text-card-foreground border-border shadow-sm ${isMe ? 'border-primary/20' : ''}`}>
+            <img
+              src={url}
+              alt={filename}
+              className="max-w-full h-auto max-h-52 object-cover cursor-pointer rounded-lg"
+              onClick={() => window.open(url, '_blank')}
+            />
+          </div>
+        );
+      }
+
+      // Otherwise render as a file with FA icon
+      return (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 border bg-card text-card-foreground border-border shadow-sm hover:bg-muted/50 transition-colors ${isMe ? 'border-primary/20' : ''}`}
+        >
+          <FontAwesomeIcon icon={getFileIcon(filename)} className={`text-lg ${getFileIconColor(filename)}`} />
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-medium truncate max-w-[180px]">{filename}</span>
+            <span className="text-[10px] text-muted-foreground">{filename.split('.').pop()?.toUpperCase()}</span>
+          </div>
+        </a>
+      );
+    }
+
+    // Regular text message
+    return (
+      <div className={`rounded-lg px-3 py-2 text-sm ${isMe ? 'bg-primary text-primary-foreground' : 'bg-card text-card-foreground border border-border shadow-sm'}`}>
+        <span className="leading-relaxed whitespace-pre-wrap break-words">
+          {renderMessageWithEmojis(msg.message)}
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div className="h-full w-full flex flex-col">
-      <div className="mb-3 flex items-center gap-2 text-muted-foreground">
-        <MessageSquare className="w-4 h-4" />
-        <span>{t('workspace.collab.chat.workspaceChat', 'Workspace Chat')}</span>
-      </div>
-      <Card className="flex-1 flex overflow-hidden">
-        <CardContent className="p-0 flex-1 flex flex-col">
-          <div className="flex-1 overflow-auto p-4 space-y-4 bg-muted/10">
-            {messages.length === 0 && (
-              <div className="text-center text-muted-foreground text-sm py-8">
-                {t('workspace.collab.chat.noMessages', 'No messages yet. Start the conversation!')}
-              </div>
-            )}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/10">
+        {messages.length === 0 && (
+          <div className="text-center text-muted-foreground text-sm py-8">
+            {t('workspace.collab.chat.noMessages', 'No messages yet. Start the conversation!')}
+          </div>
+        )}
 
-            {messages.map((msg: WorkspaceChatMessage) => {
-              const isMe = Number(msg.user_id) === Number(user?.id);
-              const msgUser = getUser(msg.user_id);
+        {messages.map((msg: WorkspaceChatMessage) => {
+          const isMe = Number(msg.user_id) === Number(user?.id);
+          const msgUser = getUser(msg.user_id);
 
-              return (
-                <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
-                  <Avatar className="w-8 h-8 border bg-background">
-                    <AvatarFallback className="text-xs">{getUserInitials(msgUser)}</AvatarFallback>
-                  </Avatar>
-                  <div className={`flex flex-col max-w-[80%] ${isMe ? 'items-end' : 'items-start'}`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {getUserDisplayName(msgUser)}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground/70">
-                        {dayjs(msg.created_at).format('MMM D, h:mm A')}
-                      </span>
-                    </div>
-                    <div className={`rounded-lg px-3 py-2 text-sm ${isMe ? 'bg-primary text-primary-foreground' : 'bg-card text-card-foreground border border-border shadow-sm'}`}>
-                      <span className="leading-relaxed whitespace-pre-wrap break-words">
-                        {renderMessageWithEmojis(msg.message)}
-                      </span>
-                    </div>
-                  </div>
+          return (
+            <div key={msg.id || msg.uuid} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
+              <Avatar className="w-8 h-8 border bg-background flex-shrink-0">
+                <AvatarFallback className="text-xs">{getUserInitials(msgUser)}</AvatarFallback>
+              </Avatar>
+              <div className={`flex flex-col max-w-[80%] ${isMe ? 'items-end' : 'items-start'}`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {getUserDisplayName(msgUser)}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground/70">
+                    {dayjs(msg.created_at).format('MMM D, h:mm A')}
+                  </span>
                 </div>
-              );
-            })}
-            <div ref={endRef} />
-          </div>
-          <div className="border-t p-3 bg-background">
-            <div className="flex items-center gap-2">
-              <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen} modal={false}>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors"
-                    onClick={() => setEmojiPickerOpen(!emojiPickerOpen)}
-                  >
-                    <Smile className="w-4 h-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-auto p-0 border-0"
-                  align="start"
-                  side="top"
-                  onOpenAutoFocus={(e) => e.preventDefault()}
-                  onPointerDownOutside={(e) => {
-                    const target = e.target as HTMLElement;
-                    if (!target.closest('[data-radix-popper-content-wrapper]')) {
-                      return;
-                    }
-                    e.preventDefault();
-                  }}
-                >
-                  <EmojiPicker
-                    onEmojiClick={handleEmojiClick}
-                    autoFocusSearch={false}
-                    theme="light"
-                    width={350}
-                    height={400}
-                    previewConfig={{ showPreview: false }}
-                  />
-                </PopoverContent>
-              </Popover>
-              <Input
-                ref={inputRef}
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder={t('workspace.collab.chat.typeMessage', 'Type a message...')}
-                className="flex-1"
-                disabled={!workspaceId || isNaN(Number(workspaceId))}
-              />
-              <Button
-                size="icon"
-                onClick={handleSend}
-                disabled={!input.trim() || !workspaceId || isNaN(Number(workspaceId))}
-              >
-                <Send className="w-4 h-4" />
-              </Button>
+                {renderMessageContent(msg, isMe)}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          );
+        })}
+        <div ref={endRef} />
+      </div>
+
+      <div className="p-3 border-t bg-background">
+        <div className="flex items-center gap-2">
+          <label className="cursor-pointer p-2 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors">
+            <Paperclip className="w-4 h-4" />
+            <input type="file" className="hidden" onChange={handleFileUpload} disabled={!workspaceId || isNaN(Number(workspaceId))} />
+          </label>
+          <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen} modal={false}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setEmojiPickerOpen(!emojiPickerOpen)}
+              >
+                <Smile className="w-4 h-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-auto p-0 border-0"
+              align="start"
+              side="top"
+              onOpenAutoFocus={(e) => e.preventDefault()}
+              onPointerDownOutside={(e) => {
+                const target = e.target as HTMLElement;
+                if (!target.closest('[data-radix-popper-content-wrapper]')) {
+                  return;
+                }
+                e.preventDefault();
+              }}
+            >
+              <EmojiPicker
+                onEmojiClick={handleEmojiClick}
+                autoFocusSearch={false}
+                theme="light"
+                width={350}
+                height={400}
+                previewConfig={{ showPreview: false }}
+              />
+            </PopoverContent>
+          </Popover>
+          <Input
+            ref={inputRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            placeholder={t('workspace.collab.chat.typeMessage', 'Type a message...')}
+            className="flex-1"
+            disabled={!workspaceId || isNaN(Number(workspaceId))}
+          />
+          <Button
+            size="icon"
+            onClick={handleSend}
+            disabled={!input.trim() || !workspaceId || isNaN(Number(workspaceId))}
+          >
+            <Send className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

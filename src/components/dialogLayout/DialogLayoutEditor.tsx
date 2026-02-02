@@ -298,7 +298,11 @@ export function DialogLayoutEditor({
             }
         } else {
             // Cross-tab movement already handled in dragOver, just save
-            updateLayout(layout);
+            // Use functional setLayout to access latest state (not stale closure)
+            setLayout(prev => {
+                updateLayout(prev);
+                return prev;
+            });
         }
     }, [findFieldTab, layout, updateLayout, allTabs]);
 

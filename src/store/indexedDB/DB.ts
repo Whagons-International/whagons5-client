@@ -2,7 +2,7 @@ import { auth } from '@/firebase/firebaseConfig';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.16.0';
+const CURRENT_DB_VERSION = '1.18.0';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -283,6 +283,9 @@ export class DB {
           if (!db.objectStoreNames.contains('workspace_chat')) {
             db.createObjectStore('workspace_chat', { keyPath: 'id' });
           }
+          if (!db.objectStoreNames.contains('workspace_resources')) {
+            db.createObjectStore('workspace_resources', { keyPath: 'id' });
+          }
 
           // Error Tracking
           if (!db.objectStoreNames.contains('exceptions')) {
@@ -347,6 +350,11 @@ export class DB {
           // Tenant availability cache (keyed by tenant name)
           if (!db.objectStoreNames.contains('tenant_availability')) {
             db.createObjectStore('tenant_availability', { keyPath: 'tenantName' });
+          }
+
+          // Whiteboards (Excalidraw data per workspace)
+          if (!db.objectStoreNames.contains('whiteboards')) {
+            db.createObjectStore('whiteboards', { keyPath: 'workspaceId' });
           }
         };
 
@@ -558,9 +566,11 @@ export class DB {
       | 'task_notes'
       | 'task_recurrences'
       | 'workspace_chat'
+      | 'workspace_resources'
       | 'exceptions'
       | 'board_attachments'
-      | 'avatars',
+      | 'avatars'
+      | 'whiteboards',
     mode: IDBTransactionMode = 'readonly'
   ) {
     if (DB.deleting) throw new Error('DB deletion in progress');
@@ -627,9 +637,11 @@ export class DB {
       | 'task_notes'
       | 'task_recurrences'
       | 'workspace_chat'
+      | 'workspace_resources'
       | 'exceptions'
       | 'board_attachments'
-      | 'avatars',
+      | 'avatars'
+      | 'whiteboards',
     mode: IDBTransactionMode = 'readwrite'
   ) {
     if (!DB.inited) throw new Error('DB not initialized');

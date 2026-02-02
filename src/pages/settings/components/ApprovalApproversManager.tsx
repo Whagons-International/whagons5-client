@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "@/store/store";
-import { Approval, User, Role, ApprovalApprover } from "@/store/types";
+import { Approval, User, Role, ApprovalApprover, JobPosition } from "@/store/types";
 import { genericActions, genericCaches, genericEventNames, genericEvents } from '@/store/genericSlices';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,7 @@ export interface ApprovalApproversManagerProps {
   approval: Approval | null;
 }
 
-type ApproverType = 'user' | 'role';
+type ApproverType = 'user' | 'role' | 'job_position';
 
 type LocalApprover = {
   id: number;
@@ -35,6 +35,7 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
   const dispatch = useDispatch<AppDispatch>();
   const { value: users } = useSelector((s: RootState) => s.users) as { value: User[] };
   const { value: roles } = useSelector((s: RootState) => s.roles) as { value: Role[] };
+  const { value: jobPositions } = useSelector((s: RootState) => s.jobPositions) as { value: JobPosition[] };
   // Access slice to subscribe for external changes; actual data read via cache for consistency
   useSelector((s: RootState) => s.approvalApprovers.value as ApprovalApprover[]);
 
@@ -46,10 +47,15 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
   const isFirstApprover = items.length === 0;
 
   const availableOptions = useMemo(() => {
-    return type === 'user'
-      ? (users || []).map((u) => ({ value: String(u.id), label: u.name }))
-      : (roles || []).map((r) => ({ value: String(r.id), label: r.name }));
-  }, [type, users, roles]);
+    if (type === 'user') {
+      return (users || []).map((u) => ({ value: String(u.id), label: u.name }));
+    } else if (type === 'role') {
+      return (roles || []).map((r) => ({ value: String(r.id), label: r.name }));
+    } else if (type === 'job_position') {
+      return (jobPositions || []).map((jp) => ({ value: String(jp.id), label: jp.title }));
+    }
+    return [];
+  }, [type, users, roles, jobPositions]);
 
   const refreshFromCache = React.useCallback(async (force: boolean = false) => {
     const aid = approval ? Number(approval.id) : null;
@@ -182,8 +188,12 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
   const nameOf = (i: LocalApprover): string => {
     if (i.approver_type === 'user') {
       return users.find(u => u.id === i.approver_id)?.name || `User #${i.approver_id}`;
+    } else if (i.approver_type === 'role') {
+      return roles.find(r => r.id === i.approver_id)?.name || `Role #${i.approver_id}`;
+    } else if (i.approver_type === 'job_position') {
+      return jobPositions.find(jp => jp.id === i.approver_id)?.title || `Job Position #${i.approver_id}`;
     }
-    return roles.find(r => r.id === i.approver_id)?.name || `Role #${i.approver_id}`;
+    return `Unknown #${i.approver_id}`;
   };
 
   const close = () => onOpenChange(false);
@@ -207,6 +217,7 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
               <SelectContent>
                 <SelectItem value="user">User</SelectItem>
                 <SelectItem value="role">Role</SelectItem>
+                <SelectItem value="job_position">Job Position</SelectItem>
               </SelectContent>
             </Select>
             <Select value={selectedId || undefined} onValueChange={setSelectedId}>
@@ -257,7 +268,12 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
                       <div className="font-medium leading-tight">{nameOf(i)}</div>
                     </div>
                     <div className="col-span-2">
-                      <div className="text-sm capitalize">{i.approver_type === 'user' ? 'User' : 'Role'}</div>
+                      <div className="text-sm capitalize">
+                        {i.approver_type === 'user' ? 'User' : 
+                         i.approver_type === 'role' ? 'Role' : 
+                         i.approver_type === 'job_position' ? 'Job Position' : 
+                         i.approver_type}
+                      </div>
                     </div>
                     <div className="col-span-3">
                       <Checkbox

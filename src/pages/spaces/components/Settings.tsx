@@ -556,6 +556,21 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
             </div>
           </div>
           <div className="mb-4 p-3 border rounded-md bg-background">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium">{t('workspace.settings.display.showDescriptionBelowName', 'Show description below name')}</div>
+                <div className="text-xs text-muted-foreground">{t('workspace.settings.display.showDescriptionBelowNameDesc', 'Display task description inline below the task name. When off, description is shown on hover only.')}</div>
+              </div>
+              <Switch
+                defaultChecked={(typeof window !== 'undefined' && (localStorage.getItem(`wh_workspace_show_description_${workspaceId || 'all'}`) ?? 'false') === 'true')}
+                onCheckedChange={(checked) => {
+                  try { localStorage.setItem(`wh_workspace_show_description_${workspaceId || 'all'}`, String(checked)); } catch {}
+                  try { window.dispatchEvent(new CustomEvent('wh:displayOptionsChanged', { detail: { showDescription: checked, workspaceId: workspaceId || 'all' } })); } catch {}
+                }}
+              />
+            </div>
+          </div>
+          <div className="mb-4 p-3 border rounded-md bg-background">
             <div className="flex items-start gap-3">
               <div className="flex-1 space-y-1">
                 <div className="text-sm font-medium flex items-center gap-2">

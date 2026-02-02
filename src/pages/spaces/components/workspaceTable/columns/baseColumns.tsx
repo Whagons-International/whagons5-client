@@ -17,11 +17,12 @@ export function createBaseColumns(opts: ColumnBuilderOptions) {
     taskAttachments,
     spotMap,
     spotsLoaded,
-    formatDueDate,
     visibleColumns,
+    density,
   } = opts;
 
   const isVisible = createVisibilityChecker(visibleColumns);
+  const isCompact = density === 'compact';
 
   const t = opts.t || ((key: string, fallback?: string) => fallback || key);
   
@@ -62,64 +63,71 @@ export function createBaseColumns(opts: ColumnBuilderOptions) {
         
         if (!hasValidId) {
           return (
-            <div className="flex flex-col items-center justify-center gap-2 h-full w-full">
+            <div className="flex items-center justify-center gap-2 h-full w-full flex-row">
+              <div className={`wh-task-checkbox flex items-center justify-center ${isCompact ? 'w-5 h-5' : 'w-6 h-6'}`}>
+                <div className={`rounded-full border-2 border-muted bg-background opacity-50 ${isCompact ? 'w-4 h-4' : 'w-5 h-5'}`} />
+              </div>
               <span className="flex items-center justify-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground">
                 {id ?? ''}
               </span>
-              <div className="wh-task-checkbox flex items-center justify-center w-6 h-6">
-                <div className="w-5 h-5 rounded-full border-2 border-muted bg-background opacity-50" />
-              </div>
             </div>
           );
         }
         
-        return (
-          <div className="flex flex-col items-center justify-center gap-2 h-full w-full">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex items-center justify-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground hover:bg-muted/80 cursor-pointer transition-colors"
-                  aria-label="Task actions"
-                >
-                  {id ?? ''}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="right" sideOffset={4} className="w-44">
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onLogTask?.(taskId); }}>
-                  Log
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDeleteTask?.(taskId); }}>
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            
-            {/* Custom circular checkbox - prevents row click */}
-            <div 
-              className="wh-task-checkbox flex items-center justify-center w-6 h-6 cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (node) {
-                  node.setSelected(!isSelected);
-                  requestAnimationFrame(() => {
-                    api?.refreshCells?.({ rowNodes: [node], force: true });
-                  });
-                }
-              }}
-            >
-              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                isSelected 
-                  ? 'bg-primary border-primary' 
-                  : 'bg-background border-border hover:border-primary/50'
-              }`}>
-                {isSelected && (
-                  <div className="w-2.5 h-2.5 rounded-full bg-white dark:bg-background" />
-                )}
-              </div>
+        // Checkbox component - shared between compact and non-compact modes
+        const checkbox = (
+          <div 
+            className={`wh-task-checkbox flex items-center justify-center cursor-pointer ${isCompact ? 'w-5 h-5' : 'w-6 h-6'}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (node) {
+                node.setSelected(!isSelected);
+                requestAnimationFrame(() => {
+                  api?.refreshCells?.({ rowNodes: [node], force: true });
+                });
+              }
+            }}
+          >
+            <div className={`rounded-full border-2 flex items-center justify-center transition-colors ${isCompact ? 'w-4 h-4' : 'w-5 h-5'} ${
+              isSelected 
+                ? 'bg-primary border-primary' 
+                : 'bg-background border-border hover:border-primary/50'
+            }`}>
+              {isSelected && (
+                <div className={`rounded-full bg-white dark:bg-background ${isCompact ? 'w-2 h-2' : 'w-2.5 h-2.5'}`} />
+              )}
             </div>
+          </div>
+        );
+
+        const idBadge = (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center justify-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground hover:bg-muted/80 cursor-pointer transition-colors"
+                aria-label="Task actions"
+              >
+                {id ?? ''}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" side="right" sideOffset={4} className="w-44">
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onLogTask?.(taskId); }}>
+                Log
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDeleteTask?.(taskId); }}>
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+
+        return (
+          <div className="flex items-center justify-center gap-2 h-full w-full flex-row">
+            {checkbox}
+            {idBadge}
           </div>
         );
       },

@@ -184,6 +184,34 @@ export default function KanbanControls({
               </div>
             )}
 
+            {/* Statuses */}
+            {availableStatuses.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold">Statuses</Label>
+                <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                  {availableStatuses.map((status) => (
+                    <div key={status.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`status-${status.id}`}
+                        checked={filters.statuses.includes(status.id)}
+                        onCheckedChange={() => handleStatusToggle(status.id)}
+                      />
+                      <Label
+                        htmlFor={`status-${status.id}`}
+                        className="flex items-center gap-2 cursor-pointer text-sm"
+                      >
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: status.color || '#888' }}
+                        />
+                        {status.name}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Priorities */}
             {availablePriorities.length > 0 && (
               <div className="space-y-2">

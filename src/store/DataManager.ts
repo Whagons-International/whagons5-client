@@ -58,6 +58,7 @@ const coreKeys = [
   'boardMessages',
   'boardAttachments',
   'workspaceChat',
+  'workspaceResources',
   'messages',
   'workflows',
   'exceptions',
@@ -178,7 +179,13 @@ export class DataManager {
 
   private async syncStream(cursor?: string): Promise<boolean> {
     ApiLoadingTracker.increment();
-    const baseUrl = apiClient.defaults.baseURL ?? '';
+    // Compute baseUrl dynamically using current subdomain from localStorage
+    // (mirrors the axios request interceptor in whagonsApi.ts)
+    const subdomain = localStorage.getItem('whagons-subdomain') || '';
+    const isDev = import.meta.env.VITE_DEVELOPMENT === 'true';
+    const protocol = isDev ? 'http' : 'https';
+    const apiHost = import.meta.env.VITE_API_URL || 'localhost:8000';
+    const baseUrl = `${protocol}://${subdomain}${apiHost}/api`;
     const authHeader = (apiClient.defaults.headers.common as any)?.Authorization as string | undefined;
     const headers: HeadersInit = {
       Accept: 'application/x-ndjson, application/json',
@@ -222,6 +229,10 @@ export class DataManager {
       const touchedTables = new Set<string>();
       const syncedTables = new Set<string>();
       const pendingSyncTables = new Set<string>();
+      // Snapshot tracking for clockless tables (pivot tables)
+      // When snapshot_start arrives, we collect all IDs seen for that table.
+      // When snapshot_end arrives, we delete local rows not in the snapshot.
+      const activeSnapshots = new Map<string, Set<string | number>>();
       const priorityTables = new Set<string>([
         'wh_workspaces',
         'wh_teams',
@@ -317,10 +328,44 @@ export class DataManager {
           return;
         }
 
+        if (msg.type === 'snapshot_start' && msg.entity) {
+          activeSnapshots.set(msg.entity, new Set());
+          return;
+        }
+
+        if (msg.type === 'snapshot_end' && msg.entity) {
+          const snapshotIds = activeSnapshots.get(msg.entity);
+          if (snapshotIds) {
+            activeSnapshots.delete(msg.entity);
+            // Delete local rows not present in the snapshot (handles hard deletes on pivot tables)
+            const cache = getCacheForTable(msg.entity);
+            if (cache) {
+              try {
+                const localRows = await cache.getAll();
+                for (const row of localRows) {
+                  const rowId = row?.id;
+                  if (rowId != null && !snapshotIds.has(rowId) && !snapshotIds.has(String(rowId))) {
+                    await cache.remove(rowId);
+                  }
+                }
+                touchedTables.add(msg.entity);
+              } catch (error) {
+                console.warn('DataManager: snapshot cleanup failed', msg.entity, error);
+              }
+            }
+          }
+          return;
+        }
+
         const table = msg.entity;
         const id = msg.id;
         if (!table || id == null) {
           return;
+        }
+        // Track IDs for active snapshots
+        const snapshotSet = activeSnapshots.get(table);
+        if (snapshotSet) {
+          snapshotSet.add(id);
         }
         if (table === 'wh_tasks') {
           if (msg.type === 'delete') {

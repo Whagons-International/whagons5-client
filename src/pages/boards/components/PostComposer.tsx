@@ -131,16 +131,22 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
       // Step 2: Upload images and create attachments
       if (selectedImages.length > 0 && user) {
         const uploadPromises = selectedImages.map(async (file) => {
+          let attachment: any = null;
           try {
             // Upload file to asset storage
+            console.log('Uploading file:', file.name);
             const uploadedFile = await uploadFile(file);
+            console.log('File uploaded successfully:', uploadedFile);
+            
+            // Use the URL returned by the server, or construct one from the ID
             const fileUrl = uploadedFile.url || getFileUrl(uploadedFile.id);
+            console.log('File URL:', fileUrl);
             
             // Get file extension
             const fileExtension = file.name.split('.').pop() || '';
             
-            // Create board attachment
-            const attachment = {
+            // Create board attachment record
+            attachment = {
               uuid: crypto.randomUUID(),
               board_message_id: messageId,
               type: 'IMAGE' as const,
@@ -150,12 +156,13 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
               file_size: file.size,
               user_id: Number(user.id)
             };
+            console.log('Creating attachment:', attachment);
 
             const attachmentResult = await dispatch(genericActions.boardAttachments.addAsync(attachment) as any).unwrap();
             console.log('Attachment created successfully:', attachmentResult);
-            return true;
+            return { success: true, attachment: attachmentResult };
           } catch (error: any) {
-            console.error('Failed to upload image:', error);
+            console.error('Failed to upload image:', file.name, error);
             console.error('Attachment error details:', {
               message: error?.message,
               payload: error?.payload,
@@ -166,12 +173,16 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
             if (error?.response?.data?.error?.includes('Tenant database not ready')) {
               alert('Your workspace is still being set up. Please wait a moment and try again.');
             }
-            return false;
+            return { success: false, error: error?.message || 'Upload failed' };
           }
         });
         
         // Wait for all uploads to complete
-        await Promise.all(uploadPromises);
+        const results = await Promise.all(uploadPromises);
+        const failures = results.filter(r => !r.success);
+        if (failures.length > 0) {
+          console.warn(`${failures.length} of ${results.length} image uploads failed`);
+        }
         
         // Attachments are written via `addAsync` and will also sync via realtime/background validation.
       }

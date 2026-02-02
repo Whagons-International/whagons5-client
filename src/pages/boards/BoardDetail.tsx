@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Settings, Users, Globe, Lock, Plus, User, Trash2, Pencil, AlertTriangle } from 'lucide-react';
+import { Settings, Users, Globe, Lock, Plus, User, Trash2, Pencil, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/providers/LanguageProvider';
@@ -317,14 +317,6 @@ function BoardDetail() {
           {/* Header */}
           <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border">
             <div className="flex items-center gap-3 px-4 py-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate('/boards')}
-                className="size-9"
-              >
-                <ArrowLeft className="size-5" />
-              </Button>
               <h1 className="text-lg font-semibold">
                 {t('boards.error.notFound', 'Board Not Found')}
               </h1>
@@ -347,14 +339,6 @@ function BoardDetail() {
         <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate('/boards')}
-                className="size-9"
-              >
-                <ArrowLeft className="size-5" />
-              </Button>
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-lg font-semibold">{board.name}</h1>

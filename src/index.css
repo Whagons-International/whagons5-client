@@ -1,12 +1,12 @@
-@import "tailwindcss";
-@plugin "tailwindcss-animate";
-@import "./starwars-fonts.css";
-
 /* FullCalendar custom styles (v6+ doesn't ship CSS files) */
 @import './styles/fullcalendar-custom.css';
 
 /* Scheduler custom styles (Bryntum-inspired) */
-@import './styles/scheduler.css';
+@import './features/scheduler/styles/scheduler.css';
+
+@import "tailwindcss";
+@import "./starwars-fonts.css";
+@plugin "tailwindcss-animate";
 
 /* 
   Add this to your HTML head instead of importing here:
@@ -911,6 +911,31 @@
     }
   }
 
+  /* Heartbeat animation for real-time status indicator */
+  @keyframes heartbeat {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    14% {
+      transform: scale(1.15);
+    }
+    28% {
+      transform: scale(1);
+    }
+    42% {
+      transform: scale(1.15);
+    }
+    70% {
+      transform: scale(1);
+      opacity: 0.8;
+    }
+  }
+
+  .animate-heartbeat {
+    animation: heartbeat 1.5s ease-in-out infinite;
+  }
+
   /* Animation utilities */
   .animate-shimmer {
     animation: shimmer 3s ease-in-out infinite;
@@ -1228,6 +1253,29 @@
   .wh-settings-grid .ag-header-viewport,
   .wh-settings-grid .ag-body-viewport {
     min-width: 100%;
+  }
+
+  /* Row drag styling for settings grid */
+  .wh-settings-grid .ag-row-dragging {
+    opacity: 0.5;
+    background-color: var(--color-primary) !important;
+  }
+
+  .wh-settings-grid .ag-row-drag {
+    cursor: grab;
+  }
+
+  .wh-settings-grid .ag-row-drag:active {
+    cursor: grabbing;
+  }
+
+  .wh-settings-grid .ag-dnd-ghost {
+    background-color: var(--color-background);
+    border: 2px dashed var(--color-primary);
+    border-radius: var(--radius-md);
+    padding: 8px 12px;
+    opacity: 0.9;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   }
 
   ::-webkit-scrollbar-track {
@@ -1895,12 +1943,14 @@ html.starwars [data-radix-popper-content-wrapper] .border-border,
   will-change: transform, opacity, filter;
 }
 
-/* Add a subtle glow effect during animation */
+/* Add a subtle glow effect during animation and hide column borders */
 .ag-theme-quartz .ag-row.wh-new-task-row .ag-cell,
 .ag-theme-quartz-dark .ag-row.wh-new-task-row .ag-cell,
 .wh-modern-grid .ag-row.wh-new-task-row .ag-cell,
 .wh-workspace-grid .ag-row.wh-new-task-row .ag-cell {
   animation: taskCellGlow 1.2s ease-out forwards;
+  border-right: none !important;
+  border-left: none !important;
 }
 
 @keyframes taskCellGlow {
@@ -1920,4 +1970,22 @@ html.starwars [data-radix-popper-content-wrapper] .border-border,
 
 /* Select and Labels in filter toolbar - now use shadcn components with proper dark mode */
 /* Removed forced white background - components now respect theme */
+
+/* ── Excalidraw style isolation ── */
+/* Undo Tailwind's global `* { border-color; outline }` and other resets inside Excalidraw */
+.excalidraw-wrapper *,
+.excalidraw-wrapper *::before,
+.excalidraw-wrapper *::after {
+  border-color: initial;
+  outline: initial;
+  box-sizing: border-box;
+}
+.excalidraw-wrapper button,
+.excalidraw-wrapper [role="button"],
+.excalidraw-wrapper a,
+.excalidraw-wrapper input,
+.excalidraw-wrapper select,
+.excalidraw-wrapper textarea {
+  transition: none;
+}
 

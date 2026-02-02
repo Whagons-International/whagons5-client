@@ -35,6 +35,29 @@ import dayjs from 'dayjs';
 import { iconService } from '@/database/iconService';
 import { CategoryPreview } from './components/CategoryPreview';
 import { StatisticsTab } from './components/StatisticsTab';
+import { GripVertical } from 'lucide-react';
+
+// LocalStorage key for custom category order
+const CATEGORY_ORDER_KEY = 'wh-categories-order';
+
+// Helper to get saved category order from localStorage
+const getSavedCategoryOrder = (): number[] => {
+  try {
+    const saved = localStorage.getItem(CATEGORY_ORDER_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+};
+
+// Helper to save category order to localStorage
+const saveCategoryOrder = (order: number[]): void => {
+  try {
+    localStorage.setItem(CATEGORY_ORDER_KEY, JSON.stringify(order));
+  } catch (e) {
+    console.error('Failed to save category order:', e);
+  }
+};
 
 // Form data interface for edit form
 interface CategoryFormData {
@@ -160,6 +183,63 @@ function Categories() {
     entityName: 'categories',
     searchFields: ['name', 'description']
   });
+
+  // Custom order state for drag-and-drop reordering (saved locally)
+  const [customOrder, setCustomOrder] = useState<number[]>(() => getSavedCategoryOrder());
+
+  // Sort filtered items based on custom order
+  const sortedFilteredItems = useMemo(() => {
+    if (customOrder.length === 0) {
+      return filteredItems;
+    }
+    
+    // Create a map of id to position for quick lookup
+    const orderMap = new Map<number, number>();
+    customOrder.forEach((id, index) => orderMap.set(id, index));
+    
+    // Sort: items in customOrder first (by their position), then remaining items by id
+    return [...filteredItems].sort((a, b) => {
+      const aPos = orderMap.get(a.id);
+      const bPos = orderMap.get(b.id);
+      
+      // Both have custom positions
+      if (aPos !== undefined && bPos !== undefined) {
+        return aPos - bPos;
+      }
+      // Only a has custom position - a comes first
+      if (aPos !== undefined) return -1;
+      // Only b has custom position - b comes first
+      if (bPos !== undefined) return 1;
+      // Neither has custom position - sort by id
+      return a.id - b.id;
+    });
+  }, [filteredItems, customOrder]);
+
+  // Handle row drag end - update custom order
+  const handleRowDragEnd = useCallback((event: any) => {
+    const { node, overNode } = event;
+    if (!node || !overNode || node === overNode) return;
+    
+    const draggedId = node.data?.id;
+    const targetId = overNode.data?.id;
+    if (!draggedId || !targetId) return;
+    
+    // Get current order of all category IDs
+    const currentIds = sortedFilteredItems.map(c => c.id);
+    const draggedIndex = currentIds.indexOf(draggedId);
+    const targetIndex = currentIds.indexOf(targetId);
+    
+    if (draggedIndex === -1 || targetIndex === -1) return;
+    
+    // Remove dragged item and insert at target position
+    const newOrder = [...currentIds];
+    newOrder.splice(draggedIndex, 1);
+    newOrder.splice(targetIndex, 0, draggedId);
+    
+    // Save to state and localStorage
+    setCustomOrder(newOrder);
+    saveCategoryOrder(newOrder);
+  }, [sortedFilteredItems]);
 
   // Form state for create dialog
   const [createFormData, setCreateFormData] = useState<CategoryFormData>({
@@ -364,6 +444,19 @@ function Categories() {
 
   // Column definitions for AG Grid
   const colDefs = useMemo<ColDef[]>(() => [
+    {
+      rowDrag: true,
+      width: 50,
+      maxWidth: 50,
+      suppressMenu: true,
+      sortable: false,
+      filter: false,
+      cellRenderer: () => (
+        <div className="flex items-center justify-center h-full cursor-grab active:cursor-grabbing">
+          <GripVertical size={16} className="text-muted-foreground/50 hover:text-muted-foreground" />
+        </div>
+      )
+    },
     { 
       field: 'name', 
       headerName: tc('grid.columns.categoryName', 'Category Name'),
@@ -617,12 +710,16 @@ function Categories() {
                 </div>
                 <div className="flex-1 min-h-0">
                   <SettingsGrid
-                    rowData={filteredItems}
+                    rowData={sortedFilteredItems}
                     columnDefs={colDefs}
                     noRowsMessage={tc('grid.noRows', 'No categories found')}
                     rowSelection="single"
                     onRowDoubleClicked={(row: any) => handleEdit(row)}
+                    onRowDragEnd={handleRowDragEnd}
+                    getRowId={(params: any) => String(params.data?.id)}
                     gridOptions={{
+                      rowDragManaged: true,
+                      animateRows: true,
                       getRowStyle: (params: any) => {
                         const isEnabled = Boolean(params?.data?.enabled);
                         if (!isEnabled) {

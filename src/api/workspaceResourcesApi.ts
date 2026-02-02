@@ -11,6 +11,7 @@ export interface WorkspaceResource {
   file_extension: string;
   file_size: number;
   user_id: number;
+  folder?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -37,12 +38,16 @@ export const getWorkspaceResources = async (workspaceId: string): Promise<Worksp
 export const uploadWorkspaceResource = async (
   workspaceId: string,
   file: File,
-  fileName?: string
+  fileName?: string,
+  folder?: string
 ): Promise<WorkspaceResource> => {
   const formData = new FormData();
   formData.append('file', file);
   if (fileName) {
     formData.append('file_name', fileName);
+  }
+  if (folder) {
+    formData.append('folder', folder);
   }
   
   const response = await api.post<WorkspaceResourceResponse>(

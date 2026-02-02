@@ -19,9 +19,8 @@ import KanbanControls from './KanbanControls';
 import KanbanSwimLane from './KanbanSwimLane';
 import TaskDialog from '../TaskDialog';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
-import { api } from '@/store/api/internalApi';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
-import { getTasksFromIndexedDB } from '@/store/reducers/tasksSlice';
+import { getTasksFromIndexedDB, moveTaskThunk } from '@/store/reducers/tasksSlice';
 import { useKanbanFilters } from './hooks/useKanbanFilters';
 import { useKanbanGrouping } from './hooks/useKanbanGrouping';
 import { exportToExcel } from './utils/exportUtils';
@@ -175,7 +174,7 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     setActiveTask(task || null);
   }, [tasks]);
 
-  // Drag end handler with optimistic updates
+  // Drag end handler with optimistic updates via Redux thunk
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event;
     
@@ -186,8 +185,12 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     const taskId = Number(active.id);
     const newStatusId = Number(over.id);
 
-    // 1. Get current task for rollback
-    const task = await TasksCache.getTask(taskId.toString());
+    // Get current task from Redux store or TasksCache for previousStatusId
+    let task = tasks.find((t: Task) => t.id === taskId);
+    if (!task) {
+      // Fallback to TasksCache if not in Redux store
+      task = await TasksCache.getTask(taskId.toString());
+    }
     if (!task) {
       toast.error('Task not found');
       return;
@@ -198,28 +201,21 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     // Don't update if status hasn't changed
     if (previousStatusId === newStatusId) return;
 
-    // 2. Optimistic update (immediate UI feedback)
-    await TasksCache.updateTask(taskId.toString(), {
-      ...task,
-      status_id: newStatusId,
-    });
-
-    // 3. API call in background
+    // Dispatch Redux thunk to handle optimistic update, API call, and rollback
     try {
-      await api.patch(`/tasks/${taskId}`, { status_id: newStatusId });
-      toast.success('Task moved successfully');
+      const result = await dispatch(moveTaskThunk({ taskId, newStatusId, previousStatusId }));
+      if (moveTaskThunk.fulfilled.match(result)) {
+        toast.success('Task moved successfully');
+      } else if (moveTaskThunk.rejected.match(result)) {
+        // Error toast is already shown in the thunk, but we can add additional handling here if needed
+        const errorMessage = result.payload as string || 'Failed to move task. Changes reverted.';
+        toast.error(errorMessage);
+      }
     } catch (error) {
-      console.error('Failed to move task:', error);
-      
-      // 4. Rollback on failure
-      await TasksCache.updateTask(taskId.toString(), {
-        ...task,
-        status_id: previousStatusId,
-      });
-      
+      console.error('Unexpected error in handleDragEnd:', error);
       toast.error('Failed to move task. Changes reverted.');
     }
-  }, []);
+  }, [dispatch, tasks]);
 
   // Handle task click
   const handleTaskClick = useCallback((task: Task) => {

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown, X } from "lucide-react"
+import { Check, ChevronsUpDown, X, Star, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -11,6 +11,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from "@/components/ui/command"
 import {
   Popover,
@@ -24,6 +25,12 @@ interface Tag {
   color?: string | null;
 }
 
+export interface GroupedTagOptions {
+  favorites: Tag[]
+  recent: Tag[]
+  all: Tag[]
+}
+
 interface TagMultiSelectProps {
   tags: Tag[]
   value?: number[]
@@ -32,6 +39,11 @@ interface TagMultiSelectProps {
   searchPlaceholder?: string
   emptyText?: string
   className?: string
+  // Grouped options support
+  groupedOptions?: GroupedTagOptions
+  // Favorites support
+  favoriteIds?: number[]
+  onFavoriteToggle?: (id: number) => void
 }
 
 export function TagMultiSelect({
@@ -42,11 +54,17 @@ export function TagMultiSelect({
   searchPlaceholder = "Search tags...",
   emptyText = "No tags found.",
   className,
+  groupedOptions,
+  favoriteIds = [],
+  onFavoriteToggle,
 }: TagMultiSelectProps) {
   const [open, setOpen] = React.useState(false)
 
+  // Use grouped options if provided, otherwise fall back to flat tags
+  const allTags = groupedOptions?.all ?? tags
+
   const selectedValues = Array.isArray(value) ? value : []
-  const selectedTags = tags.filter((tag) => selectedValues.includes(tag.id))
+  const selectedTags = allTags.filter((tag) => selectedValues.includes(tag.id))
 
   const handleSelect = (tagId: number) => {
     const newValue = selectedValues.includes(tagId)
@@ -59,6 +77,125 @@ export function TagMultiSelect({
     e.stopPropagation()
     const newValue = selectedValues.filter((v) => v !== tagId)
     onValueChange?.(newValue)
+  }
+
+  const handleFavoriteClick = (e: React.MouseEvent, tagId: number) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onFavoriteToggle?.(tagId)
+  }
+
+  const renderTag = (tag: Tag, showFavoriteIcon: boolean = true) => {
+    const isSelected = selectedValues.includes(tag.id)
+    const isFavorited = favoriteIds.includes(tag.id)
+    const hasFavoriteSupport = onFavoriteToggle !== undefined
+
+    return (
+      <CommandItem
+        key={tag.id}
+        value={tag.name}
+        onSelect={() => handleSelect(tag.id)}
+        className="group"
+      >
+        <Check
+          className={cn(
+            "mr-2 h-4 w-4 flex-shrink-0",
+            isSelected ? "opacity-100" : "opacity-0"
+          )}
+        />
+        <div
+          className="flex items-center gap-2 px-2 py-1 rounded text-xs font-medium flex-1"
+          style={{
+            backgroundColor: tag.color ? `${tag.color}20` : '#F3F4F6',
+            color: tag.color || '#374151',
+          }}
+        >
+          {tag.name}
+        </div>
+        {hasFavoriteSupport && showFavoriteIcon && (
+          <button
+            type="button"
+            onClick={(e) => handleFavoriteClick(e, tag.id)}
+            className={cn(
+              "ml-2 p-0.5 rounded transition-opacity flex-shrink-0",
+              isFavorited 
+                ? "opacity-100 text-amber-500" 
+                : "opacity-0 group-hover:opacity-60 hover:!opacity-100 text-muted-foreground"
+            )}
+            aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
+          >
+            <Star 
+              className={cn("h-3.5 w-3.5", isFavorited && "fill-current")} 
+            />
+          </button>
+        )}
+      </CommandItem>
+    )
+  }
+
+  const renderGroupedContent = () => {
+    if (!groupedOptions) {
+      // No grouped options - render flat list
+      return (
+        <CommandGroup>
+          {tags.map((tag) => renderTag(tag))}
+        </CommandGroup>
+      )
+    }
+
+    const { favorites, recent, all: rawAll } = groupedOptions
+    const hasFavorites = favorites.length > 0
+    const hasRecent = recent.length > 0
+    const excludedIds = new Set([
+      ...favorites.map((tag) => tag.id),
+      ...recent.map((tag) => tag.id),
+    ])
+    const all = rawAll.filter((tag) => !excludedIds.has(tag.id))
+
+    return (
+      <>
+        {/* Favorites section */}
+        {hasFavorites && (
+          <>
+            <CommandGroup heading={
+              <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600">
+                <Star className="h-3 w-3 fill-current" />
+                Favorites
+              </span>
+            }>
+              {favorites.map((tag) => renderTag(tag))}
+            </CommandGroup>
+            {(hasRecent || all.length > 0) && <CommandSeparator />}
+          </>
+        )}
+
+        {/* Recent section */}
+        {hasRecent && (
+          <>
+            <CommandGroup heading={
+              <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                Recent
+              </span>
+            }>
+              {recent.map((tag) => renderTag(tag))}
+            </CommandGroup>
+            {all.length > 0 && <CommandSeparator />}
+          </>
+        )}
+
+        {/* All options */}
+        {all.length > 0 && (
+          <CommandGroup heading={
+            (hasFavorites || hasRecent) ? (
+              <span className="text-xs font-medium text-muted-foreground">All</span>
+            ) : undefined
+          }>
+            {all.map((tag) => renderTag(tag))}
+          </CommandGroup>
+        )}
+      </>
+    )
   }
 
   return (
@@ -92,7 +229,7 @@ export function TagMultiSelect({
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault()
-                          handleRemove(tag.id, e)
+                          handleRemove(tag.id, e as unknown as React.MouseEvent)
                         }
                       }}
                       onMouseDown={(e) => {
@@ -118,38 +255,10 @@ export function TagMultiSelect({
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
             <CommandEmpty>{emptyText}</CommandEmpty>
-            <CommandGroup>
-              {tags.map((tag) => {
-                const isSelected = selectedValues.includes(tag.id)
-                return (
-                  <CommandItem
-                    key={tag.id}
-                    value={tag.name}
-                    onSelect={() => handleSelect(tag.id)}
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        isSelected ? "opacity-100" : "opacity-0"
-                      )}
-                    />
-                    <div
-                      className="flex items-center gap-2 px-2 py-1 rounded text-xs font-medium"
-                      style={{
-                        backgroundColor: tag.color ? `${tag.color}20` : '#F3F4F6',
-                        color: tag.color || '#374151',
-                      }}
-                    >
-                      {tag.name}
-                    </div>
-                  </CommandItem>
-                )
-              })}
-            </CommandGroup>
+            {renderGroupedContent()}
           </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
   )
 }
-

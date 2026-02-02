@@ -99,7 +99,7 @@ export function ActionsCellRenderer({
 
   return (
     <div className="flex h-full w-full items-center justify-end">
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      <div className="flex items-center gap-2 flex-nowrap">
         {leftActions.map((action, index) => renderActionButton(action, index))}
         {rightActions.map((action, index) => renderActionButton(action, index, 'r-'))}
       </div>

@@ -1,12 +1,19 @@
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { getPluginsConfig, togglePluginEnabled, togglePluginPinned, subscribeToPluginsConfig, type PluginConfig } from '@/components/AppSidebar';
-import { Pin, PinOff } from 'lucide-react';
+import { Pin, PinOff, Save } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faStar } from '@fortawesome/free-solid-svg-icons';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState } from '@/store/store';
+import { genericActions } from '@/store/genericSlices';
+import { actionsApi } from '@/api/whagonsActionsApi';
+import { MultiSelect } from '@/components/ui/multi-select';
+import toast from 'react-hot-toast';
 
 interface PluginDetails {
 	features: string[];
@@ -16,18 +23,155 @@ interface PluginDetails {
 function PluginSettings() {
 	const { pluginId } = useParams<{ pluginId: string }>();
 	const { t } = useLanguage();
+	const dispatch = useDispatch();
 	const [searchParams, setSearchParams] = useSearchParams();
 	const [pluginsConfig, setPluginsConfigState] = useState<PluginConfig[]>(getPluginsConfig());
+	const [selectedSpotTypeIds, setSelectedSpotTypeIds] = useState<string[]>([]);
+	const [savedSpotTypeIds, setSavedSpotTypeIds] = useState<string[]>([]);
+	const [saving, setSaving] = useState(false);
 	
 	// Default to 'settings' tab
 	const activeTab = searchParams.get('tab') || 'settings';
+
+	// Get plugin from Redux store
+	const plugins = useSelector((state: RootState) => {
+		try {
+			return (state as any).plugins?.value || [];
+		} catch (error) {
+			console.error('Error accessing plugins from Redux:', error);
+			return [];
+		}
+	});
+	const backendPlugin = pluginId ? plugins.find((p: any) => p.slug === pluginId || String(p.id) === String(pluginId)) : undefined;
+
+	// Get spotTypes from Redux
+	const spotTypes = useSelector((state: RootState) => {
+		try {
+			return (state as any).spotTypes?.value || [];
+		} catch (error) {
+			console.error('Error accessing spotTypes from Redux:', error);
+			return [];
+		}
+	});
 
 	useEffect(() => {
 		const unsubscribe = subscribeToPluginsConfig(setPluginsConfigState);
 		return unsubscribe;
 	}, []);
 
-	const currentPlugin = pluginsConfig.find(p => p.id === pluginId);
+	// Load spotTypes on mount
+	useEffect(() => {
+		if (pluginId === 'cleaning') {
+			try {
+				if (genericActions?.spotTypes?.getFromIndexedDB) {
+					dispatch(genericActions.spotTypes.getFromIndexedDB() as any);
+				}
+				if (genericActions?.spotTypes?.fetchFromAPI) {
+					dispatch(genericActions.spotTypes.fetchFromAPI() as any);
+				}
+			} catch (error) {
+				console.error('Error loading spot types:', error);
+			}
+		}
+	}, [pluginId, dispatch]);
+
+	// Parse existing settings from plugin
+	useEffect(() => {
+		if (backendPlugin && pluginId === 'cleaning') {
+			try {
+				let settings = {};
+				if (backendPlugin.settings) {
+					if (typeof backendPlugin.settings === 'string') {
+						try {
+							settings = JSON.parse(backendPlugin.settings);
+						} catch (e) {
+							console.error('Error parsing settings JSON:', e);
+							settings = {};
+						}
+					} else if (typeof backendPlugin.settings === 'object') {
+						settings = backendPlugin.settings;
+					}
+				}
+				
+				const spotTypeIds = (settings as any).spot_type_ids || [];
+				const spotTypeIdsString = spotTypeIds.map((id: number) => String(id));
+				setSelectedSpotTypeIds(spotTypeIdsString);
+				setSavedSpotTypeIds(spotTypeIdsString);
+			} catch (error) {
+				console.error('Error parsing plugin settings:', error);
+				setSelectedSpotTypeIds([]);
+			}
+		} else if (pluginId === 'cleaning' && !backendPlugin) {
+			// Reset if plugin not found
+			setSelectedSpotTypeIds([]);
+		}
+	}, [backendPlugin, pluginId]);
+
+	const currentPlugin = pluginId ? pluginsConfig.find(p => p.id === pluginId) : undefined;
+
+	// Handle spot types selection change (only updates local state)
+	const handleSpotTypesChange = (values: string[]) => {
+		setSelectedSpotTypeIds(values);
+	};
+
+	// Handle saving spot_type_ids
+	const handleSaveSpotTypes = async () => {
+		if (!backendPlugin) {
+			console.error('Backend plugin not found');
+			toast.error(t('plugins.cleaning.spotTypesError', 'Failed to save spot types'));
+			return;
+		}
+
+		setSaving(true);
+		
+		try {
+			const spotTypeIds = selectedSpotTypeIds.map(v => parseInt(v));
+			let currentSettings = {};
+			
+			if (backendPlugin.settings) {
+				if (typeof backendPlugin.settings === 'string') {
+					try {
+						currentSettings = JSON.parse(backendPlugin.settings);
+					} catch (e) {
+						console.error('Error parsing settings JSON:', e);
+						currentSettings = {};
+					}
+				} else if (typeof backendPlugin.settings === 'object') {
+					currentSettings = backendPlugin.settings;
+				}
+			}
+			
+			const updatedSettings = {
+				...currentSettings,
+				spot_type_ids: spotTypeIds
+			};
+
+			// Use slug instead of id, and send settings as object (backend will handle it)
+			const pluginSlug = backendPlugin.slug || pluginId;
+			await actionsApi.patch(`/plugins/${pluginSlug}`, {
+				settings: updatedSettings
+			});
+
+			// Update Redux store
+			dispatch(genericActions.plugins.updateAsync({
+				id: backendPlugin.id,
+				updates: { settings: updatedSettings }
+			}));
+
+			setSavedSpotTypeIds([...selectedSpotTypeIds]);
+			toast.success(t('plugins.cleaning.spotTypesSaved', 'Spot types saved successfully'));
+		} catch (error) {
+			console.error('Error saving spot types:', error);
+			toast.error(t('plugins.cleaning.spotTypesError', 'Failed to save spot types'));
+			// Revert to saved selection
+			setSelectedSpotTypeIds([...savedSpotTypeIds]);
+		} finally {
+			setSaving(false);
+		}
+	};
+
+	// Check if there are unsaved changes
+	const hasUnsavedChanges = JSON.stringify(selectedSpotTypeIds.sort()) !== JSON.stringify(savedSpotTypeIds.sort());
 
 	// Plugin details for summary tab
 	const getPluginDetails = (pluginId: string): PluginDetails => {
@@ -223,7 +367,8 @@ function PluginSettings() {
 	const Icon = currentPlugin.icon;
 
 	// Get translated plugin name
-	const getPluginName = (pluginId: string) => {
+	const getPluginName = (pluginId: string | undefined) => {
+		if (!pluginId || !currentPlugin) return 'Plugin';
 		return t(`plugins.${pluginId}.title`, currentPlugin.name);
 	};
 
@@ -233,7 +378,7 @@ function PluginSettings() {
 				<div 
 					className="grid place-items-center rounded-lg flex-shrink-0"
 					style={{
-						backgroundColor: currentPlugin.iconColor,
+						backgroundColor: currentPlugin.iconColor || '#6b7280',
 						width: '48px',
 						height: '48px',
 					}}
@@ -316,6 +461,66 @@ function PluginSettings() {
 						</div>
 					</CardContent>
 				</Card>
+
+				{/* Spot Types Selection for Cleaning Plugin */}
+				{pluginId === 'cleaning' && Array.isArray(spotTypes) && (
+					<Card>
+						<CardHeader>
+							<CardTitle className="flex items-center justify-between">
+								<span>{t('plugins.cleaning.spotTypes', 'Applicable Spot Types')}</span>
+								{hasUnsavedChanges && (
+									<span className="text-xs text-amber-500 font-normal">
+										{t('plugins.cleaning.unsavedChanges', 'Unsaved changes')}
+									</span>
+								)}
+							</CardTitle>
+							<CardDescription>
+								{t('plugins.cleaning.spotTypesDescription', 'Select which spot types are applicable for cleaning operations')}
+							</CardDescription>
+						</CardHeader>
+						<CardContent className="space-y-4">
+							<div className="space-y-2">
+								<label className="text-sm font-medium">
+									{t('plugins.cleaning.selectSpotTypes', 'Select Spot Types')}
+								</label>
+								<MultiSelect
+									options={Array.isArray(spotTypes) ? spotTypes.map((st: any) => ({
+										value: String(st.id),
+										label: st.name || `Spot Type ${st.id}`
+									})) : []}
+									onValueChange={handleSpotTypesChange}
+									defaultValue={Array.isArray(spotTypes) && spotTypes.length > 0 
+										? selectedSpotTypeIds.filter(id => spotTypes.some((st: any) => String(st.id) === id))
+										: []}
+									placeholder={
+										!Array.isArray(spotTypes) || spotTypes.length === 0
+											? t('plugins.cleaning.loadingSpotTypes', 'Loading spot types...')
+											: t('plugins.cleaning.selectSpotTypesPlaceholder', 'Select spot types...')
+									}
+									maxCount={10}
+									disabled={saving}
+									className="w-full"
+								/>
+								<p className="text-xs text-muted-foreground">
+									{t('plugins.cleaning.spotTypesHint', 'Only spots with selected types will be available for cleaning operations')}
+								</p>
+							</div>
+							<div className="flex justify-end pt-2">
+								<Button
+									onClick={handleSaveSpotTypes}
+									disabled={saving || !hasUnsavedChanges || !backendPlugin}
+									className="gap-2"
+								>
+									<Save className="h-4 w-4" />
+									{saving 
+										? t('plugins.cleaning.saving', 'Saving...')
+										: t('plugins.cleaning.save', 'Save')
+									}
+								</Button>
+							</div>
+						</CardContent>
+					</Card>
+				)}
 
 				<Card>
 					<CardHeader>

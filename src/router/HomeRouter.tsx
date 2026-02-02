@@ -35,6 +35,7 @@ import AnalyticsSettings from '@/pages/settings/sub_pages/analytics/AnalyticsSet
 import AnalyticsComingSoon from '@/pages/analytics/AnalyticsComingSoon';
 import MotivationSettings from '@/pages/settings/sub_pages/motivation/MotivationSettings';
 import MotivationComingSoon from '@/pages/motivation/MotivationComingSoon';
+import CleaningStatuses from '@/pages/settings/sub_pages/cleaning-statuses/CleaningStatuses';
 import Boards from '@/pages/boards/Boards';
 import Home from '@/pages/home/Home';
 // Messages removed
@@ -128,6 +129,7 @@ export const HomeRoutes = () => {
           <Route path="/settings/gamification" element={<GamificationSettings />} />
           <Route path="/settings/analytics" element={<AnalyticsSettings />} />
           <Route path="/settings/motivation" element={<MotivationSettings />} />
+          <Route path="/settings/cleaning-statuses" element={<CleaningStatuses />} />
           <Route path="/settings/test" element={<TestPage />} />
           
           {/* Compliance Routes */}

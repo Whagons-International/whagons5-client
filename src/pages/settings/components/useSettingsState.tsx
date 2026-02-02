@@ -61,7 +61,13 @@ export function useSettingsState<T extends { id: number; [key: string]: any }>({
   const [searchParams, setSearchParams] = useSearchParams();
   
   // Redux state
-  const { value: items, loading, error } = useSelector((state: RootState) => state[entityName] as { value: T[]; loading: boolean; error: string | null });
+  const { value: items, loading, error } = useSelector((state: RootState) => {
+    const entityState = (state as any)[entityName];
+    if (!entityState) {
+      return { value: [], loading: false, error: null };
+    }
+    return entityState as { value: T[]; loading: boolean; error: string | null };
+  });
   
   // Local state
   const [searchQuery, setSearchQuery] = useState('');

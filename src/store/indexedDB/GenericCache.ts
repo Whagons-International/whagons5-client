@@ -763,5 +763,3 @@ export class GenericCache {
 		return sha256(text).toString(encHex);
 	}
 }
-
-

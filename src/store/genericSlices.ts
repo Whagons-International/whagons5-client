@@ -66,6 +66,7 @@ const genericSliceConfigs = [
     { name: 'taskNotes', table: 'wh_task_notes', endpoint: '/task-notes', store: 'task_notes', hashFields: ['id','uuid','task_id','note','user_id','updated_at'] },
     { name: 'taskRecurrences', table: 'wh_task_recurrences', endpoint: '/task-recurrences', store: 'task_recurrences', hashFields: ['id','rrule','dtstart','duration_minutes','name','description','workspace_id','category_id','team_id','template_id','priority_id','status_id','user_ids','created_by','is_active','last_generated_at','count','occurrences_generated','custom_field_values','updated_at'] },
     { name: 'workspaceChat', table: 'wh_workspace_chat', endpoint: '/workspace-chat', store: 'workspace_chat', hashFields: ['id','uuid','workspace_id','message','user_id','updated_at'] },
+    { name: 'workspaceResources', table: 'wh_workspace_resources', endpoint: '/workspace-resources', store: 'workspace_resources', hashFields: ['id','uuid','workspace_id','file_path','file_url','file_name','file_extension','file_size','user_id','folder','updated_at'] },
 
     // Error Tracking
     { name: 'exceptions', table: 'wh_exceptions', endpoint: '/exceptions', store: 'exceptions', hashFields: ['id','workspace_id','user_id','role_id','updated_at'] },
@@ -155,6 +156,7 @@ export const {
     taskNotes,
     taskRecurrences,
     workspaceChat,
+    workspaceResources,
     exceptions,
     // Core entities (converted from custom)
     categories,
@@ -234,6 +236,7 @@ export const genericEventNames = {
     taskNotes: genericSlices.slices.taskNotes.eventNames,
     taskRecurrences: genericSlices.slices.taskRecurrences.eventNames,
     workspaceChat: genericSlices.slices.workspaceChat.eventNames,
+    workspaceResources: genericSlices.slices.workspaceResources.eventNames,
     exceptions: genericSlices.slices.exceptions.eventNames,
     // Core entities (converted from custom)
     categories: genericSlices.slices.categories.eventNames,
@@ -315,6 +318,7 @@ export const genericInternalActions = {
     taskNotes: genericSlices.slices.taskNotes.actions,
     taskRecurrences: genericSlices.slices.taskRecurrences.actions,
     workspaceChat: genericSlices.slices.workspaceChat.actions,
+    workspaceResources: genericSlices.slices.workspaceResources.actions,
     exceptions: genericSlices.slices.exceptions.actions,
     // Core entities (converted from custom)
     categories: genericSlices.slices.categories.actions,
@@ -388,6 +392,7 @@ export const genericActions = {
     taskNotes: publicActions(genericInternalActions.taskNotes),
     taskRecurrences: publicActions(genericInternalActions.taskRecurrences),
     workspaceChat: publicActions(genericInternalActions.workspaceChat),
+    workspaceResources: publicActions(genericInternalActions.workspaceResources),
     exceptions: publicActions(genericInternalActions.exceptions),
     // Core entities (converted from custom)
     categories: publicActions(genericInternalActions.categories),

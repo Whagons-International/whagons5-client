@@ -5,7 +5,7 @@ import { TAB_ANIMATION, getTabInitialX, type TabAnimationConfig } from '@/config
 import WorkspaceTable, { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
 import CalendarViewTab from '@/pages/spaces/components/CalendarViewTab';
-import SchedulerViewTab from '@/pages/spaces/components/SchedulerViewTab';
+import SchedulerViewTab from '@/features/scheduler/SchedulerViewTab';
 import TaskBoardTab from '@/pages/spaces/components/TaskBoardTab';
 import MapViewTab from '@/pages/spaces/components/MapViewTab';
 import WhiteboardViewTab from '@/pages/spaces/components/WhiteboardViewTab';

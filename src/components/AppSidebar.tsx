@@ -545,20 +545,22 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   }, []);
 
   // Prefer Redux once it has data; otherwise show local IndexedDB rows
-  const displayWorkspaces: Workspace[] = (workspaces && workspaces.length > 0)
-    ? workspaces as any
-    : (initialWorkspaces || []);
+  const displayWorkspaces: Workspace[] = useMemo(() => {
+    return (workspaces && workspaces.length > 0)
+      ? workspaces as any
+      : (initialWorkspaces || []);
+  }, [workspaces, initialWorkspaces]);
 
-  const workspaceIconKey = displayWorkspaces
+  const workspaceIconKey = useMemo(() => displayWorkspaces
     .map((workspace) => `${workspace.id}:${workspace.icon ?? ''}`)
-    .join('|');
+    .join('|'), [displayWorkspaces]);
 
   // Dedupe workspaces by id to avoid duplicate key warnings when state temporarily contains duplicates
   const uniqueWorkspaces = useMemo(() => {
     const map = new Map<string, Workspace>();
     for (const w of displayWorkspaces) map.set(String(w.id), w);
     return Array.from(map.values());
-  }, [displayWorkspaces, workspaceIconKey]);
+  }, [displayWorkspaces]);
 
 
   // Note: clearError action not available in generic slices

@@ -1,0 +1,104 @@
+/* Scheduler Styles - Div-based implementation */
+
+:root {
+  --scheduler-grid-line: rgba(0, 0, 0, 0.1);
+  --scheduler-grid-line-major: rgba(0, 0, 0, 0.18);
+  --scheduler-zebra-stripe: rgba(0, 0, 0, 0.012);
+  --scheduler-weekend-bg: rgba(0, 0, 0, 0.015);
+  --scheduler-today-bg: rgba(59, 130, 246, 0.04);
+  --scheduler-today-accent: rgba(59, 130, 246, 0.6);
+  --scheduler-hover-cell: rgba(59, 130, 246, 0.06);
+  --scheduler-hover-cell-border: rgba(59, 130, 246, 0.25);
+  --scheduler-current-time: hsl(var(--destructive));
+  --scheduler-event-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --scheduler-event-shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --scheduler-event-radius: 8px;
+  --scheduler-resource-width: 260px;
+  --scheduler-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark {
+  --scheduler-grid-line: rgba(255, 255, 255, 0.1);
+  --scheduler-grid-line-major: rgba(255, 255, 255, 0.18);
+  --scheduler-zebra-stripe: rgba(255, 255, 255, 0.015);
+  --scheduler-weekend-bg: rgba(255, 255, 255, 0.02);
+  --scheduler-today-bg: rgba(59, 130, 246, 0.08);
+  --scheduler-hover-cell: rgba(59, 130, 246, 0.1);
+  --scheduler-hover-cell-border: rgba(59, 130, 246, 0.35);
+  --scheduler-event-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --scheduler-event-shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+/* Theme-aware event bar (when no custom color is set) */
+.scheduler-event-bar-themed {
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 12%, transparent);
+  border-left: 3px solid var(--primary);
+  color: var(--foreground);
+}
+
+/* Event label text — dark in light mode, light in dark mode */
+.scheduler-event-label {
+  color: var(--foreground);
+  opacity: 0.85;
+}
+
+/* Event icon — visible but not overpowering */
+.scheduler-event-icon {
+  color: var(--foreground);
+  opacity: 0.7;
+}
+
+/* Event bar hover effects */
+.scheduler-event-bar:hover {
+  filter: brightness(0.96);
+}
+
+.scheduler-event-bar:active {
+  cursor: grabbing !important;
+  filter: brightness(0.92);
+}
+
+/* Drag ghost styling */
+.scheduler-drag-ghost {
+  transition: none !important;
+}
+
+/* Tooltip animation */
+.scheduler-tooltip {
+  animation: tooltip-appear 150ms ease-out;
+}
+
+@keyframes tooltip-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Time header */
+.scheduler-time-header {
+  background: linear-gradient(180deg, var(--background) 0%, hsl(var(--muted) / 0.3) 100%);
+  border-bottom: 1px solid var(--scheduler-grid-line-major);
+  backdrop-filter: blur(8px);
+}
+
+/* Resource list scrollbar */
+.scheduler-resource-list::-webkit-scrollbar {
+  width: 4px;
+}
+.scheduler-resource-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 2px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  :root {
+    --scheduler-resource-width: 200px;
+  }
+}

@@ -2,7 +2,7 @@
 @import './styles/fullcalendar-custom.css';
 
 /* Scheduler custom styles (Bryntum-inspired) */
-@import './styles/scheduler.css';
+@import './features/scheduler/styles/scheduler.css';
 
 @import "tailwindcss";
 @plugin "tailwindcss-animate";

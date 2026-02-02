@@ -4,6 +4,41 @@ import { TasksCache } from "../indexedDB/TasksCache";
 import { TaskEvents } from "../eventEmiters/taskEvents";
 import { api } from "@/store/api/internalApi";
 
+/**
+ * Apply pivot_changes from a task API response to the local taskUsers IndexedDB store.
+ * pivot_changes: { created: [{id, task_id, user_id, ...}], deleted_user_ids: [userId, ...] }
+ * This avoids fetching the whole table — the backend tells us exactly what changed.
+ */
+export async function applyTaskUserPivotChanges(taskId: number, pivotChanges: { created?: any[]; deleted_user_ids?: number[] }): Promise<void> {
+    // Lazy import to avoid circular dependency (CacheRegistry → genericSlices → store → tasksSlice)
+    const { getCacheForTable, syncReduxForTable } = await import('../indexedDB/CacheRegistry');
+    const cache = getCacheForTable('wh_task_user');
+    if (!cache) return;
+    try {
+        // Delete pivot rows by (task_id, user_id) match
+        if (pivotChanges.deleted_user_ids?.length) {
+            const deletedSet = new Set(pivotChanges.deleted_user_ids.map(Number));
+            const allRows = await cache.getAll();
+            for (const row of allRows) {
+                if (Number(row.task_id) === taskId && deletedSet.has(Number(row.user_id))) {
+                    await cache.remove(row.id);
+                }
+            }
+        }
+
+        // Add newly created pivot rows (with real server IDs)
+        if (pivotChanges.created?.length) {
+            for (const row of pivotChanges.created) {
+                await cache.add(row);
+            }
+        }
+
+        await syncReduxForTable('wh_task_user');
+    } catch (error) {
+        console.warn('applyTaskUserPivotChanges: failed', error);
+    }
+}
+
 // Helper function to ensure task has all required properties
 const ensureTaskDefaults = (task: any): Task => {
     return {
@@ -34,28 +69,10 @@ export const addTaskAsync = createAsyncThunk(
             
             // Update IndexedDB on success
             await TasksCache.addTask(newTask);
-            
-            // Verify task was added correctly to IndexedDB
-            console.log('[addTaskAsync] Task added to IndexedDB:', {
-                id: newTask.id,
-                name: newTask.name,
-                start_date: newTask.start_date,
-                due_date: newTask.due_date,
-                user_ids: newTask.user_ids,
-                workspace_id: newTask.workspace_id,
-            });
-            
-            // Verify it can be retrieved
-            const verifyTask = await TasksCache.getTask(newTask.id.toString());
-            if (!verifyTask) {
-                console.error('[addTaskAsync] WARNING: Task not found in IndexedDB after adding!');
-            } else {
-                console.log('[addTaskAsync] Verified task in IndexedDB:', {
-                    id: verifyTask.id,
-                    hasStartDate: !!verifyTask.start_date,
-                    hasUserIds: !!verifyTask.user_ids,
-                    userIdsCount: verifyTask.user_ids?.length || 0,
-                });
+
+            // Sync taskUsers pivot table locally from pivot_changes in the response
+            if (payload?.pivot_changes) {
+                await applyTaskUserPivotChanges(newTask.id, payload.pivot_changes);
             }
             
             return newTask;
@@ -93,6 +110,11 @@ export const updateTaskAsync = createAsyncThunk(
             
             // Update IndexedDB on success
             await TasksCache.updateTask(id.toString(), updatedTask);
+
+            // Sync taskUsers pivot table locally from pivot_changes in the response
+            if (payload?.pivot_changes) {
+                await applyTaskUserPivotChanges(id, payload.pivot_changes);
+            }
             
             return updatedTask;
         } catch (error: any) {

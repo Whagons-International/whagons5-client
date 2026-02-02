@@ -141,6 +141,16 @@ export function useWorkspaceKpiCards(params: {
 
   const scopedKpiCardsFromStore = useMemo(() => {
     return (allKpiCardsFromRedux || [])
+      .map((c) => {
+        // Normalize query_config / display_config from JSON strings to objects
+        let qc = c.query_config;
+        if (typeof qc === 'string') { try { qc = JSON.parse(qc); } catch { qc = {}; } }
+        let dc = c.display_config;
+        if (typeof dc === 'string') { try { dc = JSON.parse(dc); } catch { dc = {}; } }
+        return (qc !== c.query_config || dc !== c.display_config)
+          ? { ...c, query_config: qc, display_config: dc }
+          : c;
+      })
       .filter((c) => c && typeof c.id === 'number')
       .filter((c) => c.is_enabled !== false)
       .filter((c) => {
@@ -554,6 +564,8 @@ export function useWorkspaceKpiCards(params: {
   }, [headerKpiCards, defaultComputed, customComputed, hasDefaultCardsInLoaded, doneStatusId, workingStatusIds, stats.total, stats.inProgress, stats.completedToday, stats.trend, statsArePending, completedLast7Days, trendDelta, t]);
 
   const headerCards = headerCardsForRender;
+
+
 
   return {
     headerKpiCards,

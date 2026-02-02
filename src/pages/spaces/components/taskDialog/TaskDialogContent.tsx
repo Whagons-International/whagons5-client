@@ -35,7 +35,7 @@ import {
 import { normalizeDefaultUserIds } from './utils/fieldHelpers';
 import type { TaskDialogProps } from './types';
 import { celebrateTaskCompletion } from '@/utils/confetti';
-import { combineLocalDateAndTime, formatLocalDateTime } from '../scheduler/utils/dateTime';
+import { combineLocalDateAndTime, formatLocalDateTime } from '@/features/scheduler/utils/dateTime';
 import { trackSelection, trackSelections } from '@/utils/taskCreationPreferences';
 
 type Props = TaskDialogProps & {
@@ -371,6 +371,8 @@ export default function TaskDialogContent({
           if (taskTag) await dispatch(genericActions.taskTags.removeAsync(taskTag.id)).unwrap();
         }
         await syncTaskCustomFields(Number(task.id));
+        // Note: taskUsers pivot sync is handled by the backend PATCH endpoint
+        // (via Eloquent sync()). Changes propagate to frontend via WebSocket/RTL.
       } else {
         const payload: any = {
           name: formState.name.trim(),
@@ -396,12 +398,7 @@ export default function TaskDialogContent({
         };
         if (computed.spotsApplicable) payload.spot_id = formState.spotId;
 
-        console.log('[TaskDialog] Creating task with payload:', JSON.stringify(payload, null, 2));
-
         const result = await dispatch((await import('@/store/reducers/tasksSlice')).addTaskAsync(payload)).unwrap();
-        
-        console.log('[TaskDialog] Task created successfully:', JSON.stringify(result, null, 2));
-        console.log('[TaskDialog] Task has start_date:', !!result?.start_date, 'user_ids:', result?.user_ids);
         const newTaskId = result?.id;
 
         if (mode === 'create' && newTaskId && formState.selectedTagIds.length > 0) {
@@ -410,6 +407,8 @@ export default function TaskDialogContent({
           }
         }
         if (newTaskId) await syncTaskCustomFields(Number(newTaskId));
+        // Note: taskUsers pivot rows are created by the backend (via Eloquent sync()).
+        // Changes propagate to frontend via WebSocket/RTL.
 
         // Track selections for recent history (only on successful create)
         if (computed.workspaceId) {
@@ -442,19 +441,9 @@ export default function TaskDialogContent({
   // Capture initial user_ids when dialog opens (from scheduler or other source)
   useEffect(() => {
     if (open && mode === 'create') {
-      console.log('[TaskDialog] Dialog opened with task prop:', {
-        task,
-        user_ids: task?.user_ids,
-        user_ids_type: typeof task?.user_ids,
-        is_array: Array.isArray(task?.user_ids),
-        user_ids_length: task?.user_ids?.length,
-      });
-      
       if (task?.user_ids && Array.isArray(task.user_ids)) {
         initialUserIdsRef.current = task.user_ids.map((id: any) => Number(id)).filter((n: any) => Number.isFinite(n));
-        console.log('[TaskDialog] Captured initial user_ids:', initialUserIdsRef.current);
       } else {
-        console.warn('[TaskDialog] No valid user_ids in task prop!');
         initialUserIdsRef.current = [];
       }
     } else if (!open) {
@@ -540,9 +529,7 @@ export default function TaskDialogContent({
       if (!hasInitialUsers) {
         const defaultsUsers = normalizeDefaultUserIds(t.default_user_ids);
         formState.setSelectedUserIds(defaultsUsers.length > 0 ? defaultsUsers : []);
-        console.log('[TaskDialog] Applied template default users:', defaultsUsers);
       } else {
-        console.log('[TaskDialog] Preserving initial user_ids from ref:', initialUserIdsRef.current);
         // Make sure the users are still set (in case template changed before form init completed)
         formState.setSelectedUserIds(initialUserIdsRef.current);
       }
@@ -804,6 +791,9 @@ export default function TaskDialogContent({
                 : t('task.createTask', 'Create Task')}
           </Button>
         </div>
+        {mode === 'edit' && task?.id && (
+          <p className="text-[11px] text-muted-foreground/50 text-center mt-2 select-all">ID: {task.id}</p>
+        )}
       </div>
     </>
   );

@@ -1,5 +1,8 @@
 import { DB } from "./DB";
+import type { ExcalidrawElement } from "@excalidraw/excalidraw/types/element/types";
+import type { AppState } from "@excalidraw/excalidraw/types/types";
 
+// Legacy types kept for reference / migration
 export interface Page {
   id: string;
   name: string;
@@ -26,9 +29,12 @@ export interface Point {
 
 export interface WhiteboardData {
   workspaceId: string;
-  pages: Page[];
-  currentPageIndex: number;
-  history: Page[][];
+  elements: readonly ExcalidrawElement[];
+  appState?: Partial<AppState>;
+  // Legacy fields (kept for backwards compat during migration)
+  pages?: Page[];
+  currentPageIndex?: number;
+  history?: Page[][];
 }
 
 /**
@@ -66,9 +72,8 @@ export class WhiteboardCache {
     try {
       await DB.put(WhiteboardCache.STORE_NAME, {
         workspaceId: data.workspaceId,
-        pages: data.pages,
-        currentPageIndex: data.currentPageIndex,
-        history: data.history,
+        elements: data.elements,
+        appState: data.appState,
         updatedAt: Date.now(),
       });
     } catch (error) {

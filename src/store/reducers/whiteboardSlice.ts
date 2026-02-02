@@ -1,5 +1,7 @@
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { WhiteboardCache, WhiteboardData, Page } from "../indexedDB/WhiteboardCache";
+import { WhiteboardCache, WhiteboardData } from "../indexedDB/WhiteboardCache";
+import type { ExcalidrawElement } from "@excalidraw/excalidraw/types/element/types";
+import type { AppState } from "@excalidraw/excalidraw/types/types";
 
 export interface WhiteboardState {
   data: WhiteboardData | null;
@@ -28,15 +30,22 @@ export const loadWhiteboard = createAsyncThunk(
     try {
       const data = await WhiteboardCache.getWhiteboard(workspaceId);
       
-      // If no data exists, create default whiteboard
       if (!data) {
         const defaultData: WhiteboardData = {
           workspaceId,
-          pages: [{ id: '1', name: 'Page 1', elements: [] }],
-          currentPageIndex: 0,
-          history: [],
+          elements: [],
+          appState: {},
         };
         return defaultData;
+      }
+
+      // Migration: if old format detected (has pages but no elements at root)
+      if (data.pages && !data.elements) {
+        return {
+          workspaceId,
+          elements: [],
+          appState: {},
+        } as WhiteboardData;
       }
 
       return data;
@@ -52,7 +61,7 @@ export const loadWhiteboard = createAsyncThunk(
  */
 export const saveWhiteboard = createAsyncThunk(
   'whiteboard/saveWhiteboard',
-  async ({ workspaceId, payload }: { workspaceId: string; payload: { pages: Page[]; currentPageIndex: number; history: Page[][] } }, { rejectWithValue }) => {
+  async ({ workspaceId, elements, appState }: { workspaceId: string; elements: readonly ExcalidrawElement[]; appState?: Partial<AppState> }, { rejectWithValue }) => {
     if (!workspaceId) {
       return rejectWithValue('Workspace ID is required');
     }
@@ -60,9 +69,8 @@ export const saveWhiteboard = createAsyncThunk(
     try {
       const data: WhiteboardData = {
         workspaceId,
-        pages: payload.pages,
-        currentPageIndex: payload.currentPageIndex,
-        history: payload.history,
+        elements,
+        appState,
       };
 
       await WhiteboardCache.saveWhiteboard(data);
@@ -78,19 +86,14 @@ const whiteboardSlice = createSlice({
   name: 'whiteboard',
   initialState,
   reducers: {
-    setPages: (state, action: PayloadAction<Page[]>) => {
+    setElements: (state, action: PayloadAction<readonly ExcalidrawElement[]>) => {
       if (state.data) {
-        state.data.pages = action.payload;
+        state.data.elements = action.payload;
       }
     },
-    setCurrentPageIndex: (state, action: PayloadAction<number>) => {
+    setAppState: (state, action: PayloadAction<Partial<AppState>>) => {
       if (state.data) {
-        state.data.currentPageIndex = action.payload;
-      }
-    },
-    setHistory: (state, action: PayloadAction<Page[][]>) => {
-      if (state.data) {
-        state.data.history = action.payload;
+        state.data.appState = action.payload;
       }
     },
     clearError: (state) => {
@@ -98,7 +101,6 @@ const whiteboardSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    // Load whiteboard
     builder
       .addCase(loadWhiteboard.pending, (state) => {
         state.loading = true;
@@ -114,7 +116,6 @@ const whiteboardSlice = createSlice({
         state.error = action.payload as string;
       });
 
-    // Save whiteboard
     builder
       .addCase(saveWhiteboard.pending, (state) => {
         state.saving = true;
@@ -132,5 +133,5 @@ const whiteboardSlice = createSlice({
   },
 });
 
-export const { setPages, setCurrentPageIndex, setHistory, clearError } = whiteboardSlice.actions;
+export const { setElements, setAppState, clearError } = whiteboardSlice.actions;
 export default whiteboardSlice.reducer;

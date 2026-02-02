@@ -2,11 +2,11 @@
 @import './styles/fullcalendar-custom.css';
 
 /* Scheduler custom styles (Bryntum-inspired) */
-@import './styles/scheduler.css';
+@import './features/scheduler/styles/scheduler.css';
 
 @import "tailwindcss";
-@plugin "tailwindcss-animate";
 @import "./starwars-fonts.css";
+@plugin "tailwindcss-animate";
 
 /* 
   Add this to your HTML head instead of importing here:
@@ -1970,4 +1970,22 @@ html.starwars [data-radix-popper-content-wrapper] .border-border,
 
 /* Select and Labels in filter toolbar - now use shadcn components with proper dark mode */
 /* Removed forced white background - components now respect theme */
+
+/* ── Excalidraw style isolation ── */
+/* Undo Tailwind's global `* { border-color; outline }` and other resets inside Excalidraw */
+.excalidraw-wrapper *,
+.excalidraw-wrapper *::before,
+.excalidraw-wrapper *::after {
+  border-color: initial;
+  outline: initial;
+  box-sizing: border-box;
+}
+.excalidraw-wrapper button,
+.excalidraw-wrapper [role="button"],
+.excalidraw-wrapper a,
+.excalidraw-wrapper input,
+.excalidraw-wrapper select,
+.excalidraw-wrapper textarea {
+  transition: none;
+}
 

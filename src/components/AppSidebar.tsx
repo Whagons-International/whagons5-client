@@ -562,9 +562,15 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   }, []);
 
   // Prefer Redux once it has data; otherwise show local IndexedDB rows
-  const displayWorkspaces: Workspace[] = (workspaces && workspaces.length > 0)
-    ? workspaces as any
-    : (initialWorkspaces || []);
+  const displayWorkspaces: Workspace[] = useMemo(() => {
+    return (workspaces && workspaces.length > 0)
+      ? workspaces as any
+      : (initialWorkspaces || []);
+  }, [workspaces, initialWorkspaces]);
+
+  const workspaceIconKey = useMemo(() => displayWorkspaces
+    .map((workspace) => `${workspace.id}:${workspace.icon ?? ''}`)
+    .join('|'), [displayWorkspaces]);
 
   // Dedupe workspaces by id to avoid duplicate key warnings when state temporarily contains duplicates
   const uniqueWorkspaces = useMemo(() => {
@@ -673,19 +679,23 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   // Load workspace icons when workspaces change
   useEffect(() => {
     const loadWorkspaceIcons = async () => {
-      const iconNames = uniqueWorkspaces.map((workspace: Workspace) => workspace.icon).filter(Boolean);
-      if (iconNames.length > 0) {
-        try {
-          const icons = await iconService.loadIcons(iconNames);
-          setWorkspaceIcons(icons);
-        } catch (error) {
-          console.error('Error loading workspace icons:', error);
-        }
+      const iconNames = uniqueWorkspaces
+        .map((workspace: Workspace) => workspace.icon)
+        .filter((iconName): iconName is string => typeof iconName === 'string' && iconName.length > 0);
+      if (iconNames.length === 0) {
+        setWorkspaceIcons({});
+        return;
+      }
+      try {
+        const icons = await iconService.loadIcons(iconNames);
+        setWorkspaceIcons(icons);
+      } catch (error) {
+        console.error('Error loading workspace icons:', error);
       }
     };
 
     loadWorkspaceIcons();
-  }, [uniqueWorkspaces]);
+  }, [uniqueWorkspaces, workspaceIconKey]);
 
   // Preload common icons on component mount
   useEffect(() => {

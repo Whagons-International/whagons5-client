@@ -75,7 +75,7 @@ export function StatusBadge({
           {words[0]}<br />{words.slice(1).join(' ')}
         </span>
       ) : (
-        <span className="truncate max-w-[140px] lowercase whitespace-normal">{meta.name}</span>
+        <span className="truncate max-w-[140px] lowercase whitespace-nowrap">{meta.name}</span>
       )}
     </span>
   );

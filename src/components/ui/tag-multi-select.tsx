@@ -143,9 +143,14 @@ export function TagMultiSelect({
       )
     }
 
-    const { favorites, recent, all } = groupedOptions
+    const { favorites, recent, all: rawAll } = groupedOptions
     const hasFavorites = favorites.length > 0
     const hasRecent = recent.length > 0
+    const excludedIds = new Set([
+      ...favorites.map((tag) => tag.id),
+      ...recent.map((tag) => tag.id),
+    ])
+    const all = rawAll.filter((tag) => !excludedIds.has(tag.id))
 
     return (
       <>

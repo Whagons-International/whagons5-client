@@ -188,7 +188,9 @@ export function PostItem({
                 // 2. Relative path starting with /api/assets - prepend base URL
                 // 3. Just an ID - use getFileUrl to construct full URL
                 let imageUrl = attachment.file_path;
-                if (imageUrl?.startsWith('http')) {
+                if (imageUrl?.startsWith('blob:') || imageUrl?.startsWith('data:')) {
+                  // Blob/data URLs (e.g. from IndexedDB), use as-is
+                } else if (imageUrl?.startsWith('http')) {
                   // Full URL, use as-is
                 } else if (imageUrl?.includes('/api/assets/')) {
                   // Relative path with /api/assets/, extract the ID

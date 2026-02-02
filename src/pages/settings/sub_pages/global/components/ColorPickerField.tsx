@@ -9,10 +9,10 @@ import {
   ColorPicker,
   ColorPickerSelection,
   ColorPickerHue,
+  ColorPickerAlpha,
   ColorPickerEyeDropper,
   ColorPickerFormat,
   ColorPickerOutput,
-  ColorPickerAlpha,
 } from "@/components/ui/shadcn-io/color-picker";
 import { cn } from "@/lib/utils";
 import { ColorPickerFieldProps } from "../types";

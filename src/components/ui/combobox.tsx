@@ -174,6 +174,13 @@ export function Combobox({
     const hasFavorites = favorites.length > 0
     const hasRecent = recent.length > 0
 
+    // Filter out items already shown in favorites/recent from the "All" list
+    const shownValues = new Set([
+      ...favorites.map((o) => o.value),
+      ...recent.map((o) => o.value),
+    ])
+    const filteredAll = (hasFavorites || hasRecent) ? all.filter((o) => !shownValues.has(o.value)) : all
+
     return (
       <>
         {/* Favorites section */}
@@ -207,13 +214,13 @@ export function Combobox({
         )}
 
         {/* All options */}
-        {all.length > 0 && (
+        {filteredAll.length > 0 && (
           <CommandGroup heading={
             (hasFavorites || hasRecent) ? (
               <span className="text-xs font-medium text-muted-foreground">All</span>
             ) : undefined
           }>
-            {all.map((option) => renderOption(option))}
+            {filteredAll.map((option) => renderOption(option))}
           </CommandGroup>
         )}
       </>
@@ -240,7 +247,12 @@ export function Combobox({
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
         <Command>
           <CommandInput ref={inputRef} placeholder={searchPlaceholder} />
-          <CommandList>
+          <CommandList
+            onWheel={(e) => {
+              // Prevent dialog/popover from swallowing scroll events
+              e.stopPropagation()
+            }}
+          >
             <CommandEmpty>{emptyText}</CommandEmpty>
             {renderGroupedContent()}
           </CommandList>

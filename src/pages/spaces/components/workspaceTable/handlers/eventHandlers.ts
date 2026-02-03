@@ -11,13 +11,38 @@ export const setupTaskEventHandlers = (refs: EventHandlerRefs) => {
   const { refreshGrid, workspaceId } = refs;
 
   // Debounce refresh calls to prevent rapid-fire refreshes
+  // Also track if a refresh is in progress to prevent overlapping refreshes
   let refreshTimeout: NodeJS.Timeout | null = null;
+  let refreshInProgress = false;
+  let pendingRefresh = false;
+
+  const executeRefresh = async () => {
+    if (refreshInProgress) {
+      // Mark that we need another refresh after the current one completes
+      pendingRefresh = true;
+      return;
+    }
+
+    refreshInProgress = true;
+    try {
+      await refreshGrid();
+    } finally {
+      refreshInProgress = false;
+      // If there was a pending refresh request, execute it now
+      if (pendingRefresh) {
+        pendingRefresh = false;
+        // Small delay to let the grid settle before next refresh
+        setTimeout(executeRefresh, 50);
+      }
+    }
+  };
+
   const debouncedRefresh = () => {
     if (refreshTimeout) {
       clearTimeout(refreshTimeout);
     }
     refreshTimeout = setTimeout(() => {
-      refreshGrid();
+      executeRefresh();
       refreshTimeout = null;
     }, 100); // 100ms debounce
   };

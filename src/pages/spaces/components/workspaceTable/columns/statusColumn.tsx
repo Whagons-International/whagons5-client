@@ -105,11 +105,12 @@ export function createStatusColumn(opts: ColumnBuilderOptions) {
       
       const approvalPending = approvalRequired && derived === 'pending';
       const approvalRejected = approvalRequired && derived === 'rejected';
+      const approvalApproved = approvalRequired && derived === 'approved';
       const allowedNext = getAllowedNextStatuses(row);
       
-      // Build approval props when approval is pending or rejected
+      // Build approval props when approval is pending, rejected, or approved
       let approvalProps = undefined;
-      if (approvalPending || approvalRejected) {
+      if (approvalPending || approvalRejected || approvalApproved) {
         const approverDetails = buildApproverDetails(
           approvalId,
           taskRowId,
@@ -231,7 +232,7 @@ export function createStatusColumn(opts: ColumnBuilderOptions) {
           value={p.value}
           statusMap={statusMap}
           getStatusIcon={getStatusIcon}
-          allowedNext={approvalProps ? [] : allowedNext}
+          allowedNext={approvalApproved ? allowedNext : (approvalProps ? [] : allowedNext)}
           onChange={(to: number) => handleChangeStatus(row, to)}
           approvalProps={approvalProps}
         />

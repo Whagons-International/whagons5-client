@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { useAuth } from '@/providers/AuthProvider';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse, faClock, faFileAlt, faChartBar, faChartLine, faGripVertical, faCog, faLock, faCheck, faStar, faHammer, faBell, faPlus, faPuzzlePiece, faEdit, faTrash, faLink, faTrophy, faRocket, faHotel, faCalendar } from '@fortawesome/free-solid-svg-icons';
@@ -666,6 +667,21 @@ function Plugins() {
 	const [customPlugins, setCustomPlugins] = useState<CustomPlugin[]>(loadCustomPlugins());
 	const [isCustomPluginDialogOpen, setIsCustomPluginDialogOpen] = useState(false);
 	const [editingCustomPlugin, setEditingCustomPlugin] = useState<CustomPlugin | null>(null);
+	// Get current user from auth hook (has global_roles loaded)
+	const { user: authUser } = useAuth();
+	// Also check Redux state as fallback
+	const reduxUser = useSelector((state: RootState) => (state as any).user?.value ?? null);
+	// Prefer authUser, fallback to reduxUser
+	const currentUser = authUser || reduxUser;
+	
+	// Check if user is admin via is_admin field OR has an admin global role
+	const hasAdminField = !!currentUser?.is_admin;
+	const globalRoles = currentUser?.global_roles || [];
+	const hasAdminRole = Array.isArray(globalRoles) && globalRoles.some((role: any) => {
+		const roleName = typeof role === 'object' ? role.name : role;
+		return roleName && roleName.toLowerCase().includes('admin');
+	});
+	const isAdmin = hasAdminField || hasAdminRole;
 
 	useEffect(() => {
 		const unsubscribe = subscribeToPluginsConfig(setPluginsConfigState);
@@ -1242,15 +1258,17 @@ function Plugins() {
 			<div className="p-6 space-y-6 max-w-5xl mx-auto">
 				<div className="flex items-center justify-between">
 					<h1 className="text-2xl font-bold">{t('plugins.title', 'Plugins')}</h1>
-					<div className="flex items-center gap-3">
-						<button 
-							className="text-xs px-3 py-1.5 rounded-md bg-primary/10 hover:bg-primary/20 text-primary transition-colors flex items-center gap-1.5" 
-							onClick={() => navigate('/admin/plugins')}
-						>
-							<FontAwesomeIcon icon={faCog} className="text-xs" />
-							{t('plugins.manage', 'Manage Plugins')}
-						</button>
-					</div>
+					{isAdmin && (
+						<div className="flex items-center gap-3">
+							<button 
+								className="text-xs px-3 py-1.5 rounded-md bg-primary/10 hover:bg-primary/20 text-primary transition-colors flex items-center gap-1.5" 
+								onClick={() => navigate('/admin/plugins')}
+							>
+								<FontAwesomeIcon icon={faCog} className="text-xs" />
+								{t('plugins.manage', 'Manage Plugins')}
+							</button>
+						</div>
+					)}
 				</div>
 
 				<div className="space-y-4">

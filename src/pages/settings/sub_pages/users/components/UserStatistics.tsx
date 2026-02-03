@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
 import dayjs from "dayjs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Users, Shield, CreditCard, Mail } from "lucide-react";
 import type { Invitation, Team, UserTeam } from "@/store/types";
 import type { TranslateFn, UserData } from "../types";
 
@@ -96,55 +97,82 @@ export function UserStatistics({
     <div className="flex-1 min-h-0 overflow-auto p-4">
       <div className="space-y-4">
         {/* Summary cards */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold">{totalUsers}</div>
-                <div className="text-xs text-muted-foreground mt-1">{summaryLabels.total}</div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card className="relative overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">{summaryLabels.total}</p>
+                  <p className="text-3xl font-bold mt-1">{totalUsers}</p>
+                </div>
+                <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                  <Users className="h-6 w-6 text-slate-600 dark:text-slate-400" />
+                </div>
               </div>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-slate-400 to-slate-600" />
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-indigo-600">{adminCount}</div>
-                <div className="text-xs text-muted-foreground mt-1">{summaryLabels.admins}</div>
+
+          <Card className="relative overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">{summaryLabels.admins}</p>
+                  <p className="text-3xl font-bold mt-1 text-indigo-600 dark:text-indigo-400">{adminCount}</p>
+                </div>
+                <div className="h-12 w-12 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                  <Shield className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+                </div>
               </div>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-400 to-indigo-600" />
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-emerald-600">{activeSubPercent}%</div>
-                <div className="text-xs text-muted-foreground mt-1">{summaryLabels.subscriptions}</div>
+
+          <Card className="relative overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">{summaryLabels.subscriptions}</p>
+                  <p className="text-3xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">{activeSubPercent}%</p>
+                </div>
+                <div className="h-12 w-12 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                  <CreditCard className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                </div>
               </div>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-emerald-600" />
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-sky-600">{invitations.length}</div>
-                <div className="text-xs text-muted-foreground mt-1">{summaryLabels.invitations}</div>
+
+          <Card className="relative overflow-hidden">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">{summaryLabels.invitations}</p>
+                  <p className="text-3xl font-bold mt-1 text-sky-600 dark:text-sky-400">{invitations.length}</p>
+                </div>
+                <div className="h-12 w-12 rounded-full bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center">
+                  <Mail className="h-6 w-6 text-sky-600 dark:text-sky-400" />
+                </div>
               </div>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-400 to-sky-600" />
             </CardContent>
           </Card>
         </div>
 
         {/* Charts row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">{charts.usersPerTeamTitle}</CardTitle>
-              <CardDescription className="text-xs">{charts.usersPerTeamDescription}</CardDescription>
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">{charts.usersPerTeamTitle}</CardTitle>
+              <CardDescription>{charts.usersPerTeamDescription}</CardDescription>
             </CardHeader>
             <CardContent>
               {usersByTeam.length > 0 ? (
                 <ReactECharts
                   option={{
                     tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
-                    grid: { left: "3%", right: "4%", bottom: "3%", containLabel: true },
-                    xAxis: { type: "value", name: charts.usersPerTeamAxis },
+                    grid: { left: "3%", right: "12%", bottom: "3%", containLabel: true },
+                    xAxis: { type: "value", name: charts.usersPerTeamAxis, nameLocation: "end", nameGap: 5 },
                     yAxis: {
                       type: "category",
                       data: usersByTeam.map((item) => item.team.name).reverse(),
@@ -169,17 +197,18 @@ export function UserStatistics({
                   style={{ height: "300px" }}
                 />
               ) : (
-                <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                  {emptyStates.noTeamAssignments}
+                <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
+                  <Users className="h-12 w-12 mb-3 opacity-30" />
+                  <p className="text-sm">{emptyStates.noTeamAssignments}</p>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">{charts.usersByJobTitle}</CardTitle>
-              <CardDescription className="text-xs">{charts.usersByJobDescription}</CardDescription>
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">{charts.usersByJobTitle}</CardTitle>
+              <CardDescription>{charts.usersByJobDescription}</CardDescription>
             </CardHeader>
             <CardContent>
               {usersByJobPosition.length > 0 ? (
@@ -206,8 +235,9 @@ export function UserStatistics({
                   style={{ height: "300px" }}
                 />
               ) : (
-                <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                  {emptyStates.noJobPositions}
+                <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
+                  <Users className="h-12 w-12 mb-3 opacity-30" />
+                  <p className="text-sm">{emptyStates.noJobPositions}</p>
                 </div>
               )}
             </CardContent>
@@ -216,10 +246,10 @@ export function UserStatistics({
 
         {/* Invitations over time */}
         {invitationsOverTime.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">{charts.invitationsOverTimeTitle}</CardTitle>
-              <CardDescription className="text-xs">{charts.invitationsOverTimeDescription}</CardDescription>
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">{charts.invitationsOverTimeTitle}</CardTitle>
+              <CardDescription>{charts.invitationsOverTimeDescription}</CardDescription>
             </CardHeader>
             <CardContent>
               <ReactECharts

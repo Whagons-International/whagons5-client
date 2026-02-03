@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -6,7 +6,8 @@ import {
   faPlus,
   faTrash,
   faStar,
-  faCircleInfo
+  faCircleInfo,
+  faGripVertical,
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,16 @@ import { useLanguage } from "@/providers/LanguageProvider";
 import { genericActions, genericInternalActions } from "@/store/genericSlices";
 import toast from "react-hot-toast";
 import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
   WorkingSchedule,
   CountryConfig,
   HolidayCalendar,
@@ -56,6 +67,134 @@ import {
 } from "./types";
 import { FixedScheduleConfig as FixedConfigUI, RotatingScheduleConfig as RotatingConfigUI, FlexibleScheduleConfig as FlexibleConfigUI } from "./components";
 import { getDefaultConfig, calculateWeeklyHours, formatHours } from "./scheduleUtils";
+
+// Extend WorkingSchedule type to include optional position
+interface WorkingScheduleWithPosition extends WorkingSchedule {
+  position?: number;
+}
+
+// Schedule type options for display
+const scheduleTypeOptionsMap = {
+  fixed: 'Fixed',
+  rotating: 'Rotating',
+  flexible: 'Flexible'
+};
+
+// Sortable Schedule Card Component
+function SortableScheduleCard({
+  schedule,
+  onEdit,
+  scheduleTypeOptions,
+  tt,
+}: {
+  schedule: WorkingScheduleWithPosition;
+  onEdit: (schedule: WorkingSchedule) => void;
+  scheduleTypeOptions: { value: string; label: string }[];
+  tt: (key: string, fallback: string) => string;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: schedule.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const isInactive = !schedule.is_active;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`${isDragging ? 'opacity-50 z-50' : ''}`}
+    >
+      <div
+        onClick={() => onEdit(schedule)}
+        className={`group relative border rounded-xl p-4 cursor-pointer transition-all duration-200 hover:shadow-lg hover:shadow-black/5 hover:-translate-y-0.5 ${
+          isInactive 
+            ? 'bg-muted/50 border-border/40 opacity-60 hover:opacity-80' 
+            : 'bg-card hover:bg-accent/50 border-border/60 hover:border-border'
+        }`}
+      >
+        <div className="flex items-center gap-4">
+          {/* Drag Handle */}
+          <div
+            {...attributes}
+            {...listeners}
+            className={`flex-shrink-0 cursor-grab active:cursor-grabbing transition-colors ${
+              isInactive ? 'text-muted-foreground/30' : 'text-muted-foreground/50 hover:text-muted-foreground'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <FontAwesomeIcon icon={faGripVertical} className="text-lg" />
+          </div>
+
+          {/* Icon */}
+          <div className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-sm ${
+            isInactive 
+              ? 'bg-gradient-to-br from-gray-300 to-gray-400 dark:from-gray-600 dark:to-gray-700 shadow-gray-500/10' 
+              : 'bg-gradient-to-br from-orange-400 to-orange-500 shadow-orange-500/20'
+          }`}>
+            <FontAwesomeIcon icon={faClock} className="text-white text-lg" />
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <h3 className={`font-semibold truncate ${isInactive ? 'text-muted-foreground' : 'text-foreground'}`}>
+                {schedule.name}
+              </h3>
+              {schedule.is_default && (
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                  isInactive 
+                    ? 'bg-gray-100 text-gray-500 dark:bg-gray-500/20 dark:text-gray-400' 
+                    : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400'
+                }`}>
+                  <FontAwesomeIcon icon={faStar} className="text-[10px]" />
+                  Default
+                </span>
+              )}
+            </div>
+            {schedule.description && (
+              <p className="text-sm text-muted-foreground truncate">{schedule.description}</p>
+            )}
+          </div>
+
+          {/* Meta info */}
+          <div className="hidden sm:flex items-center gap-4 text-sm text-muted-foreground">
+            <div className="text-center">
+              <div className="text-xs text-muted-foreground/70 uppercase tracking-wide">{tt('fields.type', 'Type')}</div>
+              <div className={`font-medium ${isInactive ? 'text-muted-foreground' : 'text-foreground'}`}>
+                {scheduleTypeOptions.find(o => o.value === schedule.schedule_type)?.label || schedule.schedule_type}
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-muted-foreground/70 uppercase tracking-wide">{tt('fields.weeklyHours', 'Hours')}</div>
+              <div className={`font-medium ${isInactive ? 'text-muted-foreground' : 'text-foreground'}`}>
+                {schedule.weekly_hours}h
+              </div>
+            </div>
+          </div>
+
+          {/* Status badge */}
+          <div className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+            schedule.is_active 
+              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' 
+              : 'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400'
+          }`}>
+            {schedule.is_active ? tt('status.active', 'Active') : tt('status.inactive', 'Inactive')}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function WorkingSchedules() {
   const { t } = useLanguage();
@@ -111,15 +250,71 @@ function WorkingSchedules() {
     dispatch(genericInternalActions.overtimeRules.fetchFromAPI() as any);
   }, [dispatch]);
 
-  // Filtered schedules
+  // Local order state for drag and drop
+  const [orderedSchedules, setOrderedSchedules] = useState<WorkingScheduleWithPosition[]>([]);
+  const orderedSchedulesRef = useRef<WorkingScheduleWithPosition[]>([]);
+
+  // Sync ordered schedules when Redux schedules change
+  useEffect(() => {
+    const schedulesWithPosition = schedules.map((s, index) => ({
+      ...s,
+      position: (s as WorkingScheduleWithPosition).position ?? index,
+    }));
+    // Sort by position
+    schedulesWithPosition.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    setOrderedSchedules(schedulesWithPosition);
+  }, [schedules]);
+
+  // Keep ref in sync
+  useEffect(() => {
+    orderedSchedulesRef.current = orderedSchedules;
+  }, [orderedSchedules]);
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    })
+  );
+
+  // Handle drag end
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const activeId = Number(active.id);
+    const overId = Number(over.id);
+    const previousSchedules = orderedSchedulesRef.current;
+
+    const oldIndex = previousSchedules.findIndex(s => s.id === activeId);
+    const newIndex = previousSchedules.findIndex(s => s.id === overId);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newOrder = arrayMove(previousSchedules, oldIndex, newIndex).map((schedule, index) => ({
+      ...schedule,
+      position: index,
+    }));
+
+    // Update local state
+    setOrderedSchedules(newOrder);
+    toast.success(tt('messages.reordered', 'Schedule order updated'));
+  };
+
+  // Filtered schedules (from ordered schedules)
   const filteredSchedules = useMemo(() => {
-    if (!searchQuery) return schedules;
+    if (!searchQuery) return orderedSchedules;
     const query = searchQuery.toLowerCase();
-    return schedules.filter(s => 
+    return orderedSchedules.filter(s => 
       s.name.toLowerCase().includes(query) ||
       (s.description && s.description.toLowerCase().includes(query))
     );
-  }, [schedules, searchQuery]);
+  }, [orderedSchedules, searchQuery]);
+
+  // Schedule IDs for sortable context
+  const scheduleIds = useMemo(() => filteredSchedules.map(s => s.id), [filteredSchedules]);
 
   // Reset form
   const resetForm = () => {
@@ -224,8 +419,8 @@ function WorkingSchedules() {
   ];
 
   // Stats
-  const activeCount = schedules.filter(s => s.is_active).length;
-  const defaultSchedule = schedules.find(s => s.is_default);
+  const activeCount = orderedSchedules.filter(s => s.is_active).length;
+  const defaultSchedule = orderedSchedules.find(s => s.is_default);
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
@@ -253,7 +448,7 @@ function WorkingSchedules() {
             <CardDescription>{tt('stats.total', 'Total Schedules')}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{schedules.length}</div>
+            <div className="text-3xl font-bold">{orderedSchedules.length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -305,16 +500,16 @@ function WorkingSchedules() {
                     <CardContent className="py-12 text-center">
                       <FontAwesomeIcon icon={faClock} className="text-4xl text-muted-foreground/50 mb-4" />
                       <h3 className="text-lg font-semibold mb-2">
-                        {schedules.length === 0 
+                        {orderedSchedules.length === 0 
                           ? tt('empty.title', 'No schedules yet')
                           : tt('empty.noResults', 'No schedules match your search')}
                       </h3>
                       <p className="text-muted-foreground mb-4">
-                        {schedules.length === 0 
+                        {orderedSchedules.length === 0 
                           ? tt('empty.description', 'Create your first working schedule to get started')
                           : tt('empty.tryDifferent', 'Try a different search term')}
                       </p>
-                      {schedules.length === 0 && (
+                      {orderedSchedules.length === 0 && (
                         <Button onClick={() => { resetForm(); setIsCreateDialogOpen(true); }}>
                           <FontAwesomeIcon icon={faPlus} className="mr-2" />
                           {tt('actions.create', 'Create Schedule')}
@@ -323,58 +518,29 @@ function WorkingSchedules() {
                     </CardContent>
                   </Card>
                 ) : (
-                  <div className="grid gap-3">
-                    {filteredSchedules.map((schedule) => (
-                      <div
-                        key={schedule.id}
-                        onClick={() => openEditDialog(schedule)}
-                        className="group relative bg-card hover:bg-accent/50 border border-border/60 rounded-xl p-4 cursor-pointer transition-all duration-200 hover:shadow-lg hover:shadow-black/5 hover:border-border hover:-translate-y-0.5"
-                      >
-                        <div className="flex items-center gap-4">
-                          {/* Icon */}
-                          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-400 to-orange-500 flex items-center justify-center shadow-sm shadow-orange-500/20">
-                            <FontAwesomeIcon icon={faClock} className="text-white text-lg" />
-                          </div>
-
-                          {/* Content */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <h3 className="font-semibold text-foreground truncate">{schedule.name}</h3>
-                              {schedule.is_default && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400">
-                                  <FontAwesomeIcon icon={faStar} className="text-[10px]" />
-                                  Default
-                                </span>
-                              )}
-                            </div>
-                            {schedule.description && (
-                              <p className="text-sm text-muted-foreground truncate">{schedule.description}</p>
-                            )}
-                          </div>
-
-                          {/* Meta info */}
-                          <div className="hidden sm:flex items-center gap-4 text-sm text-muted-foreground">
-                            <div className="text-center">
-                              <div className="text-xs text-muted-foreground/70 uppercase tracking-wide">{tt('fields.type', 'Type')}</div>
-                              <div className="font-medium text-foreground">{scheduleTypeOptions.find(o => o.value === schedule.schedule_type)?.label || schedule.schedule_type}</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-xs text-muted-foreground/70 uppercase tracking-wide">{tt('fields.weeklyHours', 'Hours')}</div>
-                              <div className="font-medium text-foreground">{schedule.weekly_hours}h</div>
-                            </div>
-                          </div>
-
-                          {/* Status badge */}
-                          <div className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                            schedule.is_active 
-                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' 
-                              : 'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400'
-                          }`}>
-                            {schedule.is_active ? tt('status.active', 'Active') : tt('status.inactive', 'Inactive')}
-                          </div>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      {tt('dragToReorder', 'Drag schedules to reorder them')}
+                    </p>
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext items={scheduleIds} strategy={verticalListSortingStrategy}>
+                        <div className="grid gap-3">
+                          {filteredSchedules.map((schedule) => (
+                            <SortableScheduleCard
+                              key={schedule.id}
+                              schedule={schedule}
+                              onEdit={openEditDialog}
+                              scheduleTypeOptions={scheduleTypeOptions}
+                              tt={tt}
+                            />
+                          ))}
                         </div>
-                      </div>
-                    ))}
+                      </SortableContext>
+                    </DndContext>
                   </div>
                 )}
               </div>

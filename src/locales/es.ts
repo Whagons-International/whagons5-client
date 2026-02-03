@@ -27,8 +27,11 @@ export const esTranslations: Record<string, string> = {
   "settings.global.defaults.fontStyle.playfair": "Playfair Display",
   "settings.global.defaults.fontStyle.poppins": "Poppins",
   "settings.global.defaults.fontStyle.raleway": "Raleway",
-  "settings.global.defaults.fontStyle.bebas": "Bebas Neue",
-  "settings.global.defaults.fontStyle.oswald": "Oswald",
+  "settings.global.defaults.fontStyle.tahoma": "Tahoma",
+  "settings.global.defaults.fontStyle.patrickHand": "Patrick Hand",
+  "settings.global.defaults.fontStyle.architectsDaughter": "Architects Daughter",
+  "settings.global.defaults.fontStyle.dmSans": "DM Sans",
+  "settings.global.defaults.fontStyle.nunito": "Nunito",
   "settings.global.defaults.fontStyleDescription": "Elige el estilo de fuente utilizado en toda la aplicación",
 
   "settings.global.defaults.celebrationLabel": "Celebración de finalización de tarea",
@@ -1095,6 +1098,8 @@ export const esTranslations: Record<string, string> = {
   "settings.users.grid.values.noTeams": "Sin equipos",
   "settings.users.grid.values.noJobPosition": "Sin puesto",
   "settings.users.grid.values.admin": "Admin",
+  "settings.users.grid.values.adminRole": "Rol Admin",
+  "settings.users.grid.values.adminField": "Campo Admin",
   "settings.users.grid.values.user": "Usuario",
   "settings.users.grid.values.active": "Activa",
   "settings.users.grid.values.inactive": "Inactiva",
@@ -1600,7 +1605,7 @@ export const esTranslations: Record<string, string> = {
   "workspace.tabs.map": "Mapa",
   "workspace.tabs.board": "Tablero",
   "workspace.tabs.whiteboard": "Pizarra",
-  "workspace.tabs.stats": "Estadísticas",
+  "workspace.tabs.dashboard": "Dashboard",
   "workspace.tabs.config": "Config",
   
   // Workspace column translations
@@ -1649,7 +1654,7 @@ export const esTranslations: Record<string, string> = {
   "workspace.settings.display.visibleTabs": "Pestañas visibles",
   "workspace.settings.display.visibleTabsDesc": "Selecciona qué pestañas son visibles en el workspace. La pestaña de Tareas siempre está visible.",
   "workspace.settings.display.tabOrder": "Orden de pestañas",
-  "workspace.settings.display.tabOrderDesc": "Arrastra y suelta las pestañas en el workspace para reordenarlas. Las pestañas de Estadísticas y Configuración siempre permanecen al final.",
+  "workspace.settings.display.tabOrderDesc": "Arrastra y suelta las pestañas en el workspace para reordenarlas. Las pestañas de Dashboard y Configuración siempre permanecen al final.",
   "workspace.settings.display.resetTabOrder": "Restablecer por defecto",
   "workspace.settings.display.workspaceGridColumns": "Columnas de la cuadrícula del workspace",
   "workspace.settings.display.workspaceGridColumnsDesc": "Elige qué columnas son visibles en la cuadrícula de tareas del workspace. La columna de nombre de tarea siempre se muestra.",
@@ -1671,8 +1676,8 @@ export const esTranslations: Record<string, string> = {
   "sidebar.spaces": "Espacios",
   "sidebar.more": "Más",
   "sidebar.less": "Menos",
-  "sidebar.activity": "Monitor de Actividad",
-  "sidebar.activityMonitor": "Monitor de Actividad",
+  "sidebar.activity": "Actividad",
+  "sidebar.activityMonitor": "Actividad",
   "sidebar.todo": "Todo",
   "sidebar.compliance": "Normas y Estándares",
   "sidebar.analytics": "Analítica",
@@ -2320,8 +2325,8 @@ export const esTranslations: Record<string, string> = {
   "compliance.standards.status.inactive": "Inactivo",
   "compliance.standards.actions.view": "Ver",
   
-  // Activity Monitor / Monitor de Actividad
-  "activity.monitor.title": "Monitor de Actividad",
+  // Activity Monitor / Actividad
+  "activity.monitor.title": "Actividad",
   "activity.monitor.subtitle": "Vista en vivo de lo que está pasando",
   "activity.monitor.recentActivities": "actividades recientes",
   "activity.monitor.live": "En vivo",
@@ -2329,7 +2334,7 @@ export const esTranslations: Record<string, string> = {
   "activity.monitor.viewStyle": "Estilo de vista:",
   "activity.monitor.selectVisualization": "Seleccionar visualización",
   
-  // Activity Monitor - Opciones de Visualización
+  // Actividad - Opciones de Visualización
   "activity.visualizations.cosmos.label": "Cosmos de Actividad",
   "activity.visualizations.cosmos.description": "Vista orbital dinámica con galaxias de usuarios y detalles al pasar el cursor",
   "activity.visualizations.river.label": "Río de Actividad",
@@ -2353,7 +2358,7 @@ export const esTranslations: Record<string, string> = {
   "activity.visualizations.physics.label": "Muro de Tarjetas con Física",
   "activity.visualizations.physics.description": "Tarjetas con física cayendo y apilándose",
   
-  // Activity Monitor - Tipos de Actividad
+  // Actividad - Tipos de Actividad
   "activity.types.task_created": "tarea creada",
   "activity.types.task_updated": "tarea actualizada",
   "activity.types.status_changed": "estado cambiado",
@@ -2364,13 +2369,13 @@ export const esTranslations: Record<string, string> = {
   "activity.types.user_assigned": "usuario asignado",
   "activity.types.title": "Tipos de Actividad",
   
-  // Activity Monitor - Cosmos Stats
+  // Actividad - Cosmos Stats
   "activity.cosmos.title": "Cosmos de Actividad",
   "activity.cosmos.users": "Usuarios",
   "activity.cosmos.activities": "Actividades",
   "activity.cosmos.connections": "Conexiones",
   
-  // Activity Monitor - Tiempo
+  // Actividad - Tiempo
   "activity.time.justNow": "justo ahora",
   "activity.time.minutesAgo": "hace {count}m",
   "activity.time.hoursAgo": "hace {count}h",
@@ -2487,4 +2492,55 @@ export const esTranslations: Record<string, string> = {
   "timeOff.error.datesRequired": "Por favor selecciona fechas de inicio y fin",
   "timeOff.error.invalidDates": "La fecha de fin debe ser posterior a la fecha de inicio",
   "timeOff.error.generic": "Error al enviar la solicitud",
+
+  // Asistente de IA
+  "assistant.title": "Asistente",
+  "assistant.description": "Panel de chat con IA",
+  "assistant.greeting": "¿Cómo puedo ayudarte hoy?",
+  "assistant.newConversation": "Nueva conversación",
+  "assistant.noPreviousConversations": "Sin conversaciones previas",
+  "assistant.messages": "mensajes",
+  "assistant.scrollToBottom": "Ir al final",
+  "assistant.close": "Cerrar",
+  
+  // Temas del Asistente
+  "assistant.topics.tasks": "Tareas",
+  "assistant.topics.settings": "Configuración",
+  "assistant.topics.teams": "Equipos",
+  "assistant.topics.help": "Ayuda",
+  
+  // Sugerencias del Asistente - Tareas
+  "assistant.prompts.tasks.createTask": "¿Cómo creo una nueva tarea?",
+  "assistant.prompts.tasks.filterByStatus": "¿Cómo puedo filtrar tareas por estado?",
+  "assistant.prompts.tasks.slasExplained": "¿Qué son los SLAs y cómo funcionan?",
+  "assistant.prompts.tasks.assignTasks": "¿Cómo asigno tareas a los miembros del equipo?",
+  
+  // Sugerencias del Asistente - Configuración
+  "assistant.prompts.settings.configureStatuses": "¿Cómo configuro los estados?",
+  "assistant.prompts.settings.templatesBestPractices": "Muéstrame las mejores prácticas de plantillas",
+  "assistant.prompts.settings.manageTeams": "¿Dónde puedo gestionar equipos?",
+  "assistant.prompts.settings.customizeWorkspace": "¿Cómo personalizo mi espacio de trabajo?",
+  
+  // Sugerencias del Asistente - Equipos
+  "assistant.prompts.teams.addMembers": "¿Cómo agrego miembros al equipo?",
+  "assistant.prompts.teams.managePermissions": "¿Cómo gestiono los permisos del equipo?",
+  "assistant.prompts.teams.teamRoles": "¿Qué son los roles de equipo?",
+  
+  // Sugerencias del Asistente - Ayuda
+  "assistant.prompts.help.whatCanYouDo": "¿Qué puedes hacer?",
+  "assistant.prompts.help.keyboardShortcuts": "Atajos de teclado",
+  "assistant.prompts.help.getStarted": "¿Cómo empiezo?",
+  
+  // Entrada del Asistente
+  "assistant.input.placeholder": "Escribe tu mensaje aquí...",
+  "assistant.input.attachFile": "Adjuntar archivo",
+  "assistant.input.stopVoiceChat": "Detener chat de voz",
+  "assistant.input.stopResponse": "Detener respuesta",
+  "assistant.input.stopListening": "Dejar de escuchar",
+  "assistant.input.stopVoiceInput": "Detener entrada de voz",
+  "assistant.input.startingMic": "Iniciando micrófono...",
+  "assistant.input.startingVoiceInput": "Iniciando entrada de voz",
+  "assistant.input.startListening": "Empezar a escuchar",
+  "assistant.input.startVoiceInput": "Iniciar entrada de voz",
+  "assistant.input.sendMessage": "Enviar mensaje",
 };

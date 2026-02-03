@@ -356,6 +356,9 @@ export class DB {
           if (!db.objectStoreNames.contains('board_attachments')) {
             db.createObjectStore('board_attachments', { keyPath: 'id' });
           }
+          if (!db.objectStoreNames.contains('board_birthday_images')) {
+            db.createObjectStore('board_birthday_images', { keyPath: 'id' });
+          }
 
           // Workflows
           if (!db.objectStoreNames.contains('workflows')) {
@@ -620,6 +623,7 @@ export class DB {
       | 'workspace_resources'
       | 'exceptions'
       | 'board_attachments'
+      | 'board_birthday_images'
       | 'avatars'
       | 'whiteboards',
     mode: IDBTransactionMode = 'readonly'
@@ -691,6 +695,7 @@ export class DB {
       | 'workspace_resources'
       | 'exceptions'
       | 'board_attachments'
+      | 'board_birthday_images'
       | 'avatars'
       | 'whiteboards',
     mode: IDBTransactionMode = 'readwrite'

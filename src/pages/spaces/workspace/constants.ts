@@ -4,9 +4,8 @@ export const WORKSPACE_TAB_PATHS = {
   scheduler: '/scheduler',
   map: '/map',
   board: '/board',
-  whiteboard: '/whiteboard',
+  dashboard: '/dashboard',
   settings: '/settings',
-  statistics: '/statistics',
 } as const;
 
 export type WorkspaceTabKey = keyof typeof WORKSPACE_TAB_PATHS;
@@ -17,14 +16,13 @@ export const DEFAULT_TAB_SEQUENCE: WorkspaceTabKey[] = [
   'scheduler',
   'map',
   'board',
-  'whiteboard',
-  'statistics',
+  'dashboard',
   'settings',
 ];
 
 // Tabs that cannot be reordered
-export const FIXED_TABS: WorkspaceTabKey[] = ['statistics', 'settings'];
+export const FIXED_TABS: WorkspaceTabKey[] = ['dashboard', 'settings'];
 
 // Tabs always visible even if user hides others
-export const ALWAYS_VISIBLE_TABS: WorkspaceTabKey[] = ['grid', 'statistics', 'settings'];
+export const ALWAYS_VISIBLE_TABS: WorkspaceTabKey[] = ['grid', 'dashboard', 'settings'];
 

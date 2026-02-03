@@ -182,7 +182,7 @@ export const enTranslations: Record<string, string> = {
   "workspace.tabs.map": "Map",
   "workspace.tabs.board": "Board",
   "workspace.tabs.whiteboard": "Whiteboard",
-  "workspace.tabs.stats": "Stats",
+  "workspace.tabs.dashboard": "Dashboard",
   "workspace.tabs.config": "Config",
   
   // Workspace column translations
@@ -231,7 +231,7 @@ export const enTranslations: Record<string, string> = {
   "workspace.settings.display.visibleTabs": "Visible tabs",
   "workspace.settings.display.visibleTabsDesc": "Select which tabs are visible in the workspace. Tasks tab is always visible.",
   "workspace.settings.display.tabOrder": "Tab order",
-  "workspace.settings.display.tabOrderDesc": "Drag and drop tabs in the workspace to reorder them. Stats and Config tabs always stay at the end.",
+  "workspace.settings.display.tabOrderDesc": "Drag and drop tabs in the workspace to reorder them. Dashboard and Config tabs always stay at the end.",
   "workspace.settings.display.resetTabOrder": "Reset to default",
   "workspace.settings.display.workspaceGridColumns": "Workspace grid columns",
   "workspace.settings.display.workspaceGridColumnsDesc": "Choose which columns are visible in the workspace task grid. The task name column is always shown.",
@@ -1396,6 +1396,9 @@ export const enTranslations: Record<string, string> = {
   "settings.users.dialogs.editUser.tabs.permissions": "Global Roles",
   "settings.users.multiSelect.noGlobalRoles": "No global roles available",
   "settings.users.multiSelect.selectGlobalRolesOptional": "Select global roles (optional)...",
+  "settings.users.grid.values.admin": "Admin",
+  "settings.users.grid.values.adminRole": "Admin Role",
+  "settings.users.grid.values.adminField": "Admin Field",
 
   // Breadcrumbs
   "breadcrumbs.activity": "Activity",
@@ -1582,4 +1585,55 @@ export const enTranslations: Record<string, string> = {
   "timeOff.error.datesRequired": "Please select start and end dates",
   "timeOff.error.invalidDates": "End date must be after start date",
   "timeOff.error.generic": "Failed to submit request",
+
+  // AI Assistant
+  "assistant.title": "Assistant",
+  "assistant.description": "AI chat panel",
+  "assistant.greeting": "How can I help you today?",
+  "assistant.newConversation": "New conversation",
+  "assistant.noPreviousConversations": "No previous conversations",
+  "assistant.messages": "messages",
+  "assistant.scrollToBottom": "Scroll to bottom",
+  "assistant.close": "Close",
+  
+  // Assistant Topics
+  "assistant.topics.tasks": "Tasks",
+  "assistant.topics.settings": "Settings",
+  "assistant.topics.teams": "Teams",
+  "assistant.topics.help": "Help",
+  
+  // Assistant Prompts - Tasks
+  "assistant.prompts.tasks.createTask": "How do I create a new task?",
+  "assistant.prompts.tasks.filterByStatus": "How can I filter tasks by status?",
+  "assistant.prompts.tasks.slasExplained": "What are SLAs and how do they work?",
+  "assistant.prompts.tasks.assignTasks": "How do I assign tasks to team members?",
+  
+  // Assistant Prompts - Settings
+  "assistant.prompts.settings.configureStatuses": "How do I configure statuses?",
+  "assistant.prompts.settings.templatesBestPractices": "Show me templates best practices",
+  "assistant.prompts.settings.manageTeams": "Where can I manage teams?",
+  "assistant.prompts.settings.customizeWorkspace": "How do I customize my workspace?",
+  
+  // Assistant Prompts - Teams
+  "assistant.prompts.teams.addMembers": "How do I add team members?",
+  "assistant.prompts.teams.managePermissions": "How do I manage team permissions?",
+  "assistant.prompts.teams.teamRoles": "What are team roles?",
+  
+  // Assistant Prompts - Help
+  "assistant.prompts.help.whatCanYouDo": "What can you do?",
+  "assistant.prompts.help.keyboardShortcuts": "Keyboard shortcuts",
+  "assistant.prompts.help.getStarted": "How do I get started?",
+  
+  // Assistant Input
+  "assistant.input.placeholder": "Type your message here...",
+  "assistant.input.attachFile": "Attach file",
+  "assistant.input.stopVoiceChat": "Stop voice chat",
+  "assistant.input.stopResponse": "Stop response",
+  "assistant.input.stopListening": "Stop listening",
+  "assistant.input.stopVoiceInput": "Stop voice input",
+  "assistant.input.startingMic": "Starting microphone...",
+  "assistant.input.startingVoiceInput": "Starting voice input",
+  "assistant.input.startListening": "Start listening",
+  "assistant.input.startVoiceInput": "Start voice input",
+  "assistant.input.sendMessage": "Send message",
 };

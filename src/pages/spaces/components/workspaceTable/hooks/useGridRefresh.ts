@@ -53,7 +53,7 @@ export function useGridRefresh(opts: {
     if (useClientSide) {
       try {
         if (!TasksCache.initialized) await TasksCache.init();
-        const sortModel = gridRef.current.api.getSortModel?.() || [{ colId: 'created_at', sort: 'desc' }];
+        const sortModel = gridRef.current.api.getSortModel?.() || [{ colId: 'id', sort: 'desc' }];
         const { rows, totalFiltered } = await refreshClientSideGrid(gridRef.current.api, TasksCache, {
           search: searchRef.current,
           workspaceRef,
@@ -73,7 +73,11 @@ export function useGridRefresh(opts: {
       }
     } else {
       rowCache.current.clear();
-      gridRef.current.api.refreshInfiniteCache();
+      // Use purgeInfiniteCache() instead of refreshInfiniteCache() to completely
+      // clear all cached blocks and force a full reload. This prevents visual
+      // artifacts like duplicate/overlapping rows when tasks are created or deleted,
+      // as refreshInfiniteCache() can leave stale row nodes in the DOM during refresh.
+      gridRef.current.api.purgeInfiniteCache?.() ?? gridRef.current.api.refreshInfiniteCache();
     }
 
     setTimeout(() => {

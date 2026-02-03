@@ -179,7 +179,7 @@ export function ApprovalActionsManager({
   };
 
   const renderActionList = (actions: ApprovalAction[], type: 'approved' | 'rejected') => {
-    if (actions.length === 0) {
+    if (!Array.isArray(actions) || actions.length === 0) {
       return (
         <div className="text-center text-muted-foreground py-8">
           No actions configured

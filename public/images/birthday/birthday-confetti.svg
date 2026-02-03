@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Confetti pieces scattered across -->
+  <!-- Rectangles -->
+  <rect x="20" y="30" width="8" height="16" fill="#FF6B6B" transform="rotate(25 24 38)"/>
+  <rect x="50" y="15" width="6" height="12" fill="#4ECDC4" transform="rotate(-15 53 21)"/>
+  <rect x="90" y="25" width="8" height="16" fill="#FFE66D" transform="rotate(40 94 33)"/>
+  <rect x="130" y="10" width="6" height="12" fill="#A78BFA" transform="rotate(-30 133 16)"/>
+  <rect x="165" y="35" width="8" height="16" fill="#FF6B6B" transform="rotate(15 169 43)"/>
+  <rect x="35" y="80" width="6" height="12" fill="#FFE66D" transform="rotate(-45 38 86)"/>
+  <rect x="155" y="75" width="8" height="16" fill="#4ECDC4" transform="rotate(35 159 83)"/>
+  <rect x="25" y="140" width="6" height="12" fill="#A78BFA" transform="rotate(20 28 146)"/>
+  <rect x="170" y="130" width="8" height="16" fill="#FFE66D" transform="rotate(-25 174 138)"/>
+  <rect x="45" y="170" width="6" height="12" fill="#FF6B6B" transform="rotate(50 48 176)"/>
+  <rect x="150" y="165" width="8" height="16" fill="#4ECDC4" transform="rotate(-40 154 173)"/>
+  <!-- Circles -->
+  <circle cx="75" cy="50" r="6" fill="#A78BFA"/>
+  <circle cx="115" cy="45" r="5" fill="#FF6B6B"/>
+  <circle cx="145" cy="55" r="6" fill="#FFE66D"/>
+  <circle cx="60" cy="110" r="5" fill="#4ECDC4"/>
+  <circle cx="140" cy="105" r="6" fill="#A78BFA"/>
+  <circle cx="80" cy="150" r="5" fill="#FF6B6B"/>
+  <circle cx="120" cy="160" r="6" fill="#4ECDC4"/>
+  <!-- Stars -->
+  <polygon points="100,70 103,80 113,80 105,87 108,97 100,91 92,97 95,87 87,80 97,80" fill="#FFE66D"/>
+  <polygon points="30" cy="55" fill="#FF6B6B" transform="scale(0.6) translate(50,90)"/>
+  <polygon points="180,95 182,101 188,101 183,105 185,111 180,107 175,111 177,105 172,101 178,101" fill="#4ECDC4"/>
+  <!-- Squiggles -->
+  <path d="M15 100 Q25 95 20 110 Q15 125 25 120" stroke="#FF6B6B" stroke-width="3" fill="none"/>
+  <path d="M185 140 Q175 135 180 150 Q185 165 175 160" stroke="#A78BFA" stroke-width="3" fill="none"/>
+  <!-- Triangles -->
+  <polygon points="65,140 75,155 55,155" fill="#FFE66D"/>
+  <polygon points="135,140 145,155 125,155" fill="#FF6B6B"/>
+  <!-- More scattered pieces -->
+  <rect x="85" y="120" width="5" height="10" fill="#4ECDC4" transform="rotate(60 87 125)"/>
+  <rect x="105" y="85" width="5" height="10" fill="#A78BFA" transform="rotate(-20 107 90)"/>
+  <circle cx="40" cy="55" r="4" fill="#FFE66D"/>
+  <circle cx="160" cy="180" r="4" fill="#FF6B6B"/>
+  <!-- Streamers -->
+  <path d="M10 20 Q30 30 20 50 Q10 70 30 80" stroke="#4ECDC4" stroke-width="2" fill="none"/>
+  <path d="M190 20 Q170 30 180 50 Q190 70 170 80" stroke="#FF6B6B" stroke-width="2" fill="none"/>
+</svg>

@@ -1100,36 +1100,51 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
           </CollapsibleContent>
         </Collapsible>
 
-        <div className="flex justify-center pt-2 pb-1">
-          <AssistantWidget
-            floating={false}
-            renderTrigger={(open) => (
-              <button
-                type="button"
-                onClick={open}
-                title={t('sidebar.copilot', 'Copilot')}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-full bg-[var(--sidebar-border)]/80 text-[var(--sidebar-text-secondary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] transition-colors"
-              >
-                <Sparkles className="h-4 w-4" />
-              </button>
-            )}
-          />
-        </div>
-
         {/* Messages create board dialog removed */}
 
-        {showExpandedContent && (
-          <div style={{ padding: '4px 16px', fontSize: '12px', color: 'var(--sidebar-text-tertiary)', fontWeight: 400, marginTop: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span 
-              title={rtlConnected ? 'Real-time connected' : 'Real-time disconnected'}
-              style={{ display: 'flex', alignItems: 'center' }}
-            >
-              <HeartPulse 
-                size={14} 
-                className={rtlConnected ? 'text-green-500 animate-heartbeat' : 'text-red-400 opacity-50'}
-              />
-            </span>
-            <span>Version 5.0.0 <i>(beta)</i></span>
+        {showExpandedContent ? (
+          <div style={{ padding: '4px 16px', fontSize: '12px', color: 'var(--sidebar-text-tertiary)', fontWeight: 400, marginTop: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span 
+                title={rtlConnected ? 'Real-time connected' : 'Real-time disconnected'}
+                style={{ display: 'flex', alignItems: 'center' }}
+              >
+                <HeartPulse 
+                  size={14} 
+                  className={rtlConnected ? 'text-green-500 animate-heartbeat' : 'text-red-400 opacity-50'}
+                />
+              </span>
+              <span>Version 5.0.0 <i>(beta)</i></span>
+            </div>
+            <AssistantWidget
+              floating={false}
+              renderTrigger={(open) => (
+                <button
+                  type="button"
+                  onClick={open}
+                  title={t('sidebar.copilot', 'Copilot')}
+                  className="h-5 w-5 inline-flex items-center justify-center rounded-full text-[var(--sidebar-text-secondary)] hover:text-[var(--sidebar-primary)] transition-colors"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                </button>
+              )}
+            />
+          </div>
+        ) : (
+          <div className="flex justify-center py-2">
+            <AssistantWidget
+              floating={false}
+              renderTrigger={(open) => (
+                <button
+                  type="button"
+                  onClick={open}
+                  title={t('sidebar.copilot', 'Copilot')}
+                  className="h-6 w-6 inline-flex items-center justify-center rounded-full text-[var(--sidebar-text-secondary)] hover:text-[var(--sidebar-primary)] transition-colors"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                </button>
+              )}
+            />
           </div>
         )}
       </SidebarFooter>

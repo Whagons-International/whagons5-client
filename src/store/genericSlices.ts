@@ -82,10 +82,11 @@ const genericSliceConfigs = [
     { name: 'workspaces', table: 'wh_workspaces', endpoint: '/workspaces', store: 'workspaces', hashFields: ['id','name','description','color','icon','teams','view_modes','allow_ad_hoc_tasks','type','category_id','spots','created_by','updated_at'] },
 
     // Boards (Communication Boards)
-    { name: 'boards', table: 'wh_boards', endpoint: '/boards', store: 'boards', hashFields: ['id','name','description','visibility','created_by','updated_at'] },
+    { name: 'boards', table: 'wh_boards', endpoint: '/boards', store: 'boards', hashFields: ['id','name','description','visibility','birthday_messages_enabled','birthday_message_template','created_by','updated_at'] },
     { name: 'boardMembers', table: 'wh_board_members', endpoint: '/board-members', store: 'board_members', hashFields: ['id','board_id','member_type','member_id','role','updated_at'] },
     { name: 'boardMessages', table: 'wh_board_messages', endpoint: '/board-messages', store: 'board_messages', hashFields: ['id','board_id','created_by','title','content','is_pinned','starts_at','ends_at','metadata','source_type','source_id','updated_at'] },
     { name: 'boardAttachments', table: 'wh_board_attachments', endpoint: '/board-attachments', store: 'board_attachments', hashFields: ['id','uuid','board_message_id','type','file_path','file_name','file_extension','file_size','user_id','updated_at'] },
+    { name: 'boardBirthdayImages', table: 'wh_board_birthday_images', endpoint: '/board-birthday-images', store: 'board_birthday_images', hashFields: ['id','board_id','file_path','file_name','uploaded_by','updated_at'] },
 
     // Job Positions
     { name: 'jobPositions', table: 'wh_job_positions', endpoint: '/job-positions', store: 'job_positions', hashFields: ['id','code','title','level','is_leadership','is_active','description','updated_at'] },
@@ -180,6 +181,7 @@ export const {
     boardMembers,
     boardMessages,
     boardAttachments,
+    boardBirthdayImages,
     jobPositions,
     complianceStandards,
     complianceRequirements,
@@ -269,6 +271,7 @@ export const genericEventNames = {
     boardMembers: genericSlices.slices.boardMembers.eventNames,
     boardMessages: genericSlices.slices.boardMessages.eventNames,
     boardAttachments: genericSlices.slices.boardAttachments.eventNames,
+    boardBirthdayImages: genericSlices.slices.boardBirthdayImages.eventNames,
     jobPositions: genericSlices.slices.jobPositions.eventNames,
     complianceStandards: genericSlices.slices.complianceStandards.eventNames,
     complianceRequirements: genericSlices.slices.complianceRequirements.eventNames,
@@ -360,6 +363,7 @@ export const genericInternalActions = {
     boardMembers: genericSlices.slices.boardMembers.actions,
     boardMessages: genericSlices.slices.boardMessages.actions,
     boardAttachments: genericSlices.slices.boardAttachments.actions,
+    boardBirthdayImages: genericSlices.slices.boardBirthdayImages.actions,
     jobPositions: genericSlices.slices.jobPositions.actions,
     complianceStandards: genericSlices.slices.complianceStandards.actions,
     complianceRequirements: genericSlices.slices.complianceRequirements.actions,
@@ -443,6 +447,7 @@ export const genericActions = {
     boardMembers: publicActions(genericInternalActions.boardMembers),
     boardMessages: publicActions(genericInternalActions.boardMessages),
     boardAttachments: publicActions(genericInternalActions.boardAttachments),
+    boardBirthdayImages: publicActions(genericInternalActions.boardBirthdayImages),
     jobPositions: publicActions(genericInternalActions.jobPositions),
     complianceStandards: publicActions(genericInternalActions.complianceStandards),
     complianceRequirements: publicActions(genericInternalActions.complianceRequirements),

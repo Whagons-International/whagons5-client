@@ -9,6 +9,7 @@ import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import { Badge } from "@/components/ui/badge";
 import { TasksCache } from "@/store/indexedDB/TasksCache";
+import { TaskEvents } from "@/store/eventEmiters/taskEvents";
 import { useLanguage } from "@/providers/LanguageProvider";
 
 interface WorkspaceStatisticsProps {
@@ -52,11 +53,23 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
   const [statistics, setStatistics] = useState<WorkspaceStats | null>(null);
 
   const isCalculatingRef = useRef(false);
-  const lastCalculatedWorkspaceRef = useRef<string | undefined>(undefined);
   const [workspaceTasks, setWorkspaceTasks] = useState<Task[]>([]);
+
+  // Track the workspace we're currently loading for
+  const loadingWorkspaceRef = useRef<string | undefined>(undefined);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(true);
 
   // Load tasks from TasksCache (same as Workspace component)
   useEffect(() => {
+    let cancelled = false;
+    
+    // Reset state immediately when workspace changes
+    setWorkspaceTasks([]);
+    setStatistics(null);
+    setIsLoadingTasks(true);
+    isCalculatingRef.current = false;
+    loadingWorkspaceRef.current = workspaceId;
+    
     const loadTasks = async () => {
       try {
         // Initialize cache if needed
@@ -81,14 +94,37 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
         
         console.log('[WorkspaceStatistics] Loaded tasks:', loadedTasks.length, 'for workspace:', workspaceId);
         
-        setWorkspaceTasks(loadedTasks);
+        // Only update if this is still the current workspace
+        if (!cancelled && loadingWorkspaceRef.current === workspaceId) {
+          setWorkspaceTasks(loadedTasks);
+          setIsLoadingTasks(false);
+        }
       } catch (error) {
         console.error('[WorkspaceStatistics] Error loading tasks:', error);
-        setWorkspaceTasks([]);
+        if (!cancelled && loadingWorkspaceRef.current === workspaceId) {
+          setWorkspaceTasks([]);
+          setIsLoadingTasks(false);
+        }
       }
     };
     
     loadTasks();
+    
+    // Subscribe to task events to reload when cache updates
+    const unsubscribes = [
+      TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, loadTasks),
+      TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, loadTasks),
+      TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, loadTasks),
+      TaskEvents.on(TaskEvents.EVENTS.TASKS_BULK_UPDATE, loadTasks),
+      TaskEvents.on(TaskEvents.EVENTS.CACHE_INVALIDATE, loadTasks),
+    ];
+    
+    return () => {
+      cancelled = true;
+      unsubscribes.forEach((unsub) => {
+        try { unsub(); } catch {}
+      });
+    };
   }, [workspaceId]);
 
   // Calculate statistics
@@ -363,13 +399,11 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
   }, [workspaceTasks, categories, teams, workspaces, priorities, statuses, templates, users, spots]);
 
   useEffect(() => {
-    console.log('[WorkspaceStatistics] Effect triggered:', {
-      workspaceId,
-      workspaceTasksLength: workspaceTasks.length,
-      lastCalculatedWorkspace: lastCalculatedWorkspaceRef.current,
-      hasStatistics: !!statistics,
-      isCalculating: isCalculatingRef.current
-    });
+    // Don't calculate while still loading tasks
+    if (isLoadingTasks) {
+      console.log('[WorkspaceStatistics] Still loading tasks, waiting...');
+      return;
+    }
     
     // Don't calculate if already calculating
     if (isCalculatingRef.current) {
@@ -377,32 +411,13 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
       return;
     }
     
-    // Reset statistics if workspace changed
-    if (lastCalculatedWorkspaceRef.current !== workspaceId) {
-      console.log('[WorkspaceStatistics] Workspace changed, resetting statistics');
-      setStatistics(null);
-      isCalculatingRef.current = false;
-      lastCalculatedWorkspaceRef.current = workspaceId;
-      // Trigger calculation for new workspace
-      console.log('[WorkspaceStatistics] Triggering statistics calculation for new workspace...');
-      calculateStatistics();
-      return;
-    }
+    console.log('[WorkspaceStatistics] Tasks loaded, calculating statistics...', {
+      workspaceId,
+      workspaceTasksLength: workspaceTasks.length
+    });
     
-    // If workspace hasn't changed but we don't have statistics yet, calculate
-    // This handles the case where tasks are loaded but statistics haven't been calculated yet
-    if (!statistics) {
-      console.log('[WorkspaceStatistics] No statistics yet, triggering calculation...');
-      calculateStatistics();
-      return;
-    }
-    
-    // If we have statistics and tasks, we're good (don't recalculate unnecessarily)
-    // But if tasks array reference changed (new tasks added/removed), we should recalculate
-    // For now, we'll recalculate whenever workspaceTasks changes to ensure data is fresh
-    console.log('[WorkspaceStatistics] Tasks updated, recalculating statistics...');
     calculateStatistics();
-  }, [workspaceId, workspaceTasks.length, calculateStatistics]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isLoadingTasks, workspaceTasks, calculateStatistics]);
 
   const renderStatCard = (
     title: string,
@@ -499,7 +514,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
     return () => clearTimeout(timeout);
   }, [statistics]);
 
-  if (!statistics || !showRealContent) {
+  if (isLoadingTasks || !statistics || !showRealContent) {
     return renderSkeletonLayout();
   }
 

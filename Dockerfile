@@ -54,6 +54,9 @@ RUN set -ex && \
 # Copy source code
 COPY . .
 
+# Increase Node.js memory limit for large builds
+ENV NODE_OPTIONS="--max-old-space-size=8192"
+
 # Build the application
 RUN bun run build
 

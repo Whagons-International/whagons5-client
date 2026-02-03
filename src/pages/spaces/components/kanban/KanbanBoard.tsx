@@ -237,10 +237,10 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
   }, [dispatch]);
 
   // Handle export
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback(async () => {
     try {
       const filename = `kanban-board-${new Date().toISOString().split('T')[0]}.xlsx`;
-      exportToExcel(filteredTasks, statuses, filename);
+      await exportToExcel(filteredTasks, statuses, filename);
       toast.success('Board exported successfully');
     } catch (error) {
       console.error('Failed to export board:', error);

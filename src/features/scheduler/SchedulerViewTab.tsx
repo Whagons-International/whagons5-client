@@ -319,7 +319,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
   // ---- Export ----
   const handleExportPDF = useCallback(async () => { if (schedulerContainerRef.current) await exportToPDF(schedulerContainerRef.current, `scheduler-${new Date().toISOString().split("T")[0]}.pdf`); }, []);
   const handleExportPNG = useCallback(async () => { if (schedulerContainerRef.current) await exportToPNG(schedulerContainerRef.current, `scheduler-${new Date().toISOString().split("T")[0]}.png`); }, []);
-  const handleExportExcel = useCallback(() => { exportToExcel(filteredEvents, resources, `scheduler-${new Date().toISOString().split("T")[0]}.xlsx`); }, [filteredEvents, resources]);
+  const handleExportExcel = useCallback(async () => { await exportToExcel(filteredEvents, resources, `scheduler-${new Date().toISOString().split("T")[0]}.xlsx`); }, [filteredEvents, resources]);
 
   // ---- Undo / Redo ----
   const updateUndoRedoState = useCallback(() => {

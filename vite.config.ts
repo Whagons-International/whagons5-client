@@ -163,32 +163,60 @@ export default defineConfig(({ mode }) => {
             // Split cache/IndexedDB code into its own chunk
             if (id.includes('/src/store/indexedDB/')) return 'cache-sec';
 
-            // Preserve existing groupings
-            if (id.includes('/node_modules/react')) return 'vendor';
-            if (id.includes('/node_modules/react-dom')) return 'vendor';
+            // Core framework
+            if (id.includes('/node_modules/react-dom/')) return 'vendor';
+            if (id.includes('/node_modules/react/')) return 'vendor';
 
             // Heavy data grid packages
-            if (id.includes('/node_modules/ag-grid-community')) return 'ag-grid';
-            if (id.includes('/node_modules/ag-grid-enterprise')) return 'ag-grid';
+            if (id.includes('/node_modules/ag-grid-community') || id.includes('/node_modules/ag-grid-enterprise')) return 'ag-grid';
             if (id.includes('/node_modules/ag-grid-react')) return 'ag-grid-react';
 
-            if (id.includes('/node_modules/react-router-dom')) return 'router';
+            // Excalidraw + its mermaid/roughjs dependencies (very heavy)
+            if (id.includes('/node_modules/@excalidraw/')) return 'excalidraw';
+            if (id.includes('/node_modules/mermaid') || id.includes('/node_modules/@mermaid')) return 'excalidraw';
+            if (id.includes('/node_modules/roughjs/') || id.includes('/node_modules/rough/')) return 'excalidraw';
 
+            // Charting libraries
+            if (id.includes('/node_modules/echarts') || id.includes('/node_modules/echarts-for-react')) return 'echarts';
+            if (id.includes('/node_modules/d3') || id.includes('/node_modules/d3-')) return 'd3';
+
+            // Calendar
+            if (id.includes('/node_modules/@fullcalendar/')) return 'fullcalendar';
+
+            // Bryntum scheduler
+            if (id.includes('/node_modules/@bryntum/')) return 'bryntum';
+
+            // Export libs (jspdf, html2canvas, xlsx) — dynamically imported
+            if (id.includes('/node_modules/jspdf/')) return 'export-libs';
+            if (id.includes('/node_modules/html2canvas/')) return 'export-libs';
+            if (id.includes('/node_modules/xlsx/')) return 'export-libs';
+
+            // Router
+            if (id.includes('/node_modules/react-router-dom') || id.includes('/node_modules/react-router/')) return 'router';
+
+            // State management
             if (id.includes('/node_modules/@reduxjs/toolkit')) return 'redux';
             if (id.includes('/node_modules/react-redux')) return 'redux';
             if (id.includes('/node_modules/redux-persist')) return 'redux';
 
-            const uiPkgs = ['@radix-ui/react-avatar','@radix-ui/react-collapsible','@radix-ui/react-dialog','@radix-ui/react-dropdown-menu','@radix-ui/react-label','@radix-ui/react-separator','@radix-ui/react-slot','@radix-ui/react-tabs','@radix-ui/react-tooltip','lucide-react','class-variance-authority'];
-            if (uiPkgs.some(p => id.includes(`/node_modules/${p}/`))) return 'ui';
+            // UI component libraries
+            if (id.includes('/node_modules/@radix-ui/') || id.includes('/node_modules/radix-ui/')) return 'ui';
+            if (id.includes('/node_modules/lucide-react/')) return 'ui';
+            if (id.includes('/node_modules/class-variance-authority/')) return 'ui';
+            if (id.includes('/node_modules/cmdk/')) return 'ui';
+            if (id.includes('/node_modules/@floating-ui/')) return 'ui';
 
+            // Markdown rendering
             const mdPkgs = ['react-markdown','remark-breaks','remark-gfm','prismjs'];
             if (mdPkgs.some(p => id.includes(`/node_modules/${p}/`))) return 'markdown';
 
-            if (id.includes('/node_modules/axios')) return 'http';
+            // Animation
+            if (id.includes('/node_modules/framer-motion/') || id.includes('/node_modules/motion/')) return 'animation';
+
+            // HTTP
+            if (id.includes('/node_modules/axios/')) return 'http';
 
             // Don't chunk FontAwesome separately - causes circular dependency issues
-            // Keep it in main bundle to avoid initialization order problems
-            // if (id.includes('/node_modules/@fortawesome')) return 'icons';
             if (id.includes('/node_modules/crypto-js')) return 'crypto';
 
             const utilPkgs = ['tailwind-merge','tailwindcss-animate','clsx'];

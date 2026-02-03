@@ -518,8 +518,8 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
     }
   }, []);
 
-  const handleExportExcel = useCallback(() => {
-    exportToExcel(filteredEvents, resources, `scheduler-${new Date().toISOString().split("T")[0]}.xlsx`);
+  const handleExportExcel = useCallback(async () => {
+    await exportToExcel(filteredEvents, resources, `scheduler-${new Date().toISOString().split("T")[0]}.xlsx`);
   }, [filteredEvents, resources]);
 
   // Update undo/redo state

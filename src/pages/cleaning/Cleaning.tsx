@@ -36,6 +36,9 @@ function Cleaning() {
   const { value: users } = useSelector(
     (state: RootState) => (state as any).users || { value: [] }
   );
+  const { value: plugins } = useSelector(
+    (state: RootState) => (state as any).plugins || { value: [] }
+  );
 
   // Local state
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,11 +52,13 @@ function Cleaning() {
     dispatch(genericInternalActions.spots.getFromIndexedDB() as any);
     dispatch(genericInternalActions.cleaningStatuses.getFromIndexedDB() as any);
     dispatch(genericInternalActions.users.getFromIndexedDB() as any);
+    dispatch(genericInternalActions.plugins.getFromIndexedDB() as any);
     
     // Then fetch from API to ensure we have the latest data
     dispatch(genericInternalActions.spots.fetchFromAPI() as any);
     dispatch(genericInternalActions.cleaningStatuses.fetchFromAPI() as any);
     dispatch(genericInternalActions.users.fetchFromAPI() as any);
+    dispatch(genericInternalActions.plugins.fetchFromAPI() as any);
   }, [dispatch]);
 
   // Get cleaning status by ID
@@ -85,12 +90,46 @@ function Cleaning() {
     return `rgba(${r}, ${g}, ${b}, 0.2)`;
   };
 
+  // Get cleaning plugin and extract spot_type_ids
+  const cleaningPluginSpotTypeIds = useMemo(() => {
+    const cleaningPlugin = plugins.find((p: any) => p.slug === 'cleaning');
+    if (!cleaningPlugin || !cleaningPlugin.settings) {
+      return null; // No filter if plugin not found or no settings
+    }
+
+    let settings = {};
+    if (typeof cleaningPlugin.settings === 'string') {
+      try {
+        settings = JSON.parse(cleaningPlugin.settings);
+      } catch (e) {
+        console.error('Error parsing cleaning plugin settings:', e);
+        return null;
+      }
+    } else if (typeof cleaningPlugin.settings === 'object') {
+      settings = cleaningPlugin.settings;
+    }
+
+    const spotTypeIds = (settings as any).spot_type_ids;
+    if (!Array.isArray(spotTypeIds) || spotTypeIds.length === 0) {
+      return null; // No filter if no spot_type_ids configured
+    }
+
+    return spotTypeIds;
+  }, [plugins]);
+
   // Filter spots
   const filteredSpots = useMemo(() => {
     return spots.filter((spot: Spot) => {
       // Exclude soft-deleted spots
       if (spot.deleted_at !== null && spot.deleted_at !== undefined) {
         return false;
+      }
+
+      // Filter by spot_type_ids from cleaning plugin
+      if (cleaningPluginSpotTypeIds !== null) {
+        if (!spot.spot_type_id || !cleaningPluginSpotTypeIds.includes(spot.spot_type_id)) {
+          return false;
+        }
       }
 
       // Search filter
@@ -119,7 +158,7 @@ function Cleaning() {
 
       return true;
     });
-  }, [spots, searchQuery, selectedStatusFilter, showActiveTaskFilter]);
+  }, [spots, cleaningPluginSpotTypeIds, searchQuery, selectedStatusFilter, showActiveTaskFilter]);
 
   // Sort cleaning statuses by order
   const sortedCleaningStatuses = useMemo(() => {

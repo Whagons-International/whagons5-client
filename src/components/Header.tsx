@@ -14,6 +14,7 @@ import {
 import { User, LogOut, Plus, Layers, Search, Bell, X } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./ModeToggle";
+import { LaserPointerToggle } from "./LaserPointerToggle";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store/store";
 import {
@@ -145,6 +146,9 @@ function Header() {
             boards: 'Boards',
             plugins: 'Plugins',
             'kpi-cards': 'KPI Cards',
+            'working-schedules': 'Working Schedules',
+            'working-hours': 'Working Hours',
+            'time-off-types': 'Time Off Types',
         };
         const getLabel = (seg: string, index: number) => {
             // Special handling for boards board ID
@@ -167,15 +171,22 @@ function Header() {
             acc.push({ label: t('breadcrumbs.plugins', 'Plugins'), to: '/plugins' });
             acc.push({ label: pluginName, to: location.pathname });
         } else if (parts[0] === 'settings' && parts.length > 1) {
-            // For settings subpages, create breadcrumbs like: Settings > Subpage
-            acc.push({ label: t('breadcrumbs.settings', 'Settings'), to: '/settings' });
-            
-            // Special case for kpi-cards: Settings > Plugins > Custom KPI Cards
+            // Special case for plugin settings pages: Plugins > Page Name (no Settings prefix)
             if (parts[1] === 'kpi-cards') {
                 acc.push({ label: t('breadcrumbs.plugins', 'Plugins'), to: '/plugins' });
                 acc.push({ label: t('kpiCards.title', 'Custom KPI Cards'), to: '/settings/kpi-cards/manage' });
+            } else if (parts[1] === 'working-schedules') {
+                acc.push({ label: t('breadcrumbs.plugins', 'Plugins'), to: '/plugins' });
+                acc.push({ label: t('settings.workingSchedules.title', 'Working Schedules'), to: '/settings/working-schedules' });
+            } else if (parts[1] === 'working-hours') {
+                acc.push({ label: t('breadcrumbs.plugins', 'Plugins'), to: '/plugins' });
+                acc.push({ label: t('plugins.working-hours.title', 'Working Hours'), to: '/settings/working-hours' });
+            } else if (parts[1] === 'time-off-types') {
+                acc.push({ label: t('breadcrumbs.plugins', 'Plugins'), to: '/plugins' });
+                acc.push({ label: t('settings.timeOffTypes.title', 'Time Off Types'), to: '/settings/time-off-types' });
             } else {
-                // Regular settings subpages
+                // Regular settings subpages: Settings > Subpage
+                acc.push({ label: t('breadcrumbs.settings', 'Settings'), to: '/settings' });
                 for (let i = 1; i < parts.length; i++) {
                     const seg = parts[i];
                     path += `/${seg}`;
@@ -795,6 +806,7 @@ function Header() {
                             <span>{t('task.newTask', 'New Task')}</span>
                         </button>
                     )}
+                    <LaserPointerToggle className="h-9 w-9 hover:bg-accent/50 rounded-md transition-colors" />
                     <ModeToggle className="h-9 w-9 hover:bg-accent/50 rounded-md transition-colors" />
                     
                     {/* Profile with notification badge */}

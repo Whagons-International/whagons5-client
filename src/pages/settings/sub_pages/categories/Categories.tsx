@@ -290,7 +290,21 @@ function Categories() {
   // Load reporting teams from category directly
   const loadReportingTeamsForEdit = useCallback(() => {
     if (!editingCategory) return;
-    setSelectedReportingTeamIds(editingCategory.reporting_team_ids || []);
+    // Ensure reporting_team_ids is always an array (handle null, undefined, or string values)
+    let teamIds = editingCategory.reporting_team_ids;
+    if (!teamIds) {
+      teamIds = [];
+    } else if (typeof teamIds === 'string') {
+      try {
+        teamIds = JSON.parse(teamIds);
+      } catch {
+        teamIds = [];
+      }
+    }
+    if (!Array.isArray(teamIds)) {
+      teamIds = [];
+    }
+    setSelectedReportingTeamIds(teamIds);
     setReportingTeamsError(null);
   }, [editingCategory]);
 
@@ -334,9 +348,11 @@ function Categories() {
     setSavingReportingTeams(true);
     setReportingTeamsError(null);
     try {
+      // Ensure reporting_team_ids is always an array
+      const safeReportingTeamIds = Array.isArray(selectedReportingTeamIds) ? selectedReportingTeamIds : [];
       await dispatch(genericActions.categories.updateAsync({
         id: editingCategory.id,
-        updates: { reporting_team_ids: selectedReportingTeamIds }
+        updates: { reporting_team_ids: safeReportingTeamIds }
       })).unwrap();
     } catch (e: any) {
       console.error('Error saving reporting teams', e);
@@ -622,6 +638,9 @@ function Categories() {
     e.preventDefault();
     if (!editingCategory) return;
 
+    // Ensure reporting_team_ids is always an array
+    const safeReportingTeamIds = Array.isArray(selectedReportingTeamIds) ? selectedReportingTeamIds : [];
+
     const updates = {
       name: editFormData.name,
       description: editFormData.description,
@@ -633,7 +652,7 @@ function Categories() {
       sla_id: editFormData.sla_id ? parseInt(editFormData.sla_id) : null,
       approval_id: editFormData.approval_id ? parseInt(editFormData.approval_id) : null,
       status_transition_group_id: editFormData.status_transition_group_id ? parseInt(editFormData.status_transition_group_id) : undefined,
-      reporting_team_ids: selectedReportingTeamIds,
+      reporting_team_ids: safeReportingTeamIds,
       celebration_effect: editFormData.celebration_effect || null,
       dialog_layout: dialogLayout
     };

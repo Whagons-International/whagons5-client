@@ -111,6 +111,8 @@ function SortableReportCard({ card, tab, isFavorite, onToggleFavorite }: Sortabl
     onToggleFavorite(card.id);
   };
 
+  const baseColor = card.iconColor;
+  
   return (
     <div
       ref={setNodeRef}
@@ -118,52 +120,40 @@ function SortableReportCard({ card, tab, isFavorite, onToggleFavorite }: Sortabl
       className={`${isDragging ? "opacity-50 scale-105" : ""}`}
     >
       <Card
-        className="group relative cursor-grab active:cursor-grabbing select-none transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md rounded-xl border border-black/[0.08] dark:border-white/[0.1] hover:border-black/[0.12] dark:hover:border-white/[0.15] h-[140px]"
+        className={`transition-all duration-300 group select-none cursor-grab active:cursor-grabbing hover:shadow-xl hover:scale-[1.03] hover:-translate-y-1 h-[140px] overflow-hidden border-2 hover:border-primary/20 ${isDragging ? 'shadow-lg scale-[1.02]' : ''}`}
         onClick={card.onClick || (() => alert(`${t(card.titleKey)} - Coming soon!`))}
         {...listeners}
         {...attributes}
-        style={{
-          background: 'linear-gradient(to bottom, rgb(245, 245, 245), rgb(235, 235, 235))',
-          boxShadow: isDragging 
-            ? '0 12px 24px -8px rgba(0,0,0,0.15)' 
-            : '0 1px 2px rgba(0,0,0,0.04)',
-        }}
       >
-        <CardHeader className="p-4 h-full flex flex-col">
-          <div className="flex items-start justify-between">
-            <div
-              className="flex items-center justify-center w-9 h-9 rounded-lg transition-transform duration-200 group-hover:scale-110"
-              style={{ 
-                backgroundColor: `${card.iconColor}15`,
-              }}
+        <CardHeader className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div 
+              className="text-2xl group-hover:scale-110 transition-transform duration-200"
+              style={{ color: baseColor }}
             >
-              <FontAwesomeIcon 
-                icon={card.icon} 
-                className="text-base"
-                style={{ color: card.iconColor }}
-              />
+              <FontAwesomeIcon icon={card.icon} />
             </div>
             <button
               type="button"
-              className={`rounded-full p-1 transition-all duration-200 ${
+              className={`rounded-full p-2 transition text-sm ${
                 isFavorite
-                  ? 'text-amber-400'
-                  : 'text-muted-foreground/40 hover:text-amber-400 opacity-0 group-hover:opacity-100'
+                  ? 'text-yellow-500'
+                  : 'text-muted-foreground hover:text-yellow-500 opacity-0 group-hover:opacity-100'
               }`}
               onClick={handleFavoriteClick}
               onPointerDown={(e) => e.stopPropagation()}
               aria-label={isFavorite ? t("hotelAnalytics.unfavorite", "Remove from favorites") : t("hotelAnalytics.favorite", "Add to favorites")}
               title={isFavorite ? t("hotelAnalytics.unfavorite", "Remove from favorites") : t("hotelAnalytics.favorite", "Add to favorites")}
             >
-              <FontAwesomeIcon icon={isFavorite ? faStarSolid : faStarRegular} className="text-sm" />
+              <FontAwesomeIcon icon={isFavorite ? faStarSolid : faStarRegular} className="text-base" />
             </button>
           </div>
-          <div className="mt-auto">
-            <CardTitle className="text-sm font-medium text-foreground/90 leading-tight line-clamp-2">
+          <div className="space-y-1">
+            <CardTitle className="text-base font-bold leading-tight line-clamp-2">
               {t(card.titleKey, card.id)}
             </CardTitle>
             {tab === "favorites" && card.category && (
-              <span className="inline-block text-xs text-muted-foreground mt-1.5 px-2 py-0.5 rounded-md bg-background/60">
+              <span className="inline-block text-xs text-muted-foreground">
                 {t(`hotelAnalytics.tabs.${card.category}`, card.category)}
               </span>
             )}

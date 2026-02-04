@@ -37,6 +37,12 @@ import MotivationSettings from '@/pages/settings/sub_pages/motivation/Motivation
 import MotivationComingSoon from '@/pages/motivation/MotivationComingSoon';
 import HotelAnalytics from '@/pages/hotel-analytics/HotelAnalytics';
 import HotelAnalyticsSettings from '@/pages/settings/sub_pages/HotelAnalyticsSettings';
+import WorkingHoursSettings from '@/pages/settings/sub_pages/WorkingHoursSettings';
+import WorkingSchedules from '@/pages/settings/sub_pages/working-hours/WorkingSchedules';
+import TimeOffTypes from '@/pages/settings/sub_pages/working-hours/TimeOffTypes';
+import TimeOffRequests from '@/pages/time-off/TimeOffRequests';
+import { WorkingHoursDashboard } from '@/pages/working-hours';
+import { WorkingHoursGuard } from '@/components/PluginGuard';
 import Home from '@/pages/home/Home';
 import BoardDetail from '@/pages/boards/BoardDetail';
 import TestPage from '@/pages/Testpage';
@@ -126,6 +132,11 @@ export const HomeRoutes = () => {
           <Route path="/settings/analytics" element={<AnalyticsSettings />} />
           <Route path="/settings/motivation" element={<MotivationSettings />} />
           <Route path="/settings/hotel-analytics" element={<HotelAnalyticsSettings />} />
+          <Route path="/working-hours" element={<WorkingHoursGuard><WorkingHoursDashboard /></WorkingHoursGuard>} />
+          <Route path="/settings/working-hours" element={<WorkingHoursGuard><WorkingHoursSettings /></WorkingHoursGuard>} />
+          <Route path="/settings/working-schedules" element={<WorkingHoursGuard><WorkingSchedules /></WorkingHoursGuard>} />
+          <Route path="/settings/time-off-types" element={<WorkingHoursGuard><TimeOffTypes /></WorkingHoursGuard>} />
+          <Route path="/time-off" element={<WorkingHoursGuard><TimeOffRequests /></WorkingHoursGuard>} />
           <Route path="/settings/test" element={<TestPage />} />
           
           {/* Compliance Routes */}

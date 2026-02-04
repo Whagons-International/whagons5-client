@@ -255,8 +255,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 //   debug: true,
                 // }
               );
-              // Set as global instance for status indicators
-              setGlobalRtl(rtl);
               rtl.connectAndHold();
             } catch (err) {
               console.warn('AuthProvider: background hydration failed', err);

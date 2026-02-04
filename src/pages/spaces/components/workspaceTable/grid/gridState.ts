@@ -165,7 +165,7 @@ export const useWorkspaceTableMode = (params: WorkspaceTableModeParams) => {
         setUseClientSide(true);
         try {
           if (!TasksCache.initialized) await TasksCache.init();
-          const sortModel = [{ colId: 'created_at', sort: 'desc' }];
+          const sortModel = [{ colId: 'id', sort: 'desc' }];
           const { rows, totalFiltered } = await refreshClientSideGrid(params.gridApi, TasksCache, {
             search: params.searchText,
             workspaceRef: params.workspaceRef,

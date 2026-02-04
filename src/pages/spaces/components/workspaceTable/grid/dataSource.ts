@@ -2,7 +2,7 @@
 
 import type React from 'react';
 
-const DEFAULT_SORT = [{ colId: 'created_at', sort: 'desc' }];
+const DEFAULT_SORT = [{ colId: 'id', sort: 'desc' }];
 const getSort = (s?: any[]) => Array.isArray(s) && s.length > 0 ? s : DEFAULT_SORT;
 const buildParams = (wr: React.MutableRefObject<string>, sm: any, pm: any, spm: any, um: any, tm: any, tt: any) => {
   const p: any = { __statusMap: sm.current, __priorityMap: pm.current, __spotMap: spm.current, __userMap: um.current, __tagMap: tm.current, __taskTags: tt.current };

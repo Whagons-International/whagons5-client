@@ -4,6 +4,7 @@ import WaveIcon from "./WaveIcon";
 import { api } from "@/store/api/internalApi";
 import { MicOff } from "lucide-react";
 import { LiveAudioVisualizer } from "react-audio-visualize";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 interface ChatInputProps {
   onSubmit: (content: string | ContentItem[]) => void;
@@ -26,6 +27,7 @@ const isPdfData = (content: any): content is PdfData => {
 };
 
 const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) => {
+  const { t } = useLanguage();
   const [content, setContent] = useState<ContentItem[]>([]);
   const [textInput, setTextInput] = useState("");
   const [isDragging, setIsDragging] = useState(false);
@@ -391,7 +393,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
               }}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              placeholder="Type your message here..."
+              placeholder={t("assistant.input.placeholder", "Type your message here...")}
               autoComplete="off"
               spellCheck={false}
               disabled={isUploading() || props.isListening || props.isStarting}
@@ -424,7 +426,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  title="Attach file"
+                  title={t("assistant.input.attachFile", "Attach file")}
                   onClick={() => fileInputRef.current?.click()}
                   className="rounded-full p-2 text-muted-foreground hover:bg-muted"
                   disabled={isUploading() || props.gettingResponse}
@@ -440,24 +442,24 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
                     // Voice combo mode: one button stops both chat + mic.
                     <button
                       type="button"
-                      title="Stop voice chat"
+                      title={t("assistant.input.stopVoiceChat", "Stop voice chat")}
                       className="rounded-xl w-11 h-11 bg-muted text-foreground flex items-center justify-center transition-all hover:bg-muted/80 hover:shadow-md hover:-translate-y-0.5 hover:ring-2 hover:ring-primary/25 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => {
                         try { props.handleStopRequest(); } catch {}
                         try { props.setIsListening?.(false); } catch {}
                       }}
                       disabled={isUploading()}
-                      aria-label="Stop voice chat"
+                      aria-label={t("assistant.input.stopVoiceChat", "Stop voice chat")}
                     >
                       <MicOff className="w-5 h-5" />
                     </button>
                   ) : (
                     <button
                       type="button"
-                      title="Stop response"
+                      title={t("assistant.input.stopResponse", "Stop response")}
                       className="rounded-xl w-11 h-11 bg-red-600 hover:bg-red-700 text-white flex items-center justify-center transition-colors"
                       onClick={props.handleStopRequest}
-                      aria-label="Stop response"
+                      aria-label={t("assistant.input.stopResponse", "Stop response")}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -474,32 +476,32 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
                   props.isListening ? (
                     <button
                       type="button"
-                      title="Stop listening"
+                      title={t("assistant.input.stopListening", "Stop listening")}
                       className="rounded-xl w-11 h-11 bg-muted text-foreground flex items-center justify-center transition-all hover:bg-muted/80 hover:shadow-md hover:-translate-y-0.5 hover:ring-2 hover:ring-primary/25 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => props.setIsListening?.(false)}
                       disabled={isUploading()}
-                      aria-label="Stop voice input"
+                      aria-label={t("assistant.input.stopVoiceInput", "Stop voice input")}
                     >
                       <MicOff className="w-5 h-5" />
                     </button>
                   ) : props.isStarting ? (
                     <button
                       type="button"
-                      title="Starting microphone..."
+                      title={t("assistant.input.startingMic", "Starting microphone...")}
                       className="rounded-xl w-11 h-11 bg-muted text-foreground flex items-center justify-center transition-all opacity-80 cursor-not-allowed"
                       disabled
-                      aria-label="Starting voice input"
+                      aria-label={t("assistant.input.startingVoiceInput", "Starting voice input")}
                     >
                       <div className="animate-spin rounded-full h-5 w-5 border-2 border-foreground/60 border-t-transparent" />
                     </button>
                   ) : textInput.trim() === "" && content.length === 0 ? (
                     <button
                       type="button"
-                      title="Start listening"
+                      title={t("assistant.input.startListening", "Start listening")}
                       className="rounded-xl w-11 h-11 bg-muted text-foreground flex items-center justify-center transition-all hover:bg-muted/80 hover:shadow-md hover:-translate-y-0.5 hover:ring-2 hover:ring-primary/25 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => props.setIsListening?.(true)}
                       disabled={isUploading()}
-                      aria-label="Start voice input"
+                      aria-label={t("assistant.input.startVoiceInput", "Start voice input")}
                     >
                       <WaveIcon />
                     </button>
@@ -508,7 +510,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
                       type="button"
                       className="rounded-xl w-11 h-11 bg-muted text-foreground flex items-center justify-center transition-all hover:bg-muted/80 hover:shadow-md hover:-translate-y-0.5 hover:ring-2 hover:ring-primary/25 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       onClick={handleSubmit}
-                      aria-label="Send message"
+                      aria-label={t("assistant.input.sendMessage", "Send message")}
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

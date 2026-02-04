@@ -33,7 +33,8 @@ import {
   faChartLine,
   faStar as faStarSolid,
   faFileAlt,
-  faLink
+  faLink,
+  faClock
 } from "@fortawesome/free-solid-svg-icons";
 import { faStar as faStarRegular } from "@fortawesome/free-regular-svg-icons";
 import { RootState } from "@/store/store";
@@ -521,14 +522,6 @@ function Settings() {
       count: 0,
       description: t('settings.cards.integrations.description', 'Manage webhooks, API keys, and external integrations'),
       color: 'text-indigo-500'
-    },
-    {
-      id: 'schedules',
-      title: t('settings.cards.schedules.title', 'Schedules'),
-      icon: faCalendar,
-      count: 0,
-      description: t('settings.cards.schedules.description', 'Manage schedules and time-based workflows'),
-      color: 'text-orange-500'
     },
   ], [counts.slas, counts.forms, counts.workflows, t]);
 
@@ -1155,7 +1148,10 @@ function Settings() {
         navigate('/settings/users');
         break;
       case 'schedules':
-        navigate('/settings/schedules');
+        navigate('/settings/working-schedules');
+        break;
+      case 'time-off-types':
+        navigate('/settings/time-off-types');
         break;
       case 'integrations':
         navigate('/integrations');

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { useNavigate } from "react-router-dom";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { Sparkles, Plus } from "lucide-react";
+import { Sparkles, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -363,7 +363,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
     }
   }, []);
   
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const appLanguageCode = useMemo(() => (language || "en").toLowerCase().startsWith("es") ? "es" : "en", [language]);
 
   const handleStopRequest = useCallback(async () => {
@@ -1299,8 +1299,8 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
         >
           {/* Radix Sheet is built on Dialog primitives; it requires a Title + Description for a11y */}
           <SheetHeader className="sr-only">
-            <SheetTitle>Copilot</SheetTitle>
-            <SheetDescription>AI chat panel</SheetDescription>
+            <SheetTitle>{t("assistant.title", "Assistant")}</SheetTitle>
+            <SheetDescription>{t("assistant.description", "AI chat panel")}</SheetDescription>
           </SheetHeader>
           <div className="flex w-full h-full flex-col justify-between z-5 bg-background rounded-lg">
             {/* Conversation Selector Dropdown */}
@@ -1310,7 +1310,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
                   <SelectValue>
                     {(() => {
                       const currentConv = conversations.find(c => c.id === conversationId);
-                      return currentConv ? currentConv.title : "New conversation";
+                      return currentConv ? currentConv.title : t("assistant.newConversation", "New conversation");
                     })()}
                   </SelectValue>
                 </SelectTrigger>
@@ -1328,7 +1328,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
                     
                     return conversationsWithMessages.length === 0 ? (
                       <SelectItem value={conversationId} disabled>
-                        <span className="text-sm text-muted-foreground">No previous conversations</span>
+                        <span className="text-sm text-muted-foreground">{t("assistant.noPreviousConversations", "No previous conversations")}</span>
                       </SelectItem>
                     ) : (
                       conversationsWithMessages.map((conv) => (
@@ -1336,7 +1336,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
                           <div className="flex flex-col items-start gap-0.5 min-w-0 w-full">
                             <span className="text-sm truncate w-full">{conv.title}</span>
                             <span className="text-xs text-muted-foreground">
-                              {new Date(conv.updatedAt).toLocaleDateString()} • {conv.messageCount} messages
+                              {new Date(conv.updatedAt).toLocaleDateString()} • {conv.messageCount} {t("assistant.messages", "messages")}
                             </span>
                           </div>
                         </SelectItem>
@@ -1351,9 +1351,18 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
                 size="sm"
                 onClick={handleNewConversation}
                 className="h-8 px-3 shrink-0"
-                title="New conversation"
+                title={t("assistant.newConversation", "New conversation")}
               >
                 <Plus className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setOpen(false)}
+                className="h-8 w-8 p-0 shrink-0"
+                title={t("assistant.close", "Close")}
+              >
+                <X className="h-4 w-4" />
               </Button>
             </div>
             <div className="flex-1 w-full overflow-hidden flex flex-col">
@@ -1443,7 +1452,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
                             className="px-3 py-1.5 rounded-full bg-card/70 backdrop-blur border border-border/60 shadow-sm text-xs text-foreground hover:bg-card/90 transition-colors flex items-center gap-1.5"
                             onClick={() => scrollContainerToBottom()}
                           >
-                            <span>Scroll to bottom</span>
+                            <span>{t("assistant.scrollToBottom", "Scroll to bottom")}</span>
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="opacity-80">
                               <path d="M12 16a1 1 0 0 1-.707-.293l-6-6a1 1 0 1 1 1.414-1.414L12 13.586l5.293-5.293a1 1 0 0 1 1.414 1.414l-6 6A1 1 0 0 1 12 16z"/>
                             </svg>

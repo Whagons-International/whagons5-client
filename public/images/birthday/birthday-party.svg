@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="banner1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B6B"/>
+      <stop offset="100%" style="stop-color:#EE5A5A"/>
+    </linearGradient>
+    <linearGradient id="banner2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4ECDC4"/>
+      <stop offset="100%" style="stop-color:#3DB8B0"/>
+    </linearGradient>
+    <linearGradient id="banner3" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFE66D"/>
+      <stop offset="100%" style="stop-color:#FFD93D"/>
+    </linearGradient>
+    <linearGradient id="banner4" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#A78BFA"/>
+      <stop offset="100%" style="stop-color:#8B5CF6"/>
+    </linearGradient>
+  </defs>
+  <!-- Banner string -->
+  <path d="M10 40 Q50 60 100 50 Q150 40 190 55" stroke="#888" stroke-width="2" fill="none"/>
+  <!-- Banner flags -->
+  <polygon points="25,45 25,80 40,70" fill="url(#banner1)"/>
+  <polygon points="50,55 50,90 65,80" fill="url(#banner2)"/>
+  <polygon points="75,50 75,85 90,75" fill="url(#banner3)"/>
+  <polygon points="100,48 100,83 115,73" fill="url(#banner4)"/>
+  <polygon points="125,45 125,80 140,70" fill="url(#banner1)"/>
+  <polygon points="150,50 150,85 165,75" fill="url(#banner2)"/>
+  <polygon points="175,55 175,90 190,80" fill="url(#banner3)"/>
+  <!-- Party horn left -->
+  <path d="M30 150 L60 130 L65 135 L35 155 Z" fill="#FF6B6B"/>
+  <ellipse cx="25" cy="152" rx="8" ry="12" fill="#FFE66D"/>
+  <path d="M65 130 Q80 125 90 135 Q85 140 70 138" fill="#FFE66D" stroke="#E5C85E" stroke-width="1"/>
+  <!-- Party horn right -->
+  <path d="M170 150 L140 130 L135 135 L165 155 Z" fill="#4ECDC4"/>
+  <ellipse cx="175" cy="152" rx="8" ry="12" fill="#A78BFA"/>
+  <path d="M135 130 Q120 125 110 135 Q115 140 130 138" fill="#A78BFA" stroke="#8E76D6" stroke-width="1"/>
+  <!-- Confetti -->
+  <circle cx="50" cy="110" r="4" fill="#4ECDC4"/>
+  <circle cx="150" cy="105" r="4" fill="#FFE66D"/>
+  <circle cx="100" cy="115" r="5" fill="#FF6B6B"/>
+  <circle cx="80" cy="170" r="4" fill="#A78BFA"/>
+  <circle cx="120" cy="175" r="4" fill="#4ECDC4"/>
+  <rect x="90" y="100" width="5" height="10" fill="#A78BFA" transform="rotate(30 92 105)"/>
+  <rect x="60" cy="140" width="5" height="10" fill="#FFE66D" transform="rotate(-20 62 145)"/>
+  <rect x="135" y="145" width="5" height="10" fill="#FF6B6B" transform="rotate(40 137 150)"/>
+  <!-- Stars -->
+  <polygon points="100,140 103,150 113,150 105,157 108,167 100,161 92,167 95,157 87,150 97,150" fill="#FFE66D"/>
+  <!-- Floating confetti -->
+  <circle cx="30" cy="100" r="3" fill="#FF6B6B"/>
+  <circle cx="170" cy="95" r="3" fill="#A78BFA"/>
+  <rect x="40" y="120" width="4" height="8" fill="#4ECDC4" transform="rotate(45 42 124)"/>
+  <rect x="155" y="125" width="4" height="8" fill="#FFE66D" transform="rotate(-30 157 129)"/>
+</svg>

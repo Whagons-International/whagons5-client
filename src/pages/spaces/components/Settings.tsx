@@ -764,6 +764,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
             modulesLoaded={modulesLoaded}
             selectedTeamFilter={selectedTeamFilter}
             onClearTeamFilter={handleClearTeamFilter}
+            workspaceTeamIds={Array.isArray(currentWorkspace?.teams) ? currentWorkspace.teams : []}
           />
         </motion.div>
       )

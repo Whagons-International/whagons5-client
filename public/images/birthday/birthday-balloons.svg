@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="balloon1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B6B"/>
+      <stop offset="100%" style="stop-color:#EE5A5A"/>
+    </linearGradient>
+    <linearGradient id="balloon2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4ECDC4"/>
+      <stop offset="100%" style="stop-color:#3DB8B0"/>
+    </linearGradient>
+    <linearGradient id="balloon3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFE66D"/>
+      <stop offset="100%" style="stop-color:#FFD93D"/>
+    </linearGradient>
+    <linearGradient id="balloon4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#A78BFA"/>
+      <stop offset="100%" style="stop-color:#8B5CF6"/>
+    </linearGradient>
+  </defs>
+  <!-- Balloon strings -->
+  <path d="M70 130 Q75 150 100 180" stroke="#888" stroke-width="1.5" fill="none"/>
+  <path d="M100 120 Q100 150 100 180" stroke="#888" stroke-width="1.5" fill="none"/>
+  <path d="M130 130 Q125 150 100 180" stroke="#888" stroke-width="1.5" fill="none"/>
+  <path d="M160 140 Q140 160 100 180" stroke="#888" stroke-width="1.5" fill="none"/>
+  <!-- Red balloon -->
+  <ellipse cx="70" cy="70" rx="35" ry="45" fill="url(#balloon1)"/>
+  <ellipse cx="60" cy="55" rx="8" ry="12" fill="rgba(255,255,255,0.3)"/>
+  <polygon points="70,115 65,125 75,125" fill="url(#balloon1)"/>
+  <!-- Teal balloon -->
+  <ellipse cx="100" cy="60" rx="35" ry="45" fill="url(#balloon2)"/>
+  <ellipse cx="90" cy="45" rx="8" ry="12" fill="rgba(255,255,255,0.3)"/>
+  <polygon points="100,105 95,115 105,115" fill="url(#balloon2)"/>
+  <!-- Yellow balloon -->
+  <ellipse cx="130" cy="75" rx="32" ry="42" fill="url(#balloon3)"/>
+  <ellipse cx="120" cy="60" rx="7" ry="10" fill="rgba(255,255,255,0.3)"/>
+  <polygon points="130,117 125,127 135,127" fill="url(#balloon3)"/>
+  <!-- Purple balloon -->
+  <ellipse cx="160" cy="85" rx="28" ry="38" fill="url(#balloon4)"/>
+  <ellipse cx="152" cy="72" rx="6" ry="9" fill="rgba(255,255,255,0.3)"/>
+  <polygon points="160,123 156,132 164,132" fill="url(#balloon4)"/>
+  <!-- Bow -->
+  <circle cx="100" cy="180" r="5" fill="#FF6B6B"/>
+</svg>

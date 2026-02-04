@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Settings, Users, Globe, Lock, Plus, User, Trash2, Pencil, AlertTriangle } from 'lucide-react';
+import { Settings, Users, Globe, Lock, Plus, User, Trash2, Pencil, AlertTriangle, Cake, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { RootState } from '@/store/store';
 import { genericActions } from '@/store/genericSlices';
-import { Board, BoardMessage } from '@/store/types';
+import { Board, BoardMessage, BoardBirthdayImage } from '@/store/types';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -38,6 +39,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { PostItem } from './components/PostItem';
 import { PostComposer } from './components/PostComposer';
+import { BirthdayImagesManager } from './components/BirthdayImagesManager';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 
@@ -55,6 +57,7 @@ function BoardDetail() {
   const { value: members } = useSelector((state: RootState) => (state as any).boardMembers || { value: [] });
   const { value: users } = useSelector((state: RootState) => state.users || { value: [] });
   const { value: teams } = useSelector((state: RootState) => (state as any).teams || { value: [] });
+  const { value: birthdayImages } = useSelector((state: RootState) => (state as any).boardBirthdayImages || { value: [] });
   const currentUser = useSelector((state: RootState) => (state as any).user?.value ?? null);
 
   // Local state
@@ -87,6 +90,9 @@ function BoardDetail() {
     description: '',
     visibility: 'private' as 'public' | 'private',
   });
+  const [showBirthdaySection, setShowBirthdaySection] = useState(false);
+  const [birthdayEnabled, setBirthdayEnabled] = useState(false);
+  const [birthdayTemplate, setBirthdayTemplate] = useState('');
 
   // Find current board
   const board = boards.find((b: Board) => b.id === parseInt(boardId || '0'));
@@ -104,6 +110,19 @@ function BoardDetail() {
     });
     return map;
   }, [users]);
+
+  // Filter birthday images for this board
+  const boardBirthdayImages = useMemo(() => {
+    return birthdayImages.filter((img: BoardBirthdayImage) => img.board_id === parseInt(boardId || '0'));
+  }, [birthdayImages, boardId]);
+
+  // Sync birthday settings with board data
+  useEffect(() => {
+    if (board) {
+      setBirthdayEnabled(board.birthday_messages_enabled || false);
+      setBirthdayTemplate(board.birthday_message_template || '');
+    }
+  }, [board]);
 
   // Filter messages for this board
   const boardMessages = useMemo(() => {
@@ -310,12 +329,40 @@ function BoardDetail() {
     }
   };
 
+  const handleToggleBirthday = async (enabled: boolean) => {
+    setBirthdayEnabled(enabled);
+    try {
+      await dispatch(genericActions.boards.updateAsync({
+        id: parseInt(boardId || '0'),
+        updates: {
+          birthday_messages_enabled: enabled,
+        },
+      }) as any);
+    } catch (error) {
+      console.error('Failed to update birthday setting:', error);
+      setBirthdayEnabled(!enabled); // Revert on error
+    }
+  };
+
+  const handleUpdateBirthdayTemplate = async () => {
+    try {
+      await dispatch(genericActions.boards.updateAsync({
+        id: parseInt(boardId || '0'),
+        updates: {
+          birthday_message_template: birthdayTemplate || null,
+        },
+      }) as any);
+    } catch (error) {
+      console.error('Failed to update birthday template:', error);
+    }
+  };
+
   if (!board) {
     return (
       <div className="min-h-screen bg-background">
         <div className="max-w-2xl mx-auto">
           {/* Header */}
-          <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border">
+          <header className="sticky top-0 z-10 bg-background border-b border-border">
             <div className="flex items-center gap-3 px-4 py-3">
               <h1 className="text-lg font-semibold">
                 {t('boards.error.notFound', 'Board Not Found')}
@@ -333,10 +380,10 @@ function BoardDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-2xl mx-auto">
-        {/* Header - Threads Style */}
-        <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border">
+    <div className="h-full bg-background flex flex-col overflow-hidden">
+      {/* Header - Fixed at top */}
+      <header className="flex-shrink-0 bg-background border-b border-border z-50">
+        <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3">
               <div>
@@ -374,7 +421,12 @@ function BoardDetail() {
               </Button>
             </div>
           </div>
-        </header>
+        </div>
+      </header>
+
+      {/* Scrollable content area */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto">
 
         {/* Members Panel - Slide Down */}
         {showMembers && (
@@ -473,6 +525,87 @@ function BoardDetail() {
                 </div>
               </div>
 
+              {/* Birthday Messages Section */}
+              <div className="rounded-lg bg-background border border-border overflow-hidden">
+                <button
+                  onClick={() => setShowBirthdaySection(!showBirthdaySection)}
+                  className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <Cake className="size-5 text-muted-foreground" />
+                    <div className="text-left">
+                      <p className="font-medium">{t('boards.birthday.title', 'Birthday Messages')}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('boards.birthday.subtitle', 'Auto-post birthday wishes for members')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className={`px-2 py-0.5 rounded text-xs font-medium ${birthdayEnabled ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-muted text-muted-foreground'}`}>
+                      {birthdayEnabled ? t('common.enabled', 'Enabled') : t('common.disabled', 'Disabled')}
+                    </div>
+                    {showBirthdaySection ? (
+                      <ChevronUp className="size-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="size-4 text-muted-foreground" />
+                    )}
+                  </div>
+                </button>
+                
+                {showBirthdaySection && (
+                  <div className="border-t border-border p-4 space-y-4">
+                    {/* Enable/Disable Toggle */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="birthday-toggle" className="font-medium">
+                          {t('boards.birthday.enableLabel', 'Enable automatic birthday messages')}
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          {t('boards.birthday.enableDescription', 'When enabled, birthday messages will be posted automatically at 8:00 AM')}
+                        </p>
+                      </div>
+                      <Switch
+                        id="birthday-toggle"
+                        checked={birthdayEnabled}
+                        onCheckedChange={handleToggleBirthday}
+                      />
+                    </div>
+
+                    {/* Custom Message Template */}
+                    {birthdayEnabled && (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="birthday-template">
+                            {t('boards.birthday.templateLabel', 'Custom Message (optional)')}
+                          </Label>
+                          <Textarea
+                            id="birthday-template"
+                            value={birthdayTemplate}
+                            onChange={(e) => setBirthdayTemplate(e.target.value)}
+                            onBlur={handleUpdateBirthdayTemplate}
+                            placeholder={t('boards.birthday.templatePlaceholder', 'Happy birthday {name}! Hope you have a wonderful day!')}
+                            rows={2}
+                            className="text-sm"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            {t('boards.birthday.templateHint', 'Use {name} for the person\'s name. Leave blank for random default messages.')}
+                          </p>
+                        </div>
+
+                        {/* Birthday Images Manager */}
+                        <div className="pt-2 border-t border-border">
+                          <BirthdayImagesManager
+                            boardId={parseInt(boardId || '0')}
+                            customImages={boardBirthdayImages}
+                            currentUserId={currentUser?.id || 0}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Danger Zone */}
               <div className="mt-6 pt-4 border-t border-border">
                 <h3 className="text-sm font-semibold text-destructive mb-3 flex items-center gap-2">
@@ -541,6 +674,7 @@ function BoardDetail() {
               />
             ))
           )}
+        </div>
         </div>
       </div>
 

@@ -61,7 +61,21 @@ export function CategoryReportingTeamsManager({
   useEffect(() => {
     if ((variant === 'dialog' && open) || variant === 'inline') {
       if (category && controlledSelectedTeamIds === undefined) {
-        setInternalSelectedTeamIds(category.reporting_team_ids || []);
+        // Ensure reporting_team_ids is always an array (handle null, undefined, or string values)
+        let teamIds = category.reporting_team_ids;
+        if (!teamIds) {
+          teamIds = [];
+        } else if (typeof teamIds === 'string') {
+          try {
+            teamIds = JSON.parse(teamIds);
+          } catch {
+            teamIds = [];
+          }
+        }
+        if (!Array.isArray(teamIds)) {
+          teamIds = [];
+        }
+        setInternalSelectedTeamIds(teamIds);
         setInternalError(null);
       }
     }
@@ -92,9 +106,11 @@ export function CategoryReportingTeamsManager({
     setInternalError(null);
     
     try {
+      // Ensure reporting_team_ids is always an array
+      const safeReportingTeamIds = Array.isArray(internalSelectedTeamIds) ? internalSelectedTeamIds : [];
       await dispatch(genericActions.categories.updateAsync({
         id: category.id,
-        updates: { reporting_team_ids: internalSelectedTeamIds }
+        updates: { reporting_team_ids: safeReportingTeamIds }
       })).unwrap();
       if (onOpenChange) {
         onOpenChange(false);
@@ -113,7 +129,21 @@ export function CategoryReportingTeamsManager({
       return;
     }
     if (category) {
-      setInternalSelectedTeamIds(category.reporting_team_ids || []);
+      // Ensure reporting_team_ids is always an array (handle null, undefined, or string values)
+      let teamIds = category.reporting_team_ids;
+      if (!teamIds) {
+        teamIds = [];
+      } else if (typeof teamIds === 'string') {
+        try {
+          teamIds = JSON.parse(teamIds);
+        } catch {
+          teamIds = [];
+        }
+      }
+      if (!Array.isArray(teamIds)) {
+        teamIds = [];
+      }
+      setInternalSelectedTeamIds(teamIds);
       setInternalError(null);
     }
   };

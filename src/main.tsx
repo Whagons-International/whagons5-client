@@ -10,6 +10,8 @@ import { AuthProvider } from './providers/AuthProvider';
 import { ThemeProvider } from './providers/ThemeProvider';
 import { BrandingProvider } from './providers/BrandingProvider';
 import { LanguageProvider } from './providers/LanguageProvider';
+import { LaserPointerProvider } from './providers/LaserPointerProvider';
+import { LaserPointer } from './components/LaserPointer';
 import { Toaster } from 'react-hot-toast';
 import { Provider } from 'react-redux';
 import {store } from './store';
@@ -29,9 +31,12 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         <ThemeProvider defaultTheme="light" storageKey="whagons-ui-theme">
           <LanguageProvider>
             <BrandingProvider>
-              <AuthProvider>
-                <App />
-                <Toaster 
+<AuthProvider>
+                <LaserPointerProvider>
+                  <App />
+                  <LaserPointer />
+                </LaserPointerProvider>
+                <Toaster
                   position="bottom-right"
                   containerStyle={{
                     bottom: '20px',
@@ -56,10 +61,10 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
                         primary: '#ef4444',
                         secondary: '#fff',
                       },
-                    },
+},
                   }}
                 />
-              </AuthProvider>
+                </AuthProvider>
             </BrandingProvider>
           </LanguageProvider>
         </ThemeProvider>

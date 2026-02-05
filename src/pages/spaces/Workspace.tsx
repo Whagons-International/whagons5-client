@@ -2,7 +2,7 @@ import { useRef, useMemo, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useLocation } from 'react-router-dom';
 import { UrlTabs } from '@/components/ui/url-tabs';
-import { MessageSquare, FolderPlus, X, CheckCircle2, UserRound, CalendarDays, Flag, Trash2 } from 'lucide-react';
+import { MessageSquare, FolderPlus, X, CheckCircle2, UserRound, CalendarDays, Flag, Trash2, Paintbrush } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -16,6 +16,7 @@ import { TabsTrigger } from '@/animated/Tabs';
 import { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import ChatTab from '@/pages/spaces/components/ChatTab';
 import ResourcesTab from '@/pages/spaces/components/ResourcesTab';
+import WhiteboardViewTab from '@/pages/spaces/components/WhiteboardViewTab';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '@/store';
 import {
@@ -48,6 +49,7 @@ import { useWorkspaceFilters } from './workspace/hooks/useWorkspaceFilters';
 import { useWorkspaceDragDrop } from './workspace/hooks/useWorkspaceDragDrop';
 import { useWorkspaceTaskDialog } from './workspace/hooks/useWorkspaceTaskDialog';
 import { useWorkspaceRowDensity } from './workspace/hooks/useWorkspaceRowDensity';
+import { useTaskCompletionToast } from './workspace/hooks/useTaskCompletionToast';
 import { createWorkspaceTabs } from './workspace/utils/workspaceTabs';
 import { SortableTab } from './workspace/components/SortableTab';
 import { SortableKpiCard } from './workspace/components/SortableKpiCard';
@@ -152,6 +154,9 @@ export const Workspace = () => {
 
   // Task dialog
   const { openCreateTask, setOpenCreateTask, openEditTask, setOpenEditTask, selectedTask, handleOpenTaskDialog } = useWorkspaceTaskDialog();
+
+  // Task completion toast notifications
+  useTaskCompletionToast();
 
   // Drag and drop
   const { activeKpiId, handleDragStart, handleDragEnd, handleKpiDragStart, handleKpiDragEnd } = useWorkspaceDragDrop({
@@ -494,76 +499,88 @@ export const Workspace = () => {
       )}
 
       <div className={`flex flex-1 min-h-0 ${isResizing ? 'select-none' : ''}`}>
-        <div className='flex-1 min-w-0 h-full'>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={filteredOrder} strategy={rectSortingStrategy}>
-              <UrlTabs
-                tabs={tabsForRender}
-                defaultValue={primaryTabValue}
-                basePath={`/workspace/${id}`}
-                pathMap={WORKSPACE_TAB_PATHS}
-                className="w-full h-full flex flex-col [&_[data-slot=tabs]]:gap-0 [&_[data-slot=tabs-content]]:mt-0 [&>div]:pt-0 [&_[data-slot=tabs-list]]:mb-0"
-                onValueChange={(v) => { 
-                  if (Object.keys(WORKSPACE_TAB_PATHS).includes(v)) {
-                    const tabValue = v as WorkspaceTabKey;
-                    setPrevActiveTab(activeTab); 
-                    setActiveTab(tabValue);
+        {/* Main content area - hidden when whiteboard is active */}
+        {rightPanel !== 'whiteboard' && (
+          <div className='flex-1 min-w-0 h-full'>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext items={filteredOrder} strategy={rectSortingStrategy}>
+                <UrlTabs
+                  tabs={tabsForRender}
+                  defaultValue={primaryTabValue}
+                  basePath={`/workspace/${id}`}
+                  pathMap={WORKSPACE_TAB_PATHS}
+                  className="w-full h-full flex flex-col [&_[data-slot=tabs]]:gap-0 [&_[data-slot=tabs-content]]:mt-0 [&>div]:pt-0 [&_[data-slot=tabs-list]]:mb-0"
+                  onValueChange={(v) => { 
+                    if (Object.keys(WORKSPACE_TAB_PATHS).includes(v)) {
+                      const tabValue = v as WorkspaceTabKey;
+                      setPrevActiveTab(activeTab); 
+                      setActiveTab(tabValue);
+                    }
+                  }}
+                  showClearFilters={showClearFilters}
+                  onClearFilters={() => {
+                    tableRef.current?.clearFilters();
+                    setSelectedKpiCardId(null);
+                    window.dispatchEvent(new CustomEvent('workspace-filter-clear'));
+                  }}
+                  sortable={true}
+                  sortableItems={filteredOrder.filter(key => !FIXED_TABS.includes(key))}
+                  renderSortableTab={(tab, isFixed) => (
+                    <SortableTab
+                      key={tab.value}
+                      id={tab.value}
+                      disabled={isFixed}
+                    >
+                      <TabsTrigger
+                        value={tab.value}
+                        disabled={tab.disabled}
+                      >
+                        {tab.label}
+                      </TabsTrigger>
+                    </SortableTab>
+                  )}
+                  rightElement={
+                    !rightPanel ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5 h-8 px-3 rounded-md font-medium text-xs text-muted-foreground hover:text-foreground hover:bg-muted"
+                        aria-label="Collaboration"
+                        onClick={() => setRightPanel('chat')}
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">{t('workspace.collab.collab', 'Collab')}</span>
+                      </Button>
+                    ) : null
                   }
-                }}
-                showClearFilters={showClearFilters}
-                onClearFilters={() => {
-                  tableRef.current?.clearFilters();
-                  setSelectedKpiCardId(null);
-                  window.dispatchEvent(new CustomEvent('workspace-filter-clear'));
-                }}
-                sortable={true}
-                sortableItems={filteredOrder.filter(key => !FIXED_TABS.includes(key))}
-                renderSortableTab={(tab, isFixed) => (
-                  <SortableTab
-                    key={tab.value}
-                    id={tab.value}
-                    disabled={isFixed}
-                  >
-                    <TabsTrigger
-                      value={tab.value}
-                      disabled={tab.disabled}
-                    >
-                      {tab.label}
-                    </TabsTrigger>
-                  </SortableTab>
-                )}
-                rightElement={
-                  !rightPanel ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1.5 h-8 px-3 rounded-md font-medium text-xs text-muted-foreground hover:text-foreground hover:bg-muted"
-                      aria-label="Collaboration"
-                      onClick={() => setRightPanel('chat')}
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">{t('workspace.collab.collab', 'Collab')}</span>
-                    </Button>
-                  ) : null
-                }
-              />
-            </SortableContext>
-          </DndContext>
-        </div>
+                />
+              </SortableContext>
+            </DndContext>
+          </div>
+        )}
+        {/* Right panel for chat/resources, or full-width whiteboard */}
         {rightPanel && (
-            <div className="relative border-l bg-background flex flex-col" style={{ width: rightPanelWidth, flex: '0 0 auto' }}>
-              {/* Resize handle - invisible wide hit area on the left edge */}
-              <div
-                className="absolute left-0 top-0 bottom-0 w-3 -translate-x-1/2 cursor-col-resize z-10 group"
-                onMouseDown={startResize}
-              >
-                <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-px bg-transparent group-hover:bg-primary/40 transition-colors" />
-              </div>
+            <div 
+              className={cn(
+                "relative bg-background flex flex-col",
+                rightPanel === 'whiteboard' ? "flex-1" : "border-l"
+              )} 
+              style={rightPanel === 'whiteboard' ? undefined : { width: rightPanelWidth, flex: '0 0 auto' }}
+            >
+              {/* Resize handle - only show for non-whiteboard panels */}
+              {rightPanel !== 'whiteboard' && (
+                <div
+                  className="absolute left-0 top-0 bottom-0 w-3 -translate-x-1/2 cursor-col-resize z-10 group"
+                  onMouseDown={startResize}
+                >
+                  <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-px bg-transparent group-hover:bg-primary/40 transition-colors" />
+                </div>
+              )}
               <div className="flex items-center justify-between px-2 py-1.5 border-b">
                 <div className="flex items-center gap-1">
                   <Button
@@ -590,16 +607,30 @@ export const Workspace = () => {
                     <FolderPlus className="w-3.5 h-3.5 mr-1.5" />
                     {t('workspace.collab.resources', 'Resources')}
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "h-7 px-2.5 text-xs font-medium rounded-md",
+                      rightPanel === 'whiteboard' ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
+                    )}
+                    onClick={() => setRightPanel('whiteboard')}
+                  >
+                    <Paintbrush className="w-3.5 h-3.5 mr-1.5" />
+                    {t('workspace.collab.whiteboard', 'Board')}
+                  </Button>
                 </div>
-                <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Close panel" onClick={() => setRightPanel(null)}>
+                <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" aria-label="Close panel" onClick={() => setRightPanel(null)}>
                   <X className="w-3.5 h-3.5" />
                 </Button>
               </div>
               <div className="flex-1 min-h-0 overflow-auto">
                 {rightPanel === 'chat' ? (
                   <ChatTab workspaceId={id} />
-                ) : (
+                ) : rightPanel === 'resources' ? (
                   <ResourcesTab workspaceId={id} />
+                ) : (
+                  <WhiteboardViewTab workspaceId={id} />
                 )}
               </div>
             </div>

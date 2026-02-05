@@ -25,8 +25,25 @@ export function ApprovalActionsDialog({ open, onOpenChange, approval }: Approval
   // Load actions when approval changes
   useEffect(() => {
     if (approval) {
-      setApprovedActions((approval as any).on_approved_actions || []);
-      setRejectedActions((approval as any).on_rejected_actions || []);
+      // Handle both array and JSON string formats
+      const approved = (approval as any).on_approved_actions;
+      const rejected = (approval as any).on_rejected_actions;
+      
+      const parseActions = (val: unknown): any[] => {
+        if (Array.isArray(val)) return val;
+        if (typeof val === 'string') {
+          try {
+            const parsed = JSON.parse(val);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            return [];
+          }
+        }
+        return [];
+      };
+      
+      setApprovedActions(parseActions(approved));
+      setRejectedActions(parseActions(rejected));
     } else {
       setApprovedActions([]);
       setRejectedActions([]);

@@ -19,7 +19,7 @@ import {
 import toast from 'react-hot-toast';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { actionsApi } from '@/api/whagonsActionsApi';
-import { genericActions, genericInternalActions } from '@/store/genericSlices';
+import { genericActions, genericInternalActions, genericCaches } from '@/store/genericSlices';
 
 interface Plugin {
 	id: number;
@@ -29,7 +29,7 @@ interface Plugin {
 	version: string;
 	is_enabled: boolean;
 	settings: Record<string, any>;
-	required_permissions: string[];
+	required_permissions?: string[] | null;
 	routes_count?: number;
 	created_at: string;
 	updated_at: string;
@@ -62,15 +62,19 @@ export default function PluginManagement() {
 	const handleToggle = async (plugin: Plugin) => {
 		setToggling(prev => ({ ...prev, [plugin.slug]: true }));
 		try {
-			await actionsApi.patch(`/plugins/${plugin.slug}/toggle`, {
+			const response = await actionsApi.patch(`/plugins/${plugin.slug}/toggle`, {
 				is_enabled: !plugin.is_enabled,
 			});
 
-			// Update Redux via generic slice
-			dispatch(genericActions.plugins.updateAsync({
-				id: plugin.id,
-				updates: { is_enabled: !plugin.is_enabled }
-			}));
+			// Extract plugin data from response (handle API response envelope)
+			const updatedPlugin = response.data?.data || response.data || response;
+			
+			// Update cache with the response data
+			await genericCaches.plugins.update(updatedPlugin.id, updatedPlugin);
+			
+			// Update Redux state directly with the response data
+			dispatch(genericInternalActions.plugins.updateItem(updatedPlugin));
+			
 			toast.success(
 				`${plugin.name} has been ${!plugin.is_enabled ? 'enabled' : 'disabled'}`
 			);
@@ -276,7 +280,7 @@ export default function PluginManagement() {
 							</div>
 
 							{/* Required Permissions */}
-							{plugin.required_permissions &&
+							{Array.isArray(plugin.required_permissions) &&
 								plugin.required_permissions.length > 0 && (
 									<div>
 										<div className="text-sm text-muted-foreground mb-2 flex items-center gap-1">

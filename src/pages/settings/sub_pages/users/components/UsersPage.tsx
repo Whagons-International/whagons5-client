@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUser, faChartBar, faEnvelope } from "@fortawesome/free-solid-svg-icons";
-import { Check, Copy as CopyIcon, Plus, Trash } from "lucide-react";
+import { Check, Copy as CopyIcon, Plus, Trash, Crown, Shield } from "lucide-react";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { AppDispatch, RootState } from "@/store/store";
 import { useNavigate } from "react-router-dom";
@@ -71,6 +71,88 @@ function Users() {
     entityName: 'users',
     searchFields: ['name', 'email']
   });
+
+  // localStorage key for user order
+  const USER_ORDER_STORAGE_KEY = 'wh-users-order-v1';
+
+  // Load user order from localStorage
+  const loadUserOrder = (): number[] => {
+    try {
+      const saved = localStorage.getItem(USER_ORDER_STORAGE_KEY);
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed.map((id: any) => Number(id)) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  // Save user order to localStorage
+  const saveUserOrder = (order: number[]) => {
+    try {
+      localStorage.setItem(USER_ORDER_STORAGE_KEY, JSON.stringify(order));
+    } catch {
+      // Ignore localStorage errors
+    }
+  };
+
+  // State for user order
+  const [userOrder, setUserOrder] = useState<number[]>(() => loadUserOrder());
+
+  // Update order when users change (add new users to end, remove deleted ones)
+  useEffect(() => {
+    // Don't update order when users haven't loaded yet
+    if (users.length === 0) return;
+    
+    const currentUserIds = users.map(u => u.id);
+    const savedOrder = loadUserOrder();
+    
+    // Filter out deleted users from order (preserve order)
+    const validOrder = savedOrder.filter(id => currentUserIds.includes(id));
+    
+    // Add new users to the end
+    const newUsers = currentUserIds.filter(id => !validOrder.includes(id));
+    const updatedOrder = [...validOrder, ...newUsers];
+    
+    // Only update if order actually changed (new users added or deleted users removed)
+    // Compare by length and IDs (not order-sensitive for this check)
+    const currentIdsSet = new Set(userOrder);
+    const updatedIdsSet = new Set(updatedOrder);
+    const idsChanged = userOrder.length !== updatedOrder.length || 
+      userOrder.some(id => !updatedIdsSet.has(id)) ||
+      updatedOrder.some(id => !currentIdsSet.has(id));
+    
+    if (idsChanged) {
+      setUserOrder(updatedOrder);
+      saveUserOrder(updatedOrder);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [users.length, users.map(u => u.id).join(',')]);
+
+  // Apply order to filtered items
+  const orderedFilteredItems = useMemo(() => {
+    if (!userOrder.length || !filteredItems.length) return filteredItems;
+    
+    // Create a map for quick lookup
+    const itemMap = new Map(filteredItems.map(item => [item.id, item]));
+    
+    // Sort by saved order, then add any items not in order at the end
+    const ordered: UserData[] = [];
+    const unordered: UserData[] = [];
+    
+    userOrder.forEach(id => {
+      const item = itemMap.get(id);
+      if (item) {
+        ordered.push(item);
+        itemMap.delete(id);
+      }
+    });
+    
+    // Add remaining items (not in saved order) at the end
+    itemMap.forEach(item => unordered.push(item));
+    
+    return [...ordered, ...unordered];
+  }, [filteredItems, userOrder]);
 
   // Roles are loaded by DataManager on login
 
@@ -238,13 +320,55 @@ function Users() {
         hide: true
       },
       {
+        rowDrag: true,
+        width: 50,
+        maxWidth: 50,
+        minWidth: 50,
+        pinned: 'left',
+        lockPosition: true,
+        headerName: '',
+        suppressMenu: true,
+        sortable: false,
+        filter: false,
+        resizable: false
+      },
+      {
         field: 'name',
         headerName: columnLabels.name,
         flex: 2,
         minWidth: 180,
-        cellRenderer: (params: ICellRendererParams) => (
-          <AvatarCellRenderer name={params.data?.name || ''} color={params.data?.color} />
-        )
+        cellRenderer: (params: ICellRendererParams) => {
+          // Check if user has an admin-related global role (crown is based on global roles)
+          // Matches roles containing "admin" (e.g., "admin", "system admin", "super admin")
+          const globalRoles = params.data?.global_roles || [];
+          const hasAdminRole = Array.isArray(globalRoles) && globalRoles.some((role: any) => {
+            const roleName = typeof role === 'object' ? role.name : role;
+            return roleName && roleName.toLowerCase().includes('admin');
+          });
+          
+          // Check if user has is_admin field set to true (separate indicator)
+          const isAdminField = params.data?.is_admin === true;
+          
+          return (
+            <div className="flex items-center gap-2">
+              <AvatarCellRenderer name={params.data?.name || ''} color={params.data?.color} />
+              {hasAdminRole && (
+                <Crown 
+                  className="h-4 w-4 text-amber-500 flex-shrink-0" 
+                  title={tu('grid.values.adminRole', 'Admin Role')}
+                  aria-label={tu('grid.values.adminRole', 'Admin Role')}
+                />
+              )}
+              {isAdminField && (
+                <Shield 
+                  className="h-4 w-4 text-blue-500 flex-shrink-0" 
+                  title={tu('grid.values.adminField', 'Admin Field')}
+                  aria-label={tu('grid.values.adminField', 'Admin Field')}
+                />
+              )}
+            </div>
+          );
+        }
       },
       {
         field: 'email',
@@ -831,6 +955,35 @@ function Users() {
     }
   };
 
+  // Compute global roles options for MultiSelect
+  // Include both GLOBAL scope roles and roles already assigned to the user
+  const globalRolesOptions = useMemo(() => {
+    // Get all GLOBAL scope roles from available roles
+    const globalRolesFromList = roles
+      .filter((role: Role) => role.scope === 'GLOBAL')
+      .map((role: Role) => ({
+        value: role.name,
+        label: role.name
+      }));
+    
+    // Also include roles that are already assigned to the user
+    // This ensures assigned roles are visible even if they're not in the roles list
+    const assignedRoleNames = Array.isArray(editingUser?.global_roles)
+      ? editingUser.global_roles.map((role: any) => typeof role === 'object' ? role.name : role)
+      : [];
+    
+    // Create options for assigned roles that aren't already in the list
+    const assignedRoleOptions = assignedRoleNames
+      .filter((roleName: string) => !globalRolesFromList.some(opt => opt.value === roleName))
+      .map((roleName: string) => ({
+        value: roleName,
+        label: roleName
+      }));
+    
+    // Merge and return unique options
+    return [...globalRolesFromList, ...assignedRoleOptions];
+  }, [roles, editingUser?.global_roles]);
+
   // Edit submit handler
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -931,6 +1084,8 @@ function Users() {
       
       // Close edit dialog on success
       setIsEditDialogOpen(false);
+      
+      // Order is maintained by localStorage, no need to update here
     } catch (error: any) {
       const backendErrors = error?.response?.data?.errors;
       const backendMessage = error?.response?.data?.message;
@@ -994,12 +1149,82 @@ function Users() {
             ),
             content: (
               <div className="flex h-full flex-col">
+                <style>{`
+                  .ag-theme-quartz .ag-row-drag {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: move;
+                  }
+                  .ag-theme-quartz .ag-row-drag::before {
+                    content: '';
+                    display: block;
+                    width: 4px;
+                    height: 16px;
+                    background: repeating-linear-gradient(
+                      to bottom,
+                      hsl(var(--muted-foreground)) 0px,
+                      hsl(var(--muted-foreground)) 2px,
+                      transparent 2px,
+                      transparent 4px
+                    );
+                    margin-right: 4px;
+                  }
+                  .ag-theme-quartz .ag-row-drag::after {
+                    content: '';
+                    display: block;
+                    width: 4px;
+                    height: 16px;
+                    background: repeating-linear-gradient(
+                      to bottom,
+                      hsl(var(--muted-foreground)) 0px,
+                      hsl(var(--muted-foreground)) 2px,
+                      transparent 2px,
+                      transparent 4px
+                    );
+                  }
+                  .ag-theme-quartz .ag-row-drag {
+                    background-image: none;
+                  }
+                `}</style>
                 <div className="flex-1 min-h-0">
                   <SettingsGrid
-                    rowData={filteredItems}
+                    rowData={orderedFilteredItems}
                     columnDefs={columnDefs}
                     noRowsMessage={tu('grid.noUsers', 'No users found')}
                     onRowDoubleClicked={(row: UserData) => handleEdit(row)}
+                    getRowId={(params) => String(params.data.id)}
+                    gridOptions={{
+                      rowDragManaged: true,
+                      animateRows: true
+                    }}
+                    onRowDragEnd={(event: any) => {
+                      // Handle row drag end - save new order to localStorage
+                      // AG Grid with rowDragManaged: true automatically reorders rows
+                      // We need to get the new order from the grid and save it
+                      const gridApi = event.api;
+                      if (!gridApi) return;
+                      
+                      // Small delay to ensure AG Grid has updated its internal order
+                      setTimeout(() => {
+                        const allRowNodes: any[] = [];
+                        gridApi.forEachNodeAfterFilterAndSort((node: any) => {
+                          if (node.data) {
+                            allRowNodes.push(node.data);
+                          }
+                        });
+                        
+                        // Extract the new order (IDs in the order they appear)
+                        const newOrder = allRowNodes.map((item: UserData) => item.id);
+                        
+                        // Update state and save to localStorage
+                        if (newOrder.length > 0) {
+                          console.log('Saving new user order:', newOrder);
+                          setUserOrder(newOrder);
+                          saveUserOrder(newOrder);
+                        }
+                      }, 0);
+                    }}
                   />
                 </div>
               </div>
@@ -1446,14 +1671,7 @@ function Users() {
                     </span>
                   </Label>
                   <MultiSelect
-                    options={roles.length > 0
-                      ? roles
-                          .filter((role: Role) => role.scope === 'GLOBAL')
-                          .map((role: Role) => ({
-                            value: role.name,
-                            label: role.name
-                          }))
-                      : []}
+                    options={globalRolesOptions}
                     onValueChange={setSelectedGlobalRoles}
                     defaultValue={selectedGlobalRoles}
                     placeholder={

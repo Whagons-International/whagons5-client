@@ -82,10 +82,11 @@ const genericSliceConfigs = [
     { name: 'workspaces', table: 'wh_workspaces', endpoint: '/workspaces', store: 'workspaces', hashFields: ['id','name','description','color','icon','teams','view_modes','allow_ad_hoc_tasks','type','category_id','spots','created_by','updated_at'] },
 
     // Boards (Communication Boards)
-    { name: 'boards', table: 'wh_boards', endpoint: '/boards', store: 'boards', hashFields: ['id','name','description','visibility','created_by','updated_at'] },
+    { name: 'boards', table: 'wh_boards', endpoint: '/boards', store: 'boards', hashFields: ['id','name','description','visibility','birthday_messages_enabled','birthday_message_template','created_by','updated_at'] },
     { name: 'boardMembers', table: 'wh_board_members', endpoint: '/board-members', store: 'board_members', hashFields: ['id','board_id','member_type','member_id','role','updated_at'] },
     { name: 'boardMessages', table: 'wh_board_messages', endpoint: '/board-messages', store: 'board_messages', hashFields: ['id','board_id','created_by','title','content','is_pinned','starts_at','ends_at','metadata','source_type','source_id','updated_at'] },
     { name: 'boardAttachments', table: 'wh_board_attachments', endpoint: '/board-attachments', store: 'board_attachments', hashFields: ['id','uuid','board_message_id','type','file_path','file_name','file_extension','file_size','user_id','updated_at'] },
+    { name: 'boardBirthdayImages', table: 'wh_board_birthday_images', endpoint: '/board-birthday-images', store: 'board_birthday_images', hashFields: ['id','board_id','file_path','file_name','uploaded_by','updated_at'] },
 
     // Job Positions
     { name: 'jobPositions', table: 'wh_job_positions', endpoint: '/job-positions', store: 'job_positions', hashFields: ['id','code','title','level','is_leadership','is_active','description','updated_at'] },
@@ -103,10 +104,18 @@ const genericSliceConfigs = [
     // KPI Cards (Custom dashboard metrics)
     { name: 'kpiCards', table: 'wh_kpi_cards', endpoint: '/kpi-cards', store: 'kpi_cards', hashFields: ['id','name','type','query_config','display_config','position','is_enabled','updated_at'] },
 
-    // Schedule Management
-    { name: 'scheduleTemplates', table: 'wh_schedule_templates', endpoint: '/schedule-templates', store: 'schedule_templates', hashFields: ['id','name','description','schedule_type','weekly_hours','updated_at'] },
-    { name: 'scheduleTemplateDays', table: 'wh_schedule_template_days', endpoint: '/schedule-template-days', store: 'schedule_template_days', hashFields: ['id','template_id','day_of_week','is_working_day','start_time','end_time','break_duration','break_start_time','updated_at'] },
-    { name: 'userSchedules', table: 'wh_user_schedules', endpoint: '/user-schedules', store: 'user_schedules', hashFields: ['id','user_id','template_id','effective_from','effective_to','timezone','updated_at'] },
+    // Working Hours Plugin
+    { name: 'countryConfigs', table: 'wh_country_configs', endpoint: '/country-configs', store: 'country_configs', hashFields: ['id','country_code','country_name','default_weekly_hours','max_daily_hours','min_break_after_hours','min_break_duration_minutes','overtime_threshold_daily','overtime_threshold_weekly','settings','is_active','updated_at'] },
+    { name: 'overtimeRules', table: 'wh_overtime_rules', endpoint: '/overtime-rules', store: 'overtime_rules', hashFields: ['id','name','description','country_config_id','daily_threshold_hours','weekly_threshold_hours','require_approval','max_overtime_daily','max_overtime_weekly','is_active','updated_at'] },
+    { name: 'overtimeMultipliers', table: 'wh_overtime_multipliers', endpoint: '/overtime-multipliers', store: 'overtime_multipliers', hashFields: ['id','overtime_rule_id','multiplier_type','threshold_hours','multiplier','priority','is_active','updated_at'] },
+    { name: 'holidayCalendars', table: 'wh_holiday_calendars', endpoint: '/holiday-calendars', store: 'holiday_calendars', hashFields: ['id','name','country_config_id','region_code','calendar_year','source','last_synced_at','is_active','updated_at'] },
+    { name: 'holidays', table: 'wh_holidays', endpoint: '/holidays', store: 'holidays', hashFields: ['id','holiday_calendar_id','name','description','date','holiday_type','is_half_day','is_recurring','affects_overtime','is_active','updated_at'] },
+    { name: 'workingSchedules', table: 'wh_working_schedules', endpoint: '/working-schedules', store: 'working_schedules', hashFields: ['id','name','description','schedule_type','weekly_hours','country_config_id','holiday_calendar_id','overtime_rule_id','is_default','is_active','created_by','updated_at'] },
+    { name: 'workingScheduleDays', table: 'wh_working_schedule_days', endpoint: '/working-schedule-days', store: 'working_schedule_days', hashFields: ['id','working_schedule_id','day_of_week','shift_number','start_time','end_time','is_working_day','is_overnight','expected_hours','updated_at'] },
+    { name: 'workingScheduleBreaks', table: 'wh_working_schedule_breaks', endpoint: '/working-schedule-breaks', store: 'working_schedule_breaks', hashFields: ['id','working_schedule_day_id','break_type','start_time','duration_minutes','is_paid','updated_at'] },
+    { name: 'scheduleAssignments', table: 'wh_schedule_assignments', endpoint: '/schedule-assignments', store: 'schedule_assignments', hashFields: ['id','working_schedule_id','assignable_type','assignable_id','priority','effective_from','effective_to','is_active','created_by','updated_at'] },
+    { name: 'timeOffTypes', table: 'wh_time_off_types', endpoint: '/time-off-types', store: 'time_off_types', hashFields: ['id','name','code','description','color','requires_approval','approval_id','max_days_per_year','is_paid','is_active','updated_at'] },
+    { name: 'timeOffRequests', table: 'wh_time_off_requests', endpoint: '/time-off-requests', store: 'time_off_requests', hashFields: ['id','user_id','time_off_type_id','start_date','end_date','start_half_day','end_half_day','total_days','reason','status','approved_by','approved_at','rejection_reason','created_by','updated_at'] },
 
     // Notifications (client-side only, no backend table)
     { name: 'notifications', table: '', endpoint: '', store: 'notifications', hashFields: [] },
@@ -172,6 +181,7 @@ export const {
     boardMembers,
     boardMessages,
     boardAttachments,
+    boardBirthdayImages,
     jobPositions,
     complianceStandards,
     complianceRequirements,
@@ -180,9 +190,18 @@ export const {
     plugins,
     pluginRoutes,
     kpiCards,
-    scheduleTemplates,
-    scheduleTemplateDays,
-    userSchedules,
+    // Working Hours Plugin
+    countryConfigs,
+    overtimeRules,
+    overtimeMultipliers,
+    holidayCalendars,
+    holidays,
+    workingSchedules,
+    workingScheduleDays,
+    workingScheduleBreaks,
+    scheduleAssignments,
+    timeOffTypes,
+    timeOffRequests,
     notifications,
 } = genericSlices.slices;
 
@@ -252,6 +271,7 @@ export const genericEventNames = {
     boardMembers: genericSlices.slices.boardMembers.eventNames,
     boardMessages: genericSlices.slices.boardMessages.eventNames,
     boardAttachments: genericSlices.slices.boardAttachments.eventNames,
+    boardBirthdayImages: genericSlices.slices.boardBirthdayImages.eventNames,
     jobPositions: genericSlices.slices.jobPositions.eventNames,
     complianceStandards: genericSlices.slices.complianceStandards.eventNames,
     complianceRequirements: genericSlices.slices.complianceRequirements.eventNames,
@@ -260,9 +280,18 @@ export const genericEventNames = {
     plugins: genericSlices.slices.plugins.eventNames,
     pluginRoutes: genericSlices.slices.pluginRoutes.eventNames,
     kpiCards: genericSlices.slices.kpiCards.eventNames,
-    scheduleTemplates: genericSlices.slices.scheduleTemplates.eventNames,
-    scheduleTemplateDays: genericSlices.slices.scheduleTemplateDays.eventNames,
-    userSchedules: genericSlices.slices.userSchedules.eventNames,
+    // Working Hours Plugin
+    countryConfigs: genericSlices.slices.countryConfigs.eventNames,
+    overtimeRules: genericSlices.slices.overtimeRules.eventNames,
+    overtimeMultipliers: genericSlices.slices.overtimeMultipliers.eventNames,
+    holidayCalendars: genericSlices.slices.holidayCalendars.eventNames,
+    holidays: genericSlices.slices.holidays.eventNames,
+    workingSchedules: genericSlices.slices.workingSchedules.eventNames,
+    workingScheduleDays: genericSlices.slices.workingScheduleDays.eventNames,
+    workingScheduleBreaks: genericSlices.slices.workingScheduleBreaks.eventNames,
+    scheduleAssignments: genericSlices.slices.scheduleAssignments.eventNames,
+    timeOffTypes: genericSlices.slices.timeOffTypes.eventNames,
+    timeOffRequests: genericSlices.slices.timeOffRequests.eventNames,
     notifications: genericSlices.slices.notifications.eventNames,
 } as const;
 
@@ -334,6 +363,7 @@ export const genericInternalActions = {
     boardMembers: genericSlices.slices.boardMembers.actions,
     boardMessages: genericSlices.slices.boardMessages.actions,
     boardAttachments: genericSlices.slices.boardAttachments.actions,
+    boardBirthdayImages: genericSlices.slices.boardBirthdayImages.actions,
     jobPositions: genericSlices.slices.jobPositions.actions,
     complianceStandards: genericSlices.slices.complianceStandards.actions,
     complianceRequirements: genericSlices.slices.complianceRequirements.actions,
@@ -342,9 +372,18 @@ export const genericInternalActions = {
     plugins: genericSlices.slices.plugins.actions,
     pluginRoutes: genericSlices.slices.pluginRoutes.actions,
     kpiCards: genericSlices.slices.kpiCards.actions,
-    scheduleTemplates: genericSlices.slices.scheduleTemplates.actions,
-    scheduleTemplateDays: genericSlices.slices.scheduleTemplateDays.actions,
-    userSchedules: genericSlices.slices.userSchedules.actions,
+    // Working Hours Plugin
+    countryConfigs: genericSlices.slices.countryConfigs.actions,
+    overtimeRules: genericSlices.slices.overtimeRules.actions,
+    overtimeMultipliers: genericSlices.slices.overtimeMultipliers.actions,
+    holidayCalendars: genericSlices.slices.holidayCalendars.actions,
+    holidays: genericSlices.slices.holidays.actions,
+    workingSchedules: genericSlices.slices.workingSchedules.actions,
+    workingScheduleDays: genericSlices.slices.workingScheduleDays.actions,
+    workingScheduleBreaks: genericSlices.slices.workingScheduleBreaks.actions,
+    scheduleAssignments: genericSlices.slices.scheduleAssignments.actions,
+    timeOffTypes: genericSlices.slices.timeOffTypes.actions,
+    timeOffRequests: genericSlices.slices.timeOffRequests.actions,
     notifications: genericSlices.slices.notifications.actions,
 } as const;
 
@@ -408,6 +447,7 @@ export const genericActions = {
     boardMembers: publicActions(genericInternalActions.boardMembers),
     boardMessages: publicActions(genericInternalActions.boardMessages),
     boardAttachments: publicActions(genericInternalActions.boardAttachments),
+    boardBirthdayImages: publicActions(genericInternalActions.boardBirthdayImages),
     jobPositions: publicActions(genericInternalActions.jobPositions),
     complianceStandards: publicActions(genericInternalActions.complianceStandards),
     complianceRequirements: publicActions(genericInternalActions.complianceRequirements),
@@ -416,8 +456,17 @@ export const genericActions = {
     plugins: publicActions(genericInternalActions.plugins),
     pluginRoutes: publicActions(genericInternalActions.pluginRoutes),
     kpiCards: publicActions(genericInternalActions.kpiCards),
-    scheduleTemplates: publicActions(genericInternalActions.scheduleTemplates),
-    scheduleTemplateDays: publicActions(genericInternalActions.scheduleTemplateDays),
-    userSchedules: publicActions(genericInternalActions.userSchedules),
+    // Working Hours Plugin
+    countryConfigs: publicActions(genericInternalActions.countryConfigs),
+    overtimeRules: publicActions(genericInternalActions.overtimeRules),
+    overtimeMultipliers: publicActions(genericInternalActions.overtimeMultipliers),
+    holidayCalendars: publicActions(genericInternalActions.holidayCalendars),
+    holidays: publicActions(genericInternalActions.holidays),
+    workingSchedules: publicActions(genericInternalActions.workingSchedules),
+    workingScheduleDays: publicActions(genericInternalActions.workingScheduleDays),
+    workingScheduleBreaks: publicActions(genericInternalActions.workingScheduleBreaks),
+    scheduleAssignments: publicActions(genericInternalActions.scheduleAssignments),
+    timeOffTypes: publicActions(genericInternalActions.timeOffTypes),
+    timeOffRequests: publicActions(genericInternalActions.timeOffRequests),
     notifications: publicActions(genericInternalActions.notifications),
 } as const;

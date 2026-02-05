@@ -136,6 +136,41 @@ export function IconPicker({
     loadDefaultAndPopularIcons();
   }, [value]);
 
+  // Load more icons function (shared by scroll and initial load)
+  const loadMoreIcons = useCallback(async () => {
+    if (loadingMoreIcons || isSearching || loadedIconsCount >= totalIconsCount) return;
+    
+    setLoadingMoreIcons(true);
+    
+    try {
+      const startIndex = loadedIconsCount;
+      const endIndex = Math.min(startIndex + ICONS_PER_PAGE, totalIconsCount);
+      const iconsToLoad = allIconsMetadata.slice(startIndex, endIndex);
+      
+      // Add icons to display (they will be lazy-loaded by IconButton component)
+      const iconsToAdd = iconsToLoad.map((iconMeta) => ({
+        name: iconMeta.name,
+        icon: iconMeta.icon || null, // Will be lazy-loaded
+        keywords: iconMeta.keywords
+      }));
+      
+      setDisplayedIcons(prev => [...prev, ...iconsToAdd]);
+      setLoadedIconsCount(endIndex);
+    } catch (error) {
+      console.error('Error loading more icons:', error);
+    } finally {
+      setLoadingMoreIcons(false);
+    }
+  }, [loadedIconsCount, totalIconsCount, allIconsMetadata, loadingMoreIcons, isSearching]);
+
+  // Load more icons when dropdown opens (to ensure there's scrollable content)
+  useEffect(() => {
+    if (showDropdown && !isSearching && loadedIconsCount < totalIconsCount && loadedIconsCount === popularIcons.length) {
+      // Load first batch of additional icons when dropdown opens
+      loadMoreIcons();
+    }
+  }, [showDropdown, isSearching, loadedIconsCount, totalIconsCount, popularIcons.length, loadMoreIcons]);
+
   // Handle scroll to load more icons
   const handleIconScroll = useCallback(async () => {
     if (!scrollContainerRef.current || loadingMoreIcons || isSearching) return;
@@ -147,31 +182,9 @@ export function IconPicker({
     
     // Load more when user scrolls to within 200px of bottom
     if (scrollTop + clientHeight >= scrollHeight - 200) {
-      if (loadedIconsCount < totalIconsCount) {
-        setLoadingMoreIcons(true);
-        
-        try {
-          const startIndex = loadedIconsCount;
-          const endIndex = Math.min(startIndex + ICONS_PER_PAGE, totalIconsCount);
-          const iconsToLoad = allIconsMetadata.slice(startIndex, endIndex);
-          
-          // Add icons to display (they will be lazy-loaded by IconButton component)
-          const iconsToAdd = iconsToLoad.map((iconMeta) => ({
-            name: iconMeta.name,
-            icon: iconMeta.icon || null, // Will be lazy-loaded
-            keywords: iconMeta.keywords
-          }));
-          
-          setDisplayedIcons(prev => [...prev, ...iconsToAdd]);
-          setLoadedIconsCount(endIndex);
-        } catch (error) {
-          console.error('Error loading more icons:', error);
-        } finally {
-          setLoadingMoreIcons(false);
-        }
-      }
+      loadMoreIcons();
     }
-  }, [loadedIconsCount, totalIconsCount, allIconsMetadata, loadingMoreIcons, isSearching]);
+  }, [loadingMoreIcons, isSearching, loadMoreIcons]);
 
   // Handle icon search
   useEffect(() => {
@@ -270,13 +283,15 @@ export function IconPicker({
         </div>
         <div 
           ref={scrollContainerRef}
-          className="grid grid-cols-8 gap-1 overflow-y-scroll overflow-x-hidden"
+          className="overflow-y-auto overflow-x-hidden"
           style={{ 
-            height: '260px',
-            scrollbarWidth: 'thin'
+            maxHeight: '260px',
+            scrollbarWidth: 'thin',
+            overscrollBehavior: 'contain'
           }}
           onScroll={handleIconScroll}
         >
+          <div className="grid grid-cols-8 gap-1">
           {loadingIcons ? (
             <div className="col-span-8 text-center py-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
@@ -299,6 +314,7 @@ export function IconPicker({
               )}
             </>
           )}
+          </div>
         </div>
         {!loadingIcons && !isSearching && loadedIconsCount < totalIconsCount && (
           <div className="text-xs text-muted-foreground mt-2 text-center">

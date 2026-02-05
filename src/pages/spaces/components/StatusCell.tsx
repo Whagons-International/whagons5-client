@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
  
 import { MultiStateBadge, AnimatedSpinner } from '@/animated/Status';
-import { Clock, Zap, Check, PauseCircle } from 'lucide-react';
+import { Clock, Zap, Check, PauseCircle, CheckCircle2 } from 'lucide-react';
 import { ApprovalPopup, ApproverDetail } from '@/pages/spaces/components/workspaceTable/columns/ApprovalPopup';
 
 type StatusMeta = { name: string; color?: string; icon?: string; action?: string };
@@ -38,6 +38,9 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
   // Check if we should show approval UI instead of status dropdown
   const showApprovalUI = approvalProps && 
     (approvalProps.approvalStatus === 'pending' || approvalProps.approvalStatus === 'rejected');
+  
+  // Check if task was approved (show indicator badge alongside normal status)
+  const wasApproved = approvalProps && approvalProps.approvalStatus === 'approved';
 
   // Close popover on scroll
   useEffect(() => {
@@ -66,7 +69,9 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
 
   const baseColor = meta?.color || '#6B7280';
 
-  const variantIcon = isPendingStatus
+  // Use configured FontAwesome icon if available, otherwise fall back to Lucide icons based on action type
+  const configuredIcon = meta?.icon ? getStatusIcon(meta.icon) : null;
+  const fallbackIcon = isPendingStatus
     ? <Clock className="w-3.5 h-3.5" />
     : isWorkingStatus
       ? <Zap className="w-3.5 h-3.5" />
@@ -105,8 +110,10 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
         <span className="relative inline-flex items-center justify-center h-4 w-4 flex-shrink-0" aria-busy="true" style={{ color: '#ffffff' }}>
           <AnimatedSpinner className="h-4 w-4" />
         </span>
+      ) : configuredIcon ? (
+        <FontAwesomeIcon icon={configuredIcon} className="w-3.5 h-3.5 flex-shrink-0" />
       ) : (
-        <span className="w-3.5 h-3.5 flex-shrink-0">{variantIcon}</span>
+        <span className="w-3.5 h-3.5 flex-shrink-0">{fallbackIcon}</span>
       )}
       {needsWrap ? (
         <span className="text-[11px] font-semibold leading-tight capitalize text-center whitespace-normal block">
@@ -124,13 +131,26 @@ const StatusCell: React.FC<StatusCellProps> = ({ value, statusMap, getStatusIcon
       .filter((it) => it.meta);
   }, [allowedNext, statusMap]);
 
+  // Approved badge indicator - compact icon only
+  const ApprovedBadge = wasApproved ? (
+    <div 
+      className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500 text-white flex-shrink-0"
+      title="Approval completed"
+    >
+      <CheckCircle2 className="w-3.5 h-3.5" />
+    </div>
+  ) : null;
+
   const BadgeContent = (
-    <MultiStateBadge
-      state={animationState}
-      customStatus={customStatusConfig}
-      customComponent={StatusPill}
-      className="cursor-pointer"
-    />
+    <div className="flex items-center gap-2">
+      <MultiStateBadge
+        state={animationState}
+        customStatus={customStatusConfig}
+        customComponent={StatusPill}
+        className="cursor-pointer"
+      />
+      {ApprovedBadge}
+    </div>
   );
 
   // If approval is pending or rejected, show approval UI instead of status dropdown

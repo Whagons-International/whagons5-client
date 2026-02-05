@@ -1,6 +1,6 @@
 import React, { type ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { ClipboardList, Settings, Calendar, Clock, LayoutDashboard, Map as MapIcon, BarChart3, Paintbrush } from 'lucide-react';
+import { ClipboardList, Settings, Calendar, Clock, LayoutDashboard, Map as MapIcon, Gauge } from 'lucide-react';
 import { TAB_ANIMATION, getTabInitialX, type TabAnimationConfig } from '@/config/tabAnimation';
 import WorkspaceTable, { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
@@ -8,7 +8,6 @@ import CalendarViewTab from '@/pages/spaces/components/CalendarViewTab';
 import SchedulerViewTab from '@/features/scheduler/SchedulerViewTab';
 import TaskBoardTab from '@/pages/spaces/components/TaskBoardTab';
 import MapViewTab from '@/pages/spaces/components/MapViewTab';
-import WhiteboardViewTab from '@/pages/spaces/components/WhiteboardViewTab';
 import WorkspaceStatistics from '@/pages/spaces/components/WorkspaceStatistics';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { WORKSPACE_TAB_PATHS, type WorkspaceTabKey } from '../constants';
@@ -157,31 +156,17 @@ export function createWorkspaceTabs(props: TabContentProps) {
       )
     },
     {
-      value: 'whiteboard',
+      value: 'dashboard',
       label: (
-        <div className="flex items-center gap-2 pl-4">
-          <Paintbrush />
-          <span className="tab-label-text">{t('workspace.tabs.whiteboard', 'Whiteboard')}</span>
-        </div>
-      ),
-      content: (
-        <motion.div className='flex-1 h-full min-h-0' key='whiteboard' initial={{ x: getDynamicTabInitialX(prevActiveTab, 'whiteboard') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
-          <WhiteboardViewTab workspaceId={workspaceId} />
-        </motion.div>
-      )
-    },
-    {
-      value: 'statistics',
-      label: (
-        <div className="flex items-center gap-2" aria-label="Statistics">
+        <div className="flex items-center gap-2" aria-label="Dashboard">
           <div className="flex items-center justify-center w-6 h-6 rounded border border-border/60 bg-muted/40 text-muted-foreground">
-            <BarChart3 className="w-4 h-4" strokeWidth={2.2} />
+            <Gauge className="w-4 h-4" strokeWidth={2.2} />
           </div>
-          <span className="tab-label-text">{t('workspace.tabs.stats', 'Stats')}</span>
+          <span className="tab-label-text">{t('workspace.tabs.dashboard', 'Dashboard')}</span>
         </div>
       ),
       content: (
-        <motion.div className='flex-1 h-full min-h-0' key='statistics' initial={{ x: getDynamicTabInitialX(prevActiveTab, 'statistics') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+        <motion.div className='flex-1 h-full min-h-0' key='dashboard' initial={{ x: getDynamicTabInitialX(prevActiveTab, 'dashboard') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <WorkspaceStatistics workspaceId={workspaceId} />
         </motion.div>
       )

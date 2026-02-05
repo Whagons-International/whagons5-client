@@ -651,10 +651,23 @@ export interface Board {
     name: string;
     description?: string | null;
     visibility: 'public' | 'private';
+    birthday_messages_enabled: boolean;
+    birthday_message_template?: string | null;
     created_by: number;
     created_at: string;
     updated_at: string;
     deleted_at?: string | null;
+}
+
+export interface BoardBirthdayImage {
+    id: number;
+    board_id: number;
+    file_path: string;
+    file_name: string;
+    uploaded_by: number;
+    is_bundled: boolean;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface BoardMember {

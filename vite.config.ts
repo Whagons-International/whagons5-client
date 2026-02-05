@@ -7,8 +7,42 @@ import { visualizer } from 'rollup-plugin-visualizer';
 import JavaScriptObfuscator from 'javascript-obfuscator';
 // import { VitePWA } from 'vite-plugin-pwa';
 import basicSsl from '@vitejs/plugin-basic-ssl';
+import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 // https://vitejs.dev/config/
+
+// Custom plugin to serve Excalidraw assets in dev mode
+function excalidrawAssetsPlugin() {
+  return {
+    name: 'excalidraw-assets',
+    configureServer(server: any) {
+      server.middlewares.use((req: any, res: any, next: any) => {
+        if (req.url?.startsWith('/excalidraw-assets-dev/') || req.url?.startsWith('/excalidraw-assets/')) {
+          const assetPath = req.url.startsWith('/excalidraw-assets-dev/')
+            ? req.url.replace('/excalidraw-assets-dev/', '')
+            : req.url.replace('/excalidraw-assets/', '');
+          const folder = req.url.startsWith('/excalidraw-assets-dev/') ? 'excalidraw-assets-dev' : 'excalidraw-assets';
+          const filePath = path.join(__dirname, 'node_modules/@excalidraw/excalidraw/dist', folder, assetPath);
+          
+          if (fs.existsSync(filePath)) {
+            const ext = path.extname(filePath).toLowerCase();
+            const mimeTypes: Record<string, string> = {
+              '.js': 'application/javascript',
+              '.woff2': 'font/woff2',
+              '.woff': 'font/woff',
+              '.json': 'application/json',
+            };
+            res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+            fs.createReadStream(filePath).pipe(res);
+            return;
+          }
+        }
+        next();
+      });
+    }
+  };
+}
+
 // Custom selective obfuscation plugin: only obfuscate chunks that include files under src/store/indexedDB
 function cacheObfuscator(options: any) {
   return {
@@ -54,13 +88,32 @@ export default defineConfig(({ mode }) => {
           key: fs.readFileSync(keyPath),
           cert: fs.readFileSync(certPath),
         }
-      } : {})
+      } : {}),
+      // Serve Excalidraw assets from node_modules in dev
+      fs: {
+        allow: ['..'],
+      },
     },
     plugins: [
       // Only use basicSsl if HTTPS is enabled, mkcert certs don't exist
       enableHttps && !hasMkcertCerts && basicSsl(),
+      // Serve Excalidraw assets in dev mode
+      excalidrawAssetsPlugin(),
       react(), 
       tailwindcss(),
+      // Copy Excalidraw assets to dist for production builds
+      viteStaticCopy({
+        targets: [
+          {
+            src: 'node_modules/@excalidraw/excalidraw/dist/excalidraw-assets/*',
+            dest: 'excalidraw-assets'
+          },
+          {
+            src: 'node_modules/@excalidraw/excalidraw/dist/excalidraw-assets-dev/*',
+            dest: 'excalidraw-assets-dev'
+          }
+        ]
+      }),
       visualizer({
         filename: 'dist/stats.html',
         open: false,
@@ -121,6 +174,8 @@ export default defineConfig(({ mode }) => {
     ].filter(Boolean),
     define: {
       global: 'globalThis',
+      'process.env.NODE_ENV': JSON.stringify(mode),
+      'process.env.IS_PREACT': JSON.stringify('false'),
     },
     preview: {
       allowedHosts: ['whagons5.whagons.com'],

@@ -1,4 +1,4 @@
-import { DB } from './DB';
+import { DB } from '../database';
 
 type AvatarRow = {
   id: number | string;

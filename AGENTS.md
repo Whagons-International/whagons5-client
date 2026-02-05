@@ -1,4 +1,4 @@
-git# Agents: Frontend Data Flow, Caching, and State Management
+# Agents: Frontend Data Flow, Caching, and State Management
 
 This document explains the generic architecture and lifecycle applied across the frontend application, detailing how Redux, IndexedDB caching, real-time listeners, and event-driven updates work together to provide a seamless user experience. This complements the backend AGENTS.md by explaining the client-side data management patterns.
 
@@ -10,7 +10,7 @@ This document explains the generic architecture and lifecycle applied across the
 - **IndexedDB Caching**: Persistent local storage with intelligent synchronization
 - **Real-Time Updates**: WebSocket-based change propagation from backend publications
 - **Event Emitters**: Decoupled communication between cache layer and Redux store
-- **Integrity Validation**: Client-side hash verification against server state
+- **Sync Stream**: NDJSON-based cursor synchronization for data hydration
 
 ## Request → State Lifecycle
 
@@ -57,56 +57,56 @@ API Server → IndexedDB (Local Cache) → Redux Store → React Components
 
 ```typescript
 User Authenticates → AuthProvider
-  → Initialize caches (Tasks/Categories/Teams/Workspaces)
-  → Hydrate Redux from IndexedDB
-  → For reference tables, hydrate + network refresh
+  → DataManager.bootstrapAndSync()
+  → Sync stream hydrates all caches
+  → Redux store populated from IndexedDB
+  → Components render with data
 ```
 
 **Detailed Flow:**
 1. User authenticates via Firebase
 2. AuthProvider detects auth state change
-3. User data fetched from `/user` endpoint
-4. Cache initialization begins for all entities
-5. Redux store hydrated from IndexedDB (fast local access)
-6. Reference tables refreshed from network in background
+3. DataManager calls `/api/bootstrap` for tenant context
+4. Sync stream (`/api/sync/stream`) sends NDJSON with all table data
+5. Data written to IndexedDB caches
+6. Redux store hydrated from IndexedDB
 7. Components receive data via `useSelector` hooks
 
-### 2. Cache Initialization Process
+### 2. Sync Stream Architecture
 
-### 🚀 Cache Initialization Process (Critical for Performance)
+**Location**: `src/store/DataManager.ts`
 
-**⚠️ IMPORTANT**: Cache initialization is a critical performance optimization that determines app startup speed and offline capability.
-
-**Custom Cache Classes** (Tasks only - advanced features):
+The sync stream provides efficient data hydration:
 
 ```typescript
-TasksCache.init() → Check local count → Empty cache: full fetch → Non-empty: validate
+DataManager.bootstrapAndSync() → 
+  GET /api/sync/stream (NDJSON) →
+  Parse each line as JSON →
+  Route to appropriate cache →
+  Update Redux when tables touched
 ```
 
-**First time (empty cache):**
-- Fetches all records from API with pagination
-- Stores complete dataset in IndexedDB
-- Marks as initialized in localStorage
+**Features:**
+- **Cursor-based sync**: Remembers last position for incremental updates
+- **Snapshot support**: Handles pivot tables without `updated_clock` columns
+- **Priority tables**: Core tables synced to Redux first for faster UI
+- **Batched tasks**: Task records batched for performance
 
-**Subsequent loads (populated cache):**
-- Validates local data against server integrity hashes
-- Compares block-level hashes to detect changes
-- Fetches only changed records by ID
-- Updates cache incrementally
+### 3. Cache Initialization
 
-**GenericCache** (All other 30+ tables):
+**GenericCache** (All 60+ tables):
 
 ```typescript
-GenericCache.init() → Auto-initialized on first access → No explicit init needed
+GenericCache → Auto-initialized on first access → No explicit init needed
 ```
 
 - **Auto-initialization**: Generic caches initialize themselves when first accessed
-- Simple key-value storage pattern with automatic CRUD operations
-- Integrity validation using backend hash comparison
-- **Performance**: No blocking initialization - caches load lazily as needed
+- **Simple CRUD**: `add()`, `update()`, `remove()`, `getAll()`, `fetchAll()`
+- **Remote operations**: `createRemote()`, `updateRemote()`, `deleteRemote()`
+- **Soft-delete aware**: Automatically removes rows with `deleted_at` set
 
 **⚡ Performance Benefits:**
-- **Immediate app start**: No waiting for 30+ cache initializations
+- **Immediate app start**: No waiting for cache initializations
 - **Lazy loading**: Data loads only when components need it
 - **Reduced memory**: Only active data kept in memory
 - **Better UX**: App starts instantly while data loads in background
@@ -118,41 +118,35 @@ GenericCache.init() → Auto-initialized on first access → No explicit init ne
 **Purpose**: Eliminate boilerplate code for simple CRUD tables by automatically generating Redux slices, caches, and registrations.
 
 **Benefits:**
-- **95% Reduction in Boilerplate**: From 4,000+ lines to ~300 lines
+- **95% Reduction in Boilerplate**: From 4,000+ lines to ~200 lines
 - **Automatic Integration**: Cache registry, store registration, and AuthProvider initialization
 - **Type Safety**: Full TypeScript support with proper interfaces
 - **Consistency**: All generic slices follow the same patterns
 - **Event System**: Built-in event emission for UI updates
 - **Generic CRUD Actions**: `addAsync`, `updateAsync`, `removeAsync` for all tables
 
-**How to Add a New Table (4 Steps):**
+**How to Add a New Table (1 File + Version Bump):**
 ```typescript
-// 1. Add TypeScript interface
-export interface YourEntity {
-    id: number;
-    name: string;
-    created_at: string;
-    updated_at: string;
-}
+// 1. Add store name to tableRegistry.ts (single source of truth)
+// In SIMPLE_STORES (or INDEXED_STORES if indexes needed):
+'your_entities',
 
-// 2. Add to generic slice configuration
-{ name: 'yourEntities', table: 'wh_your_entities', endpoint: '/your-entities', store: 'your_entities' }
+// In GENERIC_SLICE_STORES:
+'your_entities',
 
-// 3. Add IndexedDB store
-if (!db.objectStoreNames.contains("your_entities")) {
-    db.createObjectStore("your_entities", { keyPath: "id" });
-}
-
-// 4. Increment DB version
-const CURRENT_DB_VERSION = "1.5.0";
+// 2. Bump version in DB.ts
+const CURRENT_DB_VERSION = '1.19.0';
 ```
+
+**Naming Convention (auto-derived from store name):**
+- `your_entities` → table: `wh_your_entities`, endpoint: `/your-entities`, slice: `yourEntities`
+- For exceptions, add to `SPECIAL_TABLE_NAMES` in tableRegistry.ts
 
 **That's it!** The factory automatically creates:
 - Redux slice with `getFromIndexedDB`, `fetchFromAPI`, `addAsync`, `updateAsync`, `removeAsync` actions
 - GenericCache instance with real-time updates
 - Cache registry entry for database change notifications
 - Store reducer registration
-- AuthProvider initialization and hydration
 - Event emission system for UI updates
 
 **Usage in Components:**
@@ -161,11 +155,7 @@ import { genericActions } from '@/store/genericSlices';
 
 const data = useSelector(state => state.yourEntities);
 
-// Load data
-dispatch(genericActions.yourEntities.getFromIndexedDB());
-dispatch(genericActions.yourEntities.fetchFromAPI());
-
-// CRUD operations
+// CRUD operations (optimistic updates built-in)
 dispatch(genericActions.yourEntities.addAsync(newItem));
 dispatch(genericActions.yourEntities.updateAsync({ id: 1, updates: {...} }));
 dispatch(genericActions.yourEntities.removeAsync(1));
@@ -182,7 +172,7 @@ useEffect(() => {
 }, []);
 ```
 
-### 3. Component Integration
+### 4. Component Integration
 
 Components access data through Redux selectors:
 
@@ -194,13 +184,13 @@ const { value: tasks, loading, error } = useSelector((state: RootState) => state
 
 ### Custom Cache Classes
 
-**Location**: `src/store/indexedDB/TasksCache.ts`, `CategoriesCache.ts`, etc.
+**Location**: `src/store/indexedDB/TasksCache.ts`
 
 **Features:**
 - **Local Query Engine**: Filter, sort, paginate offline (mirrors backend API)
 - **Event Emitters**: Notify Redux of cache changes
-- **Integrity Validation**: SHA-256 hash comparison with server
-- **Smart Synchronization**: Block-level change detection
+- **Bulk Operations**: Efficient batch inserts/deletes
+- **Smart Synchronization**: Incremental updates
 
 **Example - TasksCache.queryTasks():**
 ```typescript
@@ -221,17 +211,16 @@ const results = await TasksCache.queryTasks({
 
 **Features:**
 - **Generic CRUD**: Reusable for simple entities
-- **Automatic Hashing**: Configurable field-based row hashing
 - **Batch Operations**: Efficient bulk insert/update/delete
-- **Memory Efficient**: Streaming for large datasets
+- **Soft-delete Support**: Auto-removes deleted rows
+- **Envelope Unwrapping**: Handles various API response shapes
 
 **Configuration Example:**
 ```typescript
 const statusesCache = new GenericCache({
-  table: 'wh_statuses',      // Backend table for integrity
+  table: 'wh_statuses',      // Backend table name
   endpoint: '/statuses',     // API endpoint
   store: 'statuses',         // IndexedDB store name
-  hashFields: ['id', 'name', 'color', 'position', 'updated_at']
 });
 ```
 
@@ -253,7 +242,7 @@ const cacheByTable: Record<string, CacheHandler> = {
     update: (id, row) => statusesCache.update(id, row),
     remove: (id) => statusesCache.remove(id)
   }
-  // ... other tables
+  // ... other tables auto-registered by generic slice factory
 };
 ```
 
@@ -264,7 +253,7 @@ const cacheByTable: Record<string, CacheHandler> = {
 **Location**: `src/store/realTimeListener/RTL.ts`
 
 **Features:**
-- **WebSocket Connection**: SockJS-based persistent connection
+- **WebSocket Connection**: Native WebSocket to whagonsRTE server
 - **Auto-Reconnection**: Exponential backoff retry logic
 - **Multi-tenant Support**: Subdomain-aware connection routing
 - **Change Routing**: Maps database notifications to cache updates
@@ -288,17 +277,18 @@ rtl.on('publication:received', (data) => {
 
 ### Change Propagation
 
-1. **Backend Publication**: PostgreSQL publishes changes to `whagons_<table>_changes`
-2. **WebSocket Notification**: SockJS server forwards to client
-3. **Cache Update**: RTL routes change to appropriate cache handler
-4. **Event Emission**: Cache emits events for Redux synchronization
-5. **UI Refresh**: Components re-render with updated data
+1. **Backend Trigger**: PostgreSQL `pg_notify()` on INSERT/UPDATE/DELETE
+2. **whagonsRTE**: Go server receives notification, broadcasts to WebSocket clients
+3. **RTL**: Receives message, routes to CacheRegistry
+4. **Cache Update**: IndexedDB updated via appropriate cache handler
+5. **Redux Sync**: `syncReduxForTable()` refreshes Redux from IndexedDB
+6. **UI Refresh**: Components re-render via `useSelector`
 
 ## Redux Integration
 
 ### Async Thunks with Optimistic Updates
 
-**Location**: `src/store/reducers/tasksSlice.ts`, etc.
+**Location**: `src/store/reducers/tasksSlice.ts`, `src/store/genericSliceFactory.ts`
 
 **Pattern:**
 ```typescript
@@ -335,13 +325,13 @@ if (index !== -1) {
 
 ### Event-Driven Synchronization
 
-**Location**: `src/store/eventEmiters/taskEvents.ts`
+**Location**: `src/store/eventEmiters/taskEvents.ts`, `src/store/genericSliceFactory.ts`
 
 ```typescript
 // Cache notifies Redux of changes
 TaskEvents.emit(TaskEvents.EVENTS.TASK_UPDATED, updatedTask);
 
-// Redux listens for cache events
+// Components listen for cache events
 useEffect(() => {
   const unsubscribe = TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, (task) => {
     dispatch(updateTaskInRedux(task));
@@ -349,92 +339,6 @@ useEffect(() => {
   return unsubscribe;
 }, []);
 ```
-
-## Integrity Validation
-
-### Client-Side Hash Verification
-
-Similar to backend but optimized for client constraints:
-
-```typescript
-// 1. Compute local block hashes
-const localBlocks = await computeLocalBlockHashes();
-
-// 2. Compare with server global hash (fast short-circuit)
-const localGlobalHash = sha256(localBlocks.map(b => b.block_hash).join(''));
-
-// 3. If mismatch, compare block-level hashes
-// 4. Fetch and update only changed blocks
-```
-
-### Hash Parity Configuration (hashFields)
-
-We ensure client/server hash parity by configuring per-slice `hashFields` and normalizing values in `GenericCache`:
-
-- File: `src/store/genericSliceFactory.ts` adds `hashFields?: string[]` to `GenericSliceConfig` and passes it to `GenericCache`.
-- File: `src/store/indexedDB/GenericCache.ts` computes row hashes using:
-  - The `hashFields` list in the exact order.
-  - Normalization rules to match backend triggers:
-    - Date-like fields ending with `_at` or `_date` → converted to UTC epoch ms.
-    - Booleans → `'t'`/`'f'` (Postgres text casting).
-    - Arrays/Objects → deterministically stringified (stable JSON) to mirror `::text` semantics.
-
-Configured examples in `src/store/genericSlices.ts`:
-
-```ts
-{ name: 'workspaces', table: 'wh_workspaces', endpoint: '/workspaces', store: 'workspaces', hashFields: ['id','name','description','color','icon','teams','type','category_id','spots','created_by','updated_at'] },
-{ name: 'categories', table: 'wh_categories', endpoint: '/categories', store: 'categories', hashFields: ['id','name','description','color','icon','enabled','sla_id','team_id','workspace_id','updated_at'] },
-{ name: 'teams', table: 'wh_teams', endpoint: '/teams', store: 'teams', hashFields: ['id','name','description','color','updated_at'] },
-{ name: 'priorities', table: 'wh_priorities', endpoint: '/priorities', store: 'priorities', hashFields: ['id','name','color','sla_id','category_id','updated_at'] },
-{ name: 'statuses', table: 'wh_statuses', endpoint: '/statuses', store: 'statuses', hashFields: ['id','category_id','name','action','color','icon','system','initial','final','updated_at'] },
-```
-
-Debugging parity:
-
-- Enable verbose integrity logs:
-
-```js
-localStorage.setItem('wh-debug-integrity','true');
-```
-
-- On mismatches, `GenericCache.validate()` logs:
-  - Global hash mismatch (local vs server)
-  - Row-level diff: `{ table, blockId, rowId, localHash, serverHash }`
-  - Post-refetch confirmation of local vs server row hashes
-
-Backend alignment (reference):
-
-- Hash triggers defined in `database/migrations/2025_08_14_000900_create_wh_integrity_hash_tables.php` using `CONCAT_WS` of canonical columns and UTC epoch ms for timestamps.
-- Ensure each table that needs validation has a trigger; e.g., `wh_templates` added to triggers and publications.
-
-### Prompt to complete hashFields for remaining slices
-
-Use this prompt with an agent that can edit `src/store/genericSlices.ts` and view backend migrations:
-
-```
-Goal: Complete `hashFields` configuration for all slices in `src/store/genericSlices.ts` so client hashes match backend triggers.
-
-Context:
-- Frontend hashing behavior is defined in `src/store/indexedDB/GenericCache.ts` and expects `hashFields` to list columns in exact order.
-- Date fields ending `_at` or `_date` are normalized to UTC epoch ms, booleans map to 't'/'f', and arrays/objects stringify deterministically, matching server `::text`.
-- Backend triggers live in `whagons5-api/database/migrations/2025_08_14_000900_create_wh_integrity_hash_tables.php`. Each table’s row hash uses `CONCAT_WS` of specific columns.
-
-Steps:
-1) For each generic slice without `hashFields`, find the corresponding backend trigger definition in the migration and copy the column order into an array of strings. Use canonical frontend property names that match API payloads.
-2) Add `hashFields: [...]` to each slice config in `genericSlices.ts` using the exact order and fields used by the backend trigger.
-3) Skip tables without triggers (or add minimal fields if they won’t be validated yet). Note: `wh_templates` trigger has been added; include it if the frontend needs validation.
-4) Validate by running the app with `localStorage['wh-debug-integrity']='true'` and confirm that `GenericCache` logs show `global compare equal: true` for all configured tables after a reload. If mismatches persist, compare server trigger fields vs API shape and adjust field names accordingly (e.g., booleans, nested arrays/objects).
-
-Deliverables:
-- A PR updating `src/store/genericSlices.ts` with complete `hashFields` entries for all remaining slices, verified by integrity logs showing parity.
-```
-
-### Data Consistency Guarantees
-
-- **Block-Level Comparison**: Detects changes without full data transfer
-- **Row-Level Verification**: Precise identification of modified records
-- **Automatic Repair**: Missing or corrupted data automatically refetched
-- **Background Operation**: Validation doesn't block UI interactions
 
 ## Error Handling and Recovery
 
@@ -446,24 +350,24 @@ Deliverables:
 ### Authentication Issues
 - **Session Recovery**: Automatic token refresh
 - **Reconnection**: WebSocket reconnection on auth restore
-- **Data Consistency**: Cache validation after reconnection
+- **Cache Reset**: Full resync after long disconnection
 
 ### Data Corruption
-- **Cache Clearing**: Automatic reset on version mismatch
-- **Rebuild Logic**: Complete cache reconstruction from server
-- **Integrity Checks**: Continuous validation with server state
+- **Cache Clearing**: Automatic reset on DB version mismatch
+- **Rebuild Logic**: Complete cache reconstruction from sync stream
+- **Version Tracking**: `CURRENT_DB_VERSION` triggers fresh start
 
 ## Performance Optimizations
 
 ### 1. Intelligent Caching
 - **Lazy Loading**: Data loaded only when needed
-- **Incremental Updates**: Only changed data transferred
+- **Incremental Updates**: Only changed data transferred via WebSocket
 - **Background Sync**: Updates happen transparently
 
 ### 2. Memory Management
 - **IndexedDB**: Handles large datasets efficiently
 - **Pagination**: Client-side pagination for large lists
-- **Streaming**: Large imports processed in chunks
+- **Streaming**: Sync stream processes data incrementally
 
 ### 3. Query Optimization
 - **Local Filtering**: Complex queries executed locally
@@ -476,128 +380,71 @@ Deliverables:
 
 To add a new cached entity following this pattern:
 
-1. **Create Cache Class** (optional, or use GenericCache):
+1. **Add store name to tableRegistry.ts** (single source of truth):
 ```typescript
-export class MyEntityCache extends GenericCache {
-  constructor() {
-    super({
-      table: 'wh_my_entities',
-      endpoint: '/my-entities',
-      store: 'my_entities'
-    });
-  }
-}
+// In SIMPLE_STORES (or INDEXED_STORES if indexes needed):
+'my_entities',
+
+// In GENERIC_SLICE_STORES:
+'my_entities',
 ```
 
-2. **Create Redux Slice**:
+2. **Bump Version** (DB.ts):
 ```typescript
-const myEntitySlice = createSlice({
-  name: 'myEntities',
-  initialState: { value: [], loading: false },
-  reducers: {
-    // Standard CRUD reducers
-  },
-  extraReducers: (builder) => {
-    // Handle async thunks
-  }
-});
+const CURRENT_DB_VERSION = '1.19.0';
 ```
 
-3. **Register in Cache Registry**:
+3. **(Optional) Add to DataManager Core Keys** if needed at startup:
 ```typescript
-'wh_my_entities': {
-  add: (row) => MyEntityCache.add(row),
-  update: (id, row) => MyEntityCache.update(id, row),
-  remove: (id) => MyEntityCache.remove(id)
-}
+const coreKeys = [
+  // ... existing keys
+  'myEntities',  // camelCase version
+];
 ```
 
-4. **Add to Store**:
-```typescript
-const rootReducer = combineReducers({
-  // ... existing reducers
-  myEntities: myEntitySlice.reducer
-});
-```
-
-5. **Initialize in AuthProvider**:
-```typescript
-await MyEntityCache.init();
-dispatch(getMyEntitiesFromIndexedDB());
-```
+**Naming Convention (auto-derived from store name):**
+- `my_entities` → table: `wh_my_entities`, endpoint: `/my-entities`, slice: `myEntities`
+- For exceptions, add to `SPECIAL_TABLE_NAMES` in tableRegistry.ts
 
 ## Current Implementation Status
 
-### 🎯 **Final Massive Code Reduction Achieved**
+### **Simplified Architecture**
 
-**Before Generic Factory:**
-- 25+ individual slice files (4,000+ lines of code)
-- Manual maintenance for each table
-- Repetitive boilerplate code
-
-**After Generic Factory (Final State):**
-- **1 custom slice** (tasks - complex features)
-- **1 generic factory** (handles 31+ tables)
-- **98.5% reduction in boilerplate code**
-- **Single source of truth** for CRUD operations
+**After Recent Cleanup:**
+- **~1,200 lines removed** from data layer
+- **Single source of truth**: `tableRegistry.ts` defines all stores
+- **Auto-derived naming**: table/endpoint/slice computed from snake_case store name
+- **Both DB.ts and genericSlices.ts import from tableRegistry.ts**
+- **Simplified GenericCache**: CRUD-only, no integrity hashing
+- **Unified Events**: TaskEvents wraps GenericEvents
+- **Loop-based exports**: No manual listing of eventNames, actions, etc.
 
 ### Custom Slice (Advanced Features)
-- **Tasks Only**: Complete with local query engine, real-time updates, integrity validation, custom caching
+- **Tasks Only**: Complete with local query engine, real-time updates, custom caching
 
 ### Generic Slices (Automated CRUD)
-- **31+ Tables Using Generic Factory**: All simple CRUD operations
-- **Zero Boilerplate**: All slices generated from 4-line configuration
+- **60+ Tables Using Generic Factory**: All simple CRUD operations
+- **Zero Boilerplate**: All slices generated from single-line configuration
 - **Full Real-Time Support**: Automatic cache registry integration
 - **Type Safety**: Complete TypeScript integration
 - **Automatic Cache Management**: No manual cache setup required
 - **Lazy Loading**: Auto-initialize on first access for optimal performance
-
-### Migration Completed ✅
-**Successfully migrated 24 individual slices to generic factory:**
-- categories, categoryFieldAssignments, customFields
-- teams, templates, workspaces
-- forms, invitations, permissions, rolePermissions
-- slas, slaAlerts, spots, statuses, priorities
-- spotTypes, statusTransitions, tags
-- users, userTeams, userPermissions
-- taskUsers, taskTags, taskLogs
-- And 13+ additional custom field and form tables
-
-**Only 1 custom slice remains**: tasksSlice with advanced features
 
 ### Real-Time Features
 - **WebSocket Connection**: Production-ready with reconnection logic
 - **Change Notifications**: Automatic cache updates from database changes
 - **Multi-tenant Support**: Subdomain-aware connection routing
 
-## Future Enhancements
-
-### Planned Features
-- **Advanced Conflict Resolution**: Multi-user editing with merge strategies
-- **Selective Synchronization**: Per-user data filtering
-- **Background Sync**: Queued operations for offline periods
-- **Data Compression**: Reduced storage footprint for mobile devices
-
-### Scalability Improvements
-- **Service Worker Integration**: Background sync for progressive web app
-- **WebRTC Data Channels**: Peer-to-peer data synchronization
-- **CDN Integration**: Global data distribution for large deployments
-
-## Notes on Client-Server Consistency
-
-- **Hash Stability**: Same algorithm used client and server for reliable comparison
-- **Timestamp Normalization**: UTC epoch milliseconds for consistent hashing
-- **Nullable Handling**: Explicit null/empty value handling in hash computation
-- **Field Ordering**: Canonical column ordering for stable hashes
-
 ## Example References
 
-- **Redux Store**: `src/store/store.ts`, `src/store/types.ts`
+- **Redux Store**: `src/store/store.ts`
+- **Table Registry**: `src/store/tableRegistry.ts` (single source of truth)
 - **Generic Slice Factory**: `src/store/genericSliceFactory.ts`, `src/store/genericSlices.ts`
-- **Custom Caches**: `TasksCache.ts`, `CategoriesCache.ts`, `GenericCache.ts`
+- **Custom Caches**: `TasksCache.ts`, `GenericCache.ts`
 - **Cache Registry**: `CacheRegistry.ts` (routes database changes to caches)
 - **Real-Time Updates**: `RTL.ts`, `taskEvents.ts`
-- **Redux Slices**: `tasksSlice.ts`, `categoriesSlice.ts` (custom), `genericSlices.ts` (factory-generated)
+- **Data Manager**: `DataManager.ts` (sync stream orchestration)
+- **IndexedDB Wrapper**: `DB.ts` (store definitions and operations)
 - **Authentication Integration**: `AuthProvider.tsx`
 
 This architecture provides a robust, scalable foundation for data management in the Whagons application, ensuring excellent performance, offline capability, and real-time synchronization across all client instances.

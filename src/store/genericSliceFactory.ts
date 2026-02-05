@@ -75,7 +75,6 @@ export interface GenericSliceConfig {
     table: string;
     endpoint: string;
     store: string;
-    hashFields?: string[];
     cache?: GenericCache;
 }
 
@@ -98,10 +97,10 @@ export interface GenericSliceResult<T = any> {
 
 // Generic slice factory function
 export function createGenericSlice<T = any>(config: GenericSliceConfig): GenericSliceResult<T> {
-    const { name, table, endpoint, store, cache, hashFields } = config;
+    const { name, table, endpoint, store, cache } = config;
 
     // Create cache instance if not provided
-    const cacheInstance = cache || new GenericCache({ table, endpoint, store, hashFields });
+    const cacheInstance = cache || new GenericCache({ table, endpoint, store });
 
     // Get event names for this table
     const events = GenericEvents.getEvents(table);

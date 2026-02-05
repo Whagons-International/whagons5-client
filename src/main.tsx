@@ -15,11 +15,6 @@ import { LaserPointer } from './components/LaserPointer';
 import { Toaster } from 'react-hot-toast';
 import { Provider } from 'react-redux';
 import {store } from './store';
-// PWA temporarily disabled
-// import { registerSW } from 'virtual:pwa-register';
-// import { DB } from './store/indexedDB/DB';
-// import * as CryptoAPI from './crypto/crypto';
-// import { genericActions } from './store/genericSlices';
 import { initFontStyle } from './utils/fontStyle';
 
 // Initialize font style
@@ -73,61 +68,9 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
 );
 
 // Dev-only: expose the sandbox so you can test from the console quickly.
+// Dev-only: expose the sandbox for console testing
 if (import.meta.env.DEV) {
   import('./sandbox/devExpose')
     .then((m) => m.exposeSandboxToWindow())
-    .catch(() => {
-      // ignore
-    });
+    .catch(() => {});
 }
-
-
-
-// PWA registration temporarily disabled for debugging
-// Register PWA in production only
-// if (import.meta.env.VITE_DEVELOPMENT !== 'true') {
-//   const updateSW = registerSW({
-//     immediate: true,
-//     onRegistered(r) {
-//       console.log('[PWA] Service Worker registered');
-//       // Check for updates every 5 minutes
-//       setInterval(() => {
-//         if (r) {
-//           r.update();
-//         }
-//       }, 5 * 60 * 1000);
-//       
-//       // Also check immediately on page visibility change (user returns to tab)
-//       document.addEventListener('visibilitychange', () => {
-//         if (!document.hidden && r) {
-//           r.update();
-//         }
-//       });
-//     },
-//     onRegisterError(error) {
-//       console.error('[PWA] Service Worker registration error', error);
-//     },
-//     onNeedRefresh() {
-//       console.log('[PWA] Update available, reloading page...');
-//       // Automatically reload when update is ready (skipWaiting + reload)
-//       updateSW(true);
-//     },
-//     onOfflineReady() {
-//       console.log('[PWA] App ready to work offline');
-//     },
-//   });
-// }
-
-// // Expose debug helpers for manual testing in console
-// // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// // @ts-ignore
-// window.DB = DB;
-// // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// // @ts-ignore
-// window.CryptoAPI = CryptoAPI;
-// // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// // @ts-ignore
-// window.store = store;
-// // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// // @ts-ignore
-// window.genericActions = genericActions;

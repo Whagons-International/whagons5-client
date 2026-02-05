@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { api } from '@/store/api/internalApi';
-import { DB } from '../indexedDB/DB';
+import { DB } from '../database';
 
 // State interface for tenant availability
 export interface TenantAvailabilityState {

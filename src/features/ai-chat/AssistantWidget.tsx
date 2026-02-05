@@ -12,6 +12,9 @@ import ChatInput from "./components/ChatInput";
 import ChatMessageItem from "./components/ChatMessageItem";
 import ToolMessageRenderer, { ToolCallMap } from "./components/ToolMessageRenderer";
 import NewChat from "./components/NewChat";
+import { useExecutionTraces } from "./hooks/useExecutionTraces";
+import ExecutionTraceTimeline from "./components/ExecutionTraceTimeline";
+import { LoadingWidget } from "./components/LoadingWidget";
 import { createWSManager } from "./utils/ws";
 import { getEnvVariables } from "@/lib/getEnvVariables";
 import { processFrontendTool, isFrontendTool } from "./utils/frontend_tools";
@@ -39,7 +42,60 @@ const CHAT_HOST = VITE_CHAT_URL || VITE_API_URL || window.location.origin;
 const IS_DEV = (import.meta as any).env?.DEV === true || VITE_DEVELOPMENT === "true";
 const CLIENT_ID = VITE_CLIENT_ID || "";
 
+// Height offsets for scroll spacer and assistant message min-height
+export const SPACER_OFFSET = 850; // Spacer height: calc(100vh - this)
+export const ASSISTANT_MIN_HEIGHT_OFFSET = 340; // Assistant min-height: calc(100vh - this)
+
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+/**
+ * Extract image URL from a Generate_Image tool result
+ */
+function extractGeneratedImageUrl(content: any): string | null {
+  if (!content) return null;
+  
+  // Try various possible shapes of the result
+  const candidates: string[] = [];
+  
+  // Direct content string
+  if (typeof content === "string") {
+    candidates.push(content);
+  }
+  
+  // content.content (common shape: { tool_call_id, name, content: "..." })
+  if (typeof content.content === "string") {
+    candidates.push(content.content);
+  }
+  
+  // Direct URL fields
+  if (typeof content.image_url === "string") candidates.push(content.image_url);
+  if (typeof content.imageUrl === "string") candidates.push(content.imageUrl);
+  if (typeof content.url === "string") candidates.push(content.url);
+  
+  // Stringify object as fallback
+  if (typeof content === "object") {
+    try {
+      candidates.push(JSON.stringify(content));
+    } catch {}
+  }
+  
+  // Extract URL from candidates
+  for (const c of candidates) {
+    // Markdown image: ![alt](url)
+    const mdMatch = c.match(/!\[[^\]]*]\(([^)\s]+)\)/);
+    if (mdMatch && mdMatch[1]) return mdMatch[1];
+    
+    // URL with /images/ path
+    const imgPathMatch = c.match(/https?:\/\/[^\s)"]+\/images\/[^\s)"]+/);
+    if (imgPathMatch && imgPathMatch[0]) return imgPathMatch[0];
+    
+    // URL ending in image extension
+    const extMatch = c.match(/https?:\/\/[^\s)"]+\.(png|jpe?g|webp|gif)(\?[^\s)"]+)?/i);
+    if (extMatch && extMatch[0]) return extMatch[0];
+  }
+  
+  return null;
+}
 
 const FloatingButton: React.FC<{ onClick: () => void }> = ({ onClick }) => {
   const [position, setPosition] = useState<{ x: number; y: number }>(() => {
@@ -298,12 +354,69 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
     return map;
   }, [memoizedMessages]);
 
+  // Execution trace management (for real-time TypeScript execution visualization)
+  const { traces, handleTrace, clearTraces, hasActiveTraces, loadTracesFromAPI } = useExecutionTraces();
+  
+  // Toggle for legacy tool visualization vs trace-based
+  // Default to trace-based visualization (useLegacyToolViz = false)
+  // To enable legacy mode: localStorage.setItem('use_legacy_tool_viz', '1')
+  const [useLegacyToolViz] = useState<boolean>(() => {
+    return localStorage.getItem('use_legacy_tool_viz') === '1';
+  });
+
+  // Synthesize traces when messages change (for loaded conversations)
+  const synthesizedForConversationRef = useRef<string | null>(null);
+  
+  useEffect(() => {
+    // Reset synthesis tracking when conversation changes
+    if (conversationId !== synthesizedForConversationRef.current) {
+      synthesizedForConversationRef.current = null;
+    }
+  }, [conversationId]);
+
+  useEffect(() => {
+    // Don't synthesize while actively getting a response (real-time traces handle this)
+    if (gettingResponse) return;
+    
+    // Don't synthesize if we already did for this conversation
+    if (synthesizedForConversationRef.current === conversationId) return;
+    
+    // Don't synthesize if not in timeline mode
+    if (useLegacyToolViz) return;
+    
+    // Need messages with tool calls
+    if (!conversationId || messages.length === 0) return;
+    const hasToolCalls = messages.some(m => m.role === 'tool_call');
+    if (!hasToolCalls) return;
+    
+    console.log('[Traces] Synthesizing traces for:', conversationId, 'messages:', messages.length);
+    synthesizedForConversationRef.current = conversationId;
+    loadTracesFromAPI(conversationId, messages);
+  }, [useLegacyToolViz, conversationId, messages, gettingResponse, loadTracesFromAPI]);
+
+  // Scroll to position user message at top of viewport, leaving space below for AI response
   const scrollToBottom = useCallback(() => {
+    const container = chatContainerRef.current;
+    if (!container) return;
+    
     const lastUser = document.getElementById("last-user-message");
     const target = lastUser || document.getElementById("last-message");
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    if (!target) return;
+    
+    // Calculate target scroll position: place user message at very top of container viewport
+    const targetRect = target.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const topOffset = -20; // negative to push user message closer to/above top edge
+    
+    // Current position of target relative to container's scroll viewport
+    const targetRelativeTop = targetRect.top - containerRect.top;
+    // How much we need to scroll to put target at topOffset from container top
+    const scrollAmount = targetRelativeTop - topOffset;
+    
+    container.scrollTo({
+      top: container.scrollTop + scrollAmount,
+      behavior: "smooth"
+    });
   }, []);
 
   const scrollContainerToBottom = useCallback(() => {
@@ -473,8 +586,11 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
       
       // Update conversations list
       setConversations(getConversations());
+      
+      // Auto-scroll to bottom after loading messages (delay to let React render)
+      setTimeout(() => scrollContainerToBottom(), 50);
     }
-  }, [conversationId]);
+  }, [conversationId, scrollContainerToBottom]);
 
   // Load conversations when sheet opens
   useEffect(() => {
@@ -484,9 +600,11 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
       const loadedMessages = loadMessages(conversationId);
       if (loadedMessages.length > 0) {
         setMessages(loadedMessages);
+        // Auto-scroll to bottom after loading messages (delay to let React render)
+        setTimeout(() => scrollContainerToBottom(), 50);
       }
     }
-  }, [open, conversationId]);
+  }, [open, conversationId, scrollContainerToBottom]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -580,6 +698,9 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
   const handleSubmit = async (content: string | ContentItem[], opts?: SubmitOptions) => {
     if (gettingResponse) return;
     setGettingResponse(true);
+    
+    // Clear execution traces from previous interaction
+    clearTraces();
 
     // Voice mode: keep the message WS warm between sends.
     // Important: do NOT reset voice mode just because `opts` is omitted (e.g., tool follow-ups or typed
@@ -662,11 +783,53 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
     }
 
     const handleWebSocketEvent = (data: any) => {
+      // Handle execution traces (for real-time tool execution visualization)
+      // These are UI-only and NOT stored in chat history
+      if (data.type === "execution_trace") {
+        console.log('[AssistantWidget] Received trace:', data.status, data.label);
+        handleTrace(data);
+        return; // Don't process as chat message - traces are non-semantic
+      }
+      
       // Handle frontend tool prompts (tool-specific messages, not chat content)
       if (data.type === "frontend_tool_prompt") {
         handleFrontendToolPromptMessage(data, (payload) => {
           wsManager.send(conversationId, payload);
         }, navigate);
+        return; // Don't process as chat message
+      }
+
+      // Handle frontend actions from Execute_TypeScript (e.g., frontend.navigate())
+      // These require a response back to TypeScript (NOT a tool_result which ends the call)
+      if (data.type === "frontend_action") {
+        const action = data.action;
+        const actionData = data.data || {};
+        let responseMessage = "ok";
+        
+        try {
+          if (action === "navigate" && actionData.path) {
+            console.log('[FRONTEND_ACTION] Navigating to:', actionData.path);
+            navigate(actionData.path);
+            responseMessage = `Navigated to ${actionData.path}`;
+          } else if (action === "alert" && actionData.message) {
+            console.log('[FRONTEND_ACTION] Alert:', actionData.message);
+            alert(actionData.message);
+            responseMessage = "Alert shown";
+          }
+          
+          // Send response back to Go which routes it to TypeScript via stdin
+          // This is NOT a tool_result - it goes back into the running TypeScript
+          wsManager.send(conversationId, {
+            type: "frontend_action_response",
+            response: responseMessage,
+          });
+        } catch (err) {
+          wsManager.send(conversationId, {
+            type: "frontend_action_response",
+            error: String(err),
+          });
+        }
+        
         return; // Don't process as chat message
       }
 
@@ -1405,41 +1568,138 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
                         onScroll={() => { updateScrollBottomVisibility(); }}
                       >
                         <div className="mx-auto flex w-full max-w-3xl flex-col px-4 pb-10 pt-4">
-                          {memoizedMessages.map((message, index) => (
-                            message.role === "user" || message.role === "assistant" ? (
-                              <ChatMessageItem
-                                key={index}
-                                message={message}
-                                messages={memoizedMessages}
-                                isLast={index === memoizedMessages.length - 1}
-                                gettingResponse={
-                                  gettingResponse &&
-                                  index === memoizedMessages.length - 1
+                          {memoizedMessages.map((message, index) => {
+                            // User and assistant messages always render normally
+                            if (message.role === "user" || message.role === "assistant") {
+                              return (
+                                <ChatMessageItem
+                                  key={index}
+                                  message={message}
+                                  messages={memoizedMessages}
+                                  isLast={index === memoizedMessages.length - 1}
+                                  gettingResponse={
+                                    gettingResponse &&
+                                    index === memoizedMessages.length - 1
+                                  }
+                                  isLastUser={index === lastUserIndex}
+                                />
+                              );
+                            }
+                            
+                            // Tool messages: legacy mode shows the old widget
+                            if (useLegacyToolViz) {
+                              return (
+                                <ToolMessageRenderer
+                                  key={index}
+                                  message={message}
+                                  messages={memoizedMessages}
+                                  index={index}
+                                  toolCallMap={toolCallMap}
+                                />
+                              );
+                            }
+                            
+                            // In trace/timeline mode: render timeline for consecutive tool_calls as a group
+                            // For tool_result: check if it's a Generate_Image result and display the image
+                            if (message.role === "tool_result") {
+                              // Check if this is a Generate_Image result
+                              const content = message.content as any;
+                              const toolCallId = content?.tool_call_id;
+                              const toolCallMsg = toolCallId ? toolCallMap.get(toolCallId) : null;
+                              const toolName = (toolCallMsg?.content as any)?.name;
+                              
+                              if (toolName === "Generate_Image") {
+                                // Extract image URL from the result
+                                const imageUrl = extractGeneratedImageUrl(content);
+                                if (imageUrl) {
+                                  return (
+                                    <div key={index} className="px-4 py-2">
+                                      <img
+                                        src={imageUrl}
+                                        alt="Generated image"
+                                        className="max-w-full md:max-w-md rounded-lg shadow-lg"
+                                        loading="lazy"
+                                      />
+                                    </div>
+                                  );
                                 }
-                                isLastUser={index === lastUserIndex}
-                              />
-                            ) : (
-                              <ToolMessageRenderer
-                                key={index}
-                                message={message}
-                                messages={memoizedMessages}
-                                index={index}
-                                toolCallMap={toolCallMap}
-                              />
-                            )
-                          ))}
+                              }
+                              return null;
+                            }
+                            
+                            // For tool_call: only render at the FIRST one in a consecutive group
+                            if (message.role === "tool_call" && typeof message.content === "object" && message.content !== null) {
+                              // Check if previous message was also a tool_call or tool_result - if so, skip
+                              const prevMessage = index > 0 ? memoizedMessages[index - 1] : null;
+                              if (prevMessage?.role === "tool_call" || prevMessage?.role === "tool_result") {
+                                return null; // Already rendered at the first tool_call in this group
+                              }
+                              
+                              // This is the first tool_call in a consecutive group
+                              // Collect all unique tool_call IDs in this group
+                              const groupToolCallIds = new Set<string>();
+                              for (let i = index; i < memoizedMessages.length; i++) {
+                                const msg = memoizedMessages[i];
+                                if (msg.role === "tool_call" && typeof msg.content === "object" && msg.content !== null) {
+                                  const c = msg.content as any;
+                                  if (c.tool_call_id) {
+                                    groupToolCallIds.add(c.tool_call_id);
+                                  }
+                                } else if (msg.role === "tool_result") {
+                                  continue; // tool_results are part of the group
+                                } else {
+                                  break; // Hit a non-tool message, stop
+                                }
+                              }
+                              
+                              // Build traces for this group
+                              const groupTraces = new Map<string, typeof traces extends Map<string, infer V> ? V : never>();
+                              for (const toolCallId of groupToolCallIds) {
+                                if (traces.has(toolCallId)) {
+                                  groupTraces.set(toolCallId, traces.get(toolCallId)!);
+                                }
+                              }
+                              
+                              if (groupTraces.size > 0) {
+                                return (
+                                  <div key={index} className="pt-3 pl-3 pr-3">
+                                    <ExecutionTraceTimeline 
+                                      traces={groupTraces} 
+                                      isExpanded={hasActiveTraces()}
+                                    />
+                                  </div>
+                                );
+                              }
+                              
+                              return null;
+                            }
+                            
+                            return null;
+                          })}
                           {gettingResponse &&
                             memoizedMessages.length > 0 &&
                             memoizedMessages[memoizedMessages.length - 1].role === "user" && (
                             <div className="pl-5 pt-2">
-                              <span className="loading-dots">
-                                <span></span>
-                                <span></span>
-                                <span></span>
-                              </span>
+                              <LoadingWidget
+                                size={40}
+                                strokeWidthRatio={8}
+                                color="currentColor"
+                                cycleDuration={0.9}
+                              />
+                            </div>
+                          )}
+                          {/* Show active traces during live streaming - they may not match tool_call IDs yet */}
+                          {gettingResponse && hasActiveTraces() && (
+                            <div className="pt-3 pl-3 pr-3">
+                              <ExecutionTraceTimeline 
+                                traces={traces} 
+                                isExpanded={true}
+                              />
                             </div>
                           )}
                           <div id="last-message" className="h-1"></div>
+                          {/* Spacer to allow scrolling user message to top when waiting for AI response */}
+                          {gettingResponse && <div style={{ height: `calc(100vh - ${SPACER_OFFSET}px)` }} />}
                         </div>
                       </div>
                       {showScrollToBottom && (

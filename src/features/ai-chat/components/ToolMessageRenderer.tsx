@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Message } from "../models";
 import JsonSyntaxHighlighter from "./JsonSyntaxHighlighter";
 import { useTheme } from "@/providers/ThemeProvider";
+import { LoadingWidget } from "./LoadingWidget";
 
 const MAX_RENDER_CHARS = 20000;
 
@@ -324,12 +325,13 @@ function ToolMessageRenderer({
   return (
     <>
       {isToolCall && isLastMessage && (
-        <div className="md:max-w-[900px] w-full flex justify-start min-h-full">
-          <span className="loading-dots ml-5 pl-4">
-            <span></span>
-            <span></span>
-            <span></span>
-          </span>
+        <div className="md:max-w-[900px] w-full flex items-center justify-start min-h-full ml-5 pl-4">
+          <LoadingWidget
+            size={24}
+            strokeWidthRatio={10}
+            color="currentColor"
+            cycleDuration={0.9}
+          />
           <span className="ml-2 text-sm text-muted-foreground">
             {((message.content as any)?.name as string) || "processing..."}
           </span>
@@ -561,12 +563,13 @@ function ToolMessageRenderer({
       })()}
 
       {isToolResult && isLastMessage && (
-        <div className="md:max-w-[900px] w-full flex justify-start min-h-full">
-          <span className="loading-dots ml-5 pl-4">
-            <span></span>
-            <span></span>
-            <span></span>
-          </span>
+        <div className="md:max-w-[900px] w-full flex items-center justify-start min-h-full ml-5 pl-4">
+          <LoadingWidget
+            size={24}
+            strokeWidthRatio={10}
+            color="currentColor"
+            cycleDuration={0.9}
+          />
           <span className="ml-2 text-sm text-muted-foreground">processing...</span>
         </div>
       )}

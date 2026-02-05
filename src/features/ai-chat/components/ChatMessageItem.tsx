@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Message, ContentItem, ImageData, PdfData } from "../models";
 import AssistantMessageRenderer from "./AssistantMessageRenderer";
 import { getEnvVariables } from "@/lib/getEnvVariables";
+import { ASSISTANT_MIN_HEIGHT_OFFSET } from "../AssistantWidget";
 
 interface ChatMessageItemProps {
   message: Message;
@@ -9,6 +10,7 @@ interface ChatMessageItemProps {
   isLast: boolean;
   gettingResponse: boolean;
   isLastUser?: boolean;
+  isLastAssistant?: boolean;
 }
 
 const isImageData = (content: any): content is ImageData => {
@@ -83,6 +85,7 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = (props) => {
         isUser ? " user justify-end items-start pt-4" : " assistant justify-start items-start"
       }`}
       id={props.isLastUser ? "last-user-message" : undefined}
+      style={!isUser && isLast ? { minHeight: `calc(100vh - ${ASSISTANT_MIN_HEIGHT_OFFSET}px)` } : undefined}
     >
       <div
         className={`message-content ${

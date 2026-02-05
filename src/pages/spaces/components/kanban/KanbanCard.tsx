@@ -2,13 +2,14 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
 import { User } from 'lucide-react';
+import { forwardRef } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store/store';
 import type { KanbanCardProps } from './types/kanban.types';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 
-export default function KanbanCard({ task, onClick }: KanbanCardProps) {
+const KanbanCard = forwardRef<HTMLDivElement, KanbanCardProps>(function KanbanCard({ task, onClick }, forwardedRef) {
   const {
     attributes,
     listeners,
@@ -35,9 +36,19 @@ export default function KanbanCard({ task, onClick }: KanbanCardProps) {
     task.user_ids?.includes(u.id)
   ).slice(0, 3); // Show max 3 avatars
 
+  // Combine refs - setNodeRef for dnd-kit and forwardedRef for AnimatePresence
+  const combinedRef = (node: HTMLDivElement | null) => {
+    setNodeRef(node);
+    if (typeof forwardedRef === 'function') {
+      forwardedRef(node);
+    } else if (forwardedRef) {
+      forwardedRef.current = node;
+    }
+  };
+
   return (
     <div
-      ref={setNodeRef}
+      ref={combinedRef}
       style={style}
       {...attributes}
       {...listeners}
@@ -122,4 +133,6 @@ export default function KanbanCard({ task, onClick }: KanbanCardProps) {
       </motion.div>
     </div>
   );
-}
+});
+
+export default KanbanCard;

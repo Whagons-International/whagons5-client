@@ -206,14 +206,11 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
       const result = await dispatch(moveTaskThunk({ taskId, newStatusId, previousStatusId }));
       if (moveTaskThunk.fulfilled.match(result)) {
         toast.success('Task moved successfully');
-      } else if (moveTaskThunk.rejected.match(result)) {
-        // Error toast is already shown in the thunk, but we can add additional handling here if needed
-        const errorMessage = result.payload as string || 'Failed to move task. Changes reverted.';
-        toast.error(errorMessage);
       }
+      // Note: 403 errors are handled by the API interceptor which shows a toast
+      // Other errors are silently rolled back (optimistic update reverted)
     } catch (error) {
       console.error('Unexpected error in handleDragEnd:', error);
-      toast.error('Failed to move task. Changes reverted.');
     }
   }, [dispatch, tasks]);
 

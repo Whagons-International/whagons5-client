@@ -1,36 +1,54 @@
 import type { Task, Status } from '@/store/types';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
-export function exportToExcel(
+export async function exportToExcel(
   tasks: Task[],
   statuses: Status[],
   filename: string
 ) {
-  // Prepare data for Excel
-  const data = tasks.map((task) => {
+  // Create workbook and worksheet
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Tasks');
+
+  // Define columns
+  worksheet.columns = [
+    { header: 'ID', key: 'id', width: 10 },
+    { header: 'Name', key: 'name', width: 30 },
+    { header: 'Description', key: 'description', width: 40 },
+    { header: 'Status', key: 'status', width: 15 },
+    { header: 'Due Date', key: 'dueDate', width: 15 },
+    { header: 'Start Date', key: 'startDate', width: 15 },
+    { header: 'Created At', key: 'createdAt', width: 20 },
+    { header: 'Updated At', key: 'updatedAt', width: 20 },
+  ];
+
+  // Add data rows
+  tasks.forEach((task) => {
     const status = statuses.find((s) => s.id === task.status_id);
-    
-    return {
-      ID: task.id,
-      Name: task.name,
-      Description: task.description || '',
-      Status: status?.name || '',
-      'Due Date': task.due_date || '',
-      'Start Date': task.start_date || '',
-      'Created At': task.created_at,
-      'Updated At': task.updated_at,
-    };
+    worksheet.addRow({
+      id: task.id,
+      name: task.name,
+      description: task.description || '',
+      status: status?.name || '',
+      dueDate: task.due_date || '',
+      startDate: task.start_date || '',
+      createdAt: task.created_at,
+      updatedAt: task.updated_at,
+    });
   });
 
-  // Create workbook and worksheet
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet(data);
+  // Style header row
+  worksheet.getRow(1).font = { bold: true };
 
-  // Add worksheet to workbook
-  XLSX.utils.book_append_sheet(wb, ws, 'Tasks');
-
-  // Save file
-  XLSX.writeFile(wb, filename);
+  // Generate buffer and download
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 export async function exportToPNG(element: HTMLElement, filename: string) {

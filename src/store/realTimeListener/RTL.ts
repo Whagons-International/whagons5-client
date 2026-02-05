@@ -30,6 +30,7 @@ export class RealTimeListener {
   private ws: WebSocket | null = null;
   private isConnected: boolean = false;
   private isConnecting: boolean = false;
+  private isAuthenticated: boolean = false;
   private reconnectAttempts: number = 0;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private pingInterval: NodeJS.Timeout | null = null;
@@ -301,6 +302,7 @@ export class RealTimeListener {
     this.isConnected = true;
     this.isConnecting = false;
     this.reconnectAttempts = 0;
+    setRtlConnected(true);
     
     // Start ping interval to keep connection alive
     this.pingInterval = setInterval(() => {
@@ -334,6 +336,8 @@ export class RealTimeListener {
     this.debugLog('WebSocket disconnected', { code: event.code, reason: event.reason });
     this.isConnected = false;
     this.isConnecting = false;
+    this.isAuthenticated = false;
+    setRtlConnected(false);
     
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
@@ -421,6 +425,7 @@ export class RealTimeListener {
   private handleSystemMessage(data: RTLMessage): void {
     if (data.operation === 'authenticated') {
       this.debugLog('Successfully authenticated', data.data);
+      this.isAuthenticated = true;
       this.emit('connection:status', { 
         status: 'authenticated', 
         message: 'Authenticated ✅',
@@ -636,10 +641,11 @@ export class RealTimeListener {
   /**
    * Get connection status
    */
-  get connectionStatus(): { connected: boolean; connecting: boolean } {
+  get connectionStatus(): { connected: boolean; connecting: boolean; authenticated: boolean } {
     return {
       connected: this.isConnected,
-      connecting: this.isConnecting
+      connecting: this.isConnecting,
+      authenticated: this.isAuthenticated
     };
   }
 
@@ -673,4 +679,22 @@ export function getGlobalRtl(): RealTimeListener {
 
 export function setGlobalRtl(instance: RealTimeListener): void {
   globalRtlInstance = instance;
+}
+
+// Global connection status with subscribers for React
+let rtlConnectedState = false;
+const subscribers = new Set<() => void>();
+
+export function getRtlConnected(): boolean {
+  return rtlConnectedState;
+}
+
+export function setRtlConnected(connected: boolean): void {
+  rtlConnectedState = connected;
+  subscribers.forEach(cb => cb());
+}
+
+export function subscribeRtlConnected(callback: () => void): () => void {
+  subscribers.add(callback);
+  return () => subscribers.delete(callback);
 }

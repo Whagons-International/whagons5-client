@@ -15,7 +15,7 @@ import { getTasksFromIndexedDB } from '../store/reducers/tasksSlice';
 import { fetchNotificationPreferences } from '../store/reducers/notificationPreferencesSlice';
 
 // Custom caches with advanced features
-import { RealTimeListener } from '@/store/realTimeListener/RTL';
+import { RealTimeListener, setGlobalRtl } from '@/store/realTimeListener/RTL';
 import { DB } from '@/store/indexedDB/DB';
 import { DataManager } from '@/store/DataManager';
 import { requestNotificationPermission, setupForegroundMessageHandler, unregisterToken } from '@/firebase/fcmHelper';
@@ -255,6 +255,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 //   debug: true,
                 // }
               );
+              setGlobalRtl(rtl);
               rtl.connectAndHold();
             } catch (err) {
               console.warn('AuthProvider: background hydration failed', err);

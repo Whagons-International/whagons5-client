@@ -1,60 +1,59 @@
 import { Navigate, Route, Routes, useLocation, matchPath } from 'react-router';
+import { lazy, Suspense, useMemo } from 'react';
 
-import { Workspace } from '@/pages/spaces/Workspace';
 import MainLayout from '@/layouts/MainLayout';
-import Stripe from '@/pages/stripe/Stripe';
-// import ChatWindow from '@/pages/aichat/ChatWindow';
-import Profile from '@/pages/profile/Profile';
-import { useMemo } from 'react';
-import Settings from '@/pages/settings/Settings';
-import Stuff from '@/pages/stuff/Stuff';
-import Categories from '@/pages/settings/sub_pages/categories/Categories';
-import CustomFieldsTab from '@/pages/settings/sub_pages/custom-fields/CustomFieldsTab';
-import Templates from '@/pages/settings/sub_pages/templates/Templates';
-import Forms from '@/pages/settings/sub_pages/forms';
-import Teams from '@/pages/settings/sub_pages/teams/Teams';
-import Workspaces from '@/pages/settings/sub_pages/workspaces/Workspaces';
-import Spots from '@/pages/settings/sub_pages/spots/Spots';
-import SpotTypes from '@/pages/settings/sub_pages/spot-types/SpotTypes';
-import Users from '@/pages/settings/sub_pages/users/Users';
-import JobPositions from '@/pages/settings/sub_pages/job-positions/JobPositions';
-import RolesAndPermissions from '@/pages/settings/sub_pages/roles-and-permissions/RolesAndPermissions';
-import Statuses from '@/pages/settings/sub_pages/statuses/Statuses';
-import Priorities from '@/pages/settings/sub_pages/priorities/Priorities';
-import Tags from '@/pages/settings/sub_pages/tags/Tags';
-import Slas from '@/pages/settings/sub_pages/slas/Slas';
-import Workflows from '@/pages/settings/sub_pages/workflows/Workflows';
-import Approvals from '@/pages/settings/sub_pages/approvals/Approvals';
-import Global from '@/pages/settings/sub_pages/global/Global';
-import BoardsSettings from '@/pages/settings/sub_pages/boards/Boards';
-import KpiCardsSettings from '@/pages/settings/sub_pages/kpi-cards-settings/KpiCardsSettings';
-import KpiCardsManage from '@/pages/settings/sub_pages/kpi-cards-manage/KpiCardsManage';
-import GamificationSettings from '@/pages/settings/sub_pages/gamification/GamificationSettings';
-import GamificationComingSoon from '@/pages/gamification/GamificationComingSoon';
-import AnalyticsSettings from '@/pages/settings/sub_pages/analytics/AnalyticsSettings';
-import AnalyticsComingSoon from '@/pages/analytics/AnalyticsComingSoon';
-import MotivationSettings from '@/pages/settings/sub_pages/motivation/MotivationSettings';
-import MotivationComingSoon from '@/pages/motivation/MotivationComingSoon';
-import HotelAnalytics from '@/pages/hotel-analytics/HotelAnalytics';
-import HotelAnalyticsSettings from '@/pages/settings/sub_pages/HotelAnalyticsSettings';
-import WorkingHoursSettings from '@/pages/settings/sub_pages/WorkingHoursSettings';
-import WorkingSchedules from '@/pages/settings/sub_pages/working-hours/WorkingSchedules';
-import TimeOffTypes from '@/pages/settings/sub_pages/working-hours/TimeOffTypes';
-import TimeOffRequests from '@/pages/time-off/TimeOffRequests';
-import { WorkingHoursDashboard } from '@/pages/working-hours';
-import { WorkingHoursGuard } from '@/components/PluginGuard';
+
+// Core pages - keep static (used on every session)
 import Home from '@/pages/home/Home';
-import BoardDetail from '@/pages/boards/BoardDetail';
-import TestPage from '@/pages/Testpage';
-import Plugins from '@/pages/Plugins';
-import PluginSettings from '@/pages/PluginSettings';
-import PluginManagement from '@/pages/admin/PluginManagement';
-import Integrations from '@/pages/Integrations';
-import { ComplianceStandards } from '@/pages/compliance/ComplianceStandards';
-import { ComplianceStandardDetail } from '@/pages/compliance/ComplianceStandardDetail';
-import SharedWithMe from '@/pages/shared/SharedWithMe';
-import BroadcastsPage from '@/pages/broadcasts/BroadcastsPage';
-import ActivityMonitor from '@/pages/activity/ActivityMonitor';
+import { Workspace } from '@/pages/spaces/Workspace';
+
+// Lazy-loaded pages
+const Profile = lazy(() => import('@/pages/profile/Profile'));
+const Stripe = lazy(() => import('@/pages/stripe/Stripe'));
+const Settings = lazy(() => import('@/pages/settings/Settings'));
+const Stuff = lazy(() => import('@/pages/stuff/Stuff'));
+const Plugins = lazy(() => import('@/pages/Plugins'));
+const PluginSettings = lazy(() => import('@/pages/PluginSettings'));
+const PluginManagement = lazy(() => import('@/pages/admin/PluginManagement'));
+const Integrations = lazy(() => import('@/pages/Integrations'));
+const BoardDetail = lazy(() => import('@/pages/boards/BoardDetail'));
+const TestPage = lazy(() => import('@/pages/Testpage'));
+const SharedWithMe = lazy(() => import('@/pages/shared/SharedWithMe'));
+const BroadcastsPage = lazy(() => import('@/pages/broadcasts/BroadcastsPage'));
+const ActivityMonitor = lazy(() => import('@/pages/activity/ActivityMonitor'));
+const GamificationComingSoon = lazy(() => import('@/pages/gamification/GamificationComingSoon'));
+const AnalyticsComingSoon = lazy(() => import('@/pages/analytics/AnalyticsComingSoon'));
+const MotivationComingSoon = lazy(() => import('@/pages/motivation/MotivationComingSoon'));
+const HotelAnalytics = lazy(() => import('@/pages/hotel-analytics/HotelAnalytics'));
+const ComplianceStandards = lazy(() => import('@/pages/compliance/ComplianceStandards').then(m => ({ default: m.ComplianceStandards })));
+const ComplianceStandardDetail = lazy(() => import('@/pages/compliance/ComplianceStandardDetail').then(m => ({ default: m.ComplianceStandardDetail })));
+
+// Settings sub-pages (lazy)
+const Categories = lazy(() => import('@/pages/settings/sub_pages/categories/Categories'));
+const CustomFieldsTab = lazy(() => import('@/pages/settings/sub_pages/custom-fields/CustomFieldsTab'));
+const Templates = lazy(() => import('@/pages/settings/sub_pages/templates/Templates'));
+const Forms = lazy(() => import('@/pages/settings/sub_pages/forms'));
+const Teams = lazy(() => import('@/pages/settings/sub_pages/teams/Teams'));
+const Workspaces = lazy(() => import('@/pages/settings/sub_pages/workspaces/Workspaces'));
+const Spots = lazy(() => import('@/pages/settings/sub_pages/spots/Spots'));
+const SpotTypes = lazy(() => import('@/pages/settings/sub_pages/spot-types/SpotTypes'));
+const Users = lazy(() => import('@/pages/settings/sub_pages/users/Users'));
+const JobPositions = lazy(() => import('@/pages/settings/sub_pages/job-positions/JobPositions'));
+const RolesAndPermissions = lazy(() => import('@/pages/settings/sub_pages/roles-and-permissions/RolesAndPermissions'));
+const Statuses = lazy(() => import('@/pages/settings/sub_pages/statuses/Statuses'));
+const Priorities = lazy(() => import('@/pages/settings/sub_pages/priorities/Priorities'));
+const Tags = lazy(() => import('@/pages/settings/sub_pages/tags/Tags'));
+const Slas = lazy(() => import('@/pages/settings/sub_pages/slas/Slas'));
+const Workflows = lazy(() => import('@/pages/settings/sub_pages/workflows/Workflows'));
+const Approvals = lazy(() => import('@/pages/settings/sub_pages/approvals/Approvals'));
+const Global = lazy(() => import('@/pages/settings/sub_pages/global/Global'));
+const BoardsSettings = lazy(() => import('@/pages/settings/sub_pages/boards/Boards'));
+const KpiCardsSettings = lazy(() => import('@/pages/settings/sub_pages/kpi-cards-settings/KpiCardsSettings'));
+const KpiCardsManage = lazy(() => import('@/pages/settings/sub_pages/kpi-cards-manage/KpiCardsManage'));
+const GamificationSettings = lazy(() => import('@/pages/settings/sub_pages/gamification/GamificationSettings'));
+const AnalyticsSettings = lazy(() => import('@/pages/settings/sub_pages/analytics/AnalyticsSettings'));
+const MotivationSettings = lazy(() => import('@/pages/settings/sub_pages/motivation/MotivationSettings'));
+const HotelAnalyticsSettings = lazy(() => import('@/pages/settings/sub_pages/HotelAnalyticsSettings'));
 
 
 const pages = [
@@ -84,65 +83,60 @@ export const HomeRoutes = () => {
     <>
       <MainLayout>
         <AllPages />
-        <Routes>
-          <Route path="/" element={<Navigate to="/welcome" replace />} />
-          <Route path="/welcome" element={<Home />} />
-          <Route path="/home" element={<Home />} />
-          <Route path="/tasks" element={<Workspace />} />
-          <Route path="/shared-with-me" element={<SharedWithMe />} />
-          {/* <Route path="/workspace/:id" element={<Workspace />} />
-          <Route path="/workspace/all" element={<Workspace />} /> */}
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/stripe" element={<Stripe />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/stuff" element={<Stuff />} />
-          <Route path="/plugins" element={<Plugins />} />
-          <Route path="/plugins/:pluginId/settings" element={<PluginSettings />} />
-          <Route path="/admin/plugins" element={<PluginManagement />} />
-          <Route path="/integrations" element={<Integrations />} />
-          <Route path="/boards/:boardId" element={<BoardDetail />} />
-          <Route path="/broadcasts" element={<BroadcastsPage />} />
-          <Route path="/activity" element={<ActivityMonitor />} />
-          <Route path="/gamification" element={<GamificationComingSoon />} />
-          <Route path="/analytics" element={<AnalyticsComingSoon />} />
-          <Route path="/motivation" element={<MotivationComingSoon />} />
-          <Route path="/hotel-analytics" element={<HotelAnalytics />} />
-          <Route path="/settings/categories" element={<Categories />} />
-          <Route path="/settings/categories/custom-fields" element={<CustomFieldsTab />} />
-          <Route path="/settings/templates" element={<Templates />} />
-          <Route path="/settings/forms" element={<Forms />} />
-          <Route path="/settings/workspaces" element={<Workspaces />} />
-          <Route path="/settings/teams" element={<Teams />} />
-          <Route path="/settings/spots" element={<Spots />} />
-          <Route path="/settings/spots/types" element={<SpotTypes />} />
-          <Route path="/settings/job-positions" element={<JobPositions />} />
-          <Route path="/settings/users" element={<Users />} /> 
-          <Route path="/settings/roles-and-permissions" element={<RolesAndPermissions />} />
-          <Route path="/settings/statuses" element={<Statuses />} />
-          <Route path="/settings/priorities" element={<Priorities />} />
-          <Route path="/settings/tags" element={<Tags />} />
-          <Route path="/settings/slas" element={<Slas />} />
-          <Route path="/settings/workflows" element={<Workflows />} />
-          <Route path="/settings/approvals" element={<Approvals />} />
-          <Route path="/settings/global" element={<Global />} />
-          <Route path="/settings/boards" element={<BoardsSettings />} />
-          <Route path="/settings/kpi-cards" element={<KpiCardsSettings />} />
-          <Route path="/settings/kpi-cards/manage" element={<KpiCardsManage />} />
-          <Route path="/settings/gamification" element={<GamificationSettings />} />
-          <Route path="/settings/analytics" element={<AnalyticsSettings />} />
-          <Route path="/settings/motivation" element={<MotivationSettings />} />
-          <Route path="/settings/hotel-analytics" element={<HotelAnalyticsSettings />} />
-          <Route path="/working-hours" element={<WorkingHoursGuard><WorkingHoursDashboard /></WorkingHoursGuard>} />
-          <Route path="/settings/working-hours" element={<WorkingHoursGuard><WorkingHoursSettings /></WorkingHoursGuard>} />
-          <Route path="/settings/working-schedules" element={<WorkingHoursGuard><WorkingSchedules /></WorkingHoursGuard>} />
-          <Route path="/settings/time-off-types" element={<WorkingHoursGuard><TimeOffTypes /></WorkingHoursGuard>} />
-          <Route path="/time-off" element={<WorkingHoursGuard><TimeOffRequests /></WorkingHoursGuard>} />
-          <Route path="/settings/test" element={<TestPage />} />
-          
-          {/* Compliance Routes */}
-          <Route path="/compliance/standards" element={<ComplianceStandards />} />
-          <Route path="/compliance/standards/:id" element={<ComplianceStandardDetail />} />
-        </Routes>
+        <Suspense fallback={null}>
+          <Routes>
+            <Route path="/" element={<Navigate to="/welcome" replace />} />
+            <Route path="/welcome" element={<Home />} />
+            <Route path="/home" element={<Home />} />
+            <Route path="/tasks" element={<Workspace />} />
+            <Route path="/shared-with-me" element={<SharedWithMe />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/stripe" element={<Stripe />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/stuff" element={<Stuff />} />
+            <Route path="/plugins" element={<Plugins />} />
+            <Route path="/plugins/:pluginId/settings" element={<PluginSettings />} />
+            <Route path="/admin/plugins" element={<PluginManagement />} />
+            <Route path="/integrations" element={<Integrations />} />
+            <Route path="/boards/:boardId" element={<BoardDetail />} />
+            <Route path="/broadcasts" element={<BroadcastsPage />} />
+            <Route path="/activity" element={<ActivityMonitor />} />
+            <Route path="/gamification" element={<GamificationComingSoon />} />
+            <Route path="/analytics" element={<AnalyticsComingSoon />} />
+            <Route path="/motivation" element={<MotivationComingSoon />} />
+            <Route path="/hotel-analytics" element={<HotelAnalytics />} />
+            <Route path="/settings/categories" element={<Categories />} />
+            <Route path="/settings/categories/custom-fields" element={<CustomFieldsTab />} />
+            <Route path="/settings/templates" element={<Templates />} />
+            <Route path="/settings/forms" element={<Forms />} />
+            <Route path="/settings/workspaces" element={<Workspaces />} />
+            <Route path="/settings/teams" element={<Teams />} />
+            <Route path="/settings/spots" element={<Spots />} />
+            <Route path="/settings/spots/types" element={<SpotTypes />} />
+            <Route path="/settings/job-positions" element={<JobPositions />} />
+            <Route path="/settings/users" element={<Users />} /> 
+            <Route path="/settings/roles-and-permissions" element={<RolesAndPermissions />} />
+            <Route path="/settings/statuses" element={<Statuses />} />
+            <Route path="/settings/priorities" element={<Priorities />} />
+            <Route path="/settings/tags" element={<Tags />} />
+            <Route path="/settings/slas" element={<Slas />} />
+            <Route path="/settings/workflows" element={<Workflows />} />
+            <Route path="/settings/approvals" element={<Approvals />} />
+            <Route path="/settings/global" element={<Global />} />
+            <Route path="/settings/boards" element={<BoardsSettings />} />
+            <Route path="/settings/kpi-cards" element={<KpiCardsSettings />} />
+            <Route path="/settings/kpi-cards/manage" element={<KpiCardsManage />} />
+            <Route path="/settings/gamification" element={<GamificationSettings />} />
+            <Route path="/settings/analytics" element={<AnalyticsSettings />} />
+            <Route path="/settings/motivation" element={<MotivationSettings />} />
+            <Route path="/settings/hotel-analytics" element={<HotelAnalyticsSettings />} />
+            <Route path="/settings/test" element={<TestPage />} />
+            
+            {/* Compliance Routes */}
+            <Route path="/compliance/standards" element={<ComplianceStandards />} />
+            <Route path="/compliance/standards/:id" element={<ComplianceStandardDetail />} />
+          </Routes>
+        </Suspense>
       </MainLayout>
     </>
   );

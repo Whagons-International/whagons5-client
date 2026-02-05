@@ -44,7 +44,7 @@ const CLIENT_ID = VITE_CLIENT_ID || "";
 
 // Height offsets for scroll spacer and assistant message min-height
 export const SPACER_OFFSET = 850; // Spacer height: calc(100vh - this)
-export const ASSISTANT_MIN_HEIGHT_OFFSET = 340; // Assistant min-height: calc(100vh - this)
+export const ASSISTANT_MIN_HEIGHT_OFFSET = 280; // Assistant min-height: calc(100vh - this)
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -1568,135 +1568,106 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
                         onScroll={() => { updateScrollBottomVisibility(); }}
                       >
                         <div className="mx-auto flex w-full max-w-3xl flex-col px-4 pb-10 pt-4">
-                          {memoizedMessages.map((message, index) => {
-                            // User and assistant messages always render normally
-                            if (message.role === "user" || message.role === "assistant") {
-                              return (
-                                <ChatMessageItem
-                                  key={index}
-                                  message={message}
-                                  messages={memoizedMessages}
-                                  isLast={index === memoizedMessages.length - 1}
-                                  gettingResponse={
-                                    gettingResponse &&
-                                    index === memoizedMessages.length - 1
+                          {(() => {
+                            // Render helper for a single message
+                            const renderMessage = (message: Message, index: number) => {
+                              if (message.role === "user" || message.role === "assistant") {
+                                return (
+                                  <ChatMessageItem
+                                    key={index}
+                                    message={message}
+                                    messages={memoizedMessages}
+                                    isLast={index === memoizedMessages.length - 1}
+                                    gettingResponse={gettingResponse && index === memoizedMessages.length - 1}
+                                    isLastUser={index === lastUserIndex}
+                                  />
+                                );
+                              }
+                              if (useLegacyToolViz) {
+                                return (
+                                  <ToolMessageRenderer
+                                    key={index}
+                                    message={message}
+                                    messages={memoizedMessages}
+                                    index={index}
+                                    toolCallMap={toolCallMap}
+                                  />
+                                );
+                              }
+                              if (message.role === "tool_result") {
+                                const content = message.content as any;
+                                const toolCallId = content?.tool_call_id;
+                                const toolCallMsg = toolCallId ? toolCallMap.get(toolCallId) : null;
+                                const toolName = (toolCallMsg?.content as any)?.name;
+                                if (toolName === "Generate_Image") {
+                                  const imageUrl = extractGeneratedImageUrl(content);
+                                  if (imageUrl) {
+                                    return (
+                                      <div key={index} className="px-4 py-2">
+                                        <img src={imageUrl} alt="Generated image" className="max-w-full md:max-w-md rounded-lg shadow-lg" loading="lazy" />
+                                      </div>
+                                    );
                                   }
-                                  isLastUser={index === lastUserIndex}
-                                />
-                              );
-                            }
-                            
-                            // Tool messages: legacy mode shows the old widget
-                            if (useLegacyToolViz) {
-                              return (
-                                <ToolMessageRenderer
-                                  key={index}
-                                  message={message}
-                                  messages={memoizedMessages}
-                                  index={index}
-                                  toolCallMap={toolCallMap}
-                                />
-                              );
-                            }
-                            
-                            // In trace/timeline mode: render timeline for consecutive tool_calls as a group
-                            // For tool_result: check if it's a Generate_Image result and display the image
-                            if (message.role === "tool_result") {
-                              // Check if this is a Generate_Image result
-                              const content = message.content as any;
-                              const toolCallId = content?.tool_call_id;
-                              const toolCallMsg = toolCallId ? toolCallMap.get(toolCallId) : null;
-                              const toolName = (toolCallMsg?.content as any)?.name;
-                              
-                              if (toolName === "Generate_Image") {
-                                // Extract image URL from the result
-                                const imageUrl = extractGeneratedImageUrl(content);
-                                if (imageUrl) {
+                                }
+                                return null;
+                              }
+                              if (message.role === "tool_call" && typeof message.content === "object" && message.content !== null) {
+                                const prevMessage = index > 0 ? memoizedMessages[index - 1] : null;
+                                if (prevMessage?.role === "tool_call" || prevMessage?.role === "tool_result") return null;
+                                const groupToolCallIds = new Set<string>();
+                                for (let j = index; j < memoizedMessages.length; j++) {
+                                  const m = memoizedMessages[j];
+                                  if (m.role === "tool_call" && typeof m.content === "object" && m.content !== null) {
+                                    const c = m.content as any;
+                                    if (c.tool_call_id) groupToolCallIds.add(c.tool_call_id);
+                                  } else if (m.role === "tool_result") {
+                                    continue;
+                                  } else {
+                                    break;
+                                  }
+                                }
+                                const groupTraces = new Map<string, typeof traces extends Map<string, infer V> ? V : never>();
+                                for (const toolCallId of groupToolCallIds) {
+                                  if (traces.has(toolCallId)) groupTraces.set(toolCallId, traces.get(toolCallId)!);
+                                }
+                                if (groupTraces.size > 0) {
                                   return (
-                                    <div key={index} className="px-4 py-2">
-                                      <img
-                                        src={imageUrl}
-                                        alt="Generated image"
-                                        className="max-w-full md:max-w-md rounded-lg shadow-lg"
-                                        loading="lazy"
-                                      />
+                                    <div key={index} className="pt-3 pl-3 pr-3">
+                                      <ExecutionTraceTimeline traces={groupTraces} isExpanded={hasActiveTraces()} />
                                     </div>
                                   );
                                 }
+                                return null;
                               }
                               return null;
-                            }
-                            
-                            // For tool_call: only render at the FIRST one in a consecutive group
-                            if (message.role === "tool_call" && typeof message.content === "object" && message.content !== null) {
-                              // Check if previous message was also a tool_call or tool_result - if so, skip
-                              const prevMessage = index > 0 ? memoizedMessages[index - 1] : null;
-                              if (prevMessage?.role === "tool_call" || prevMessage?.role === "tool_result") {
-                                return null; // Already rendered at the first tool_call in this group
-                              }
-                              
-                              // This is the first tool_call in a consecutive group
-                              // Collect all unique tool_call IDs in this group
-                              const groupToolCallIds = new Set<string>();
-                              for (let i = index; i < memoizedMessages.length; i++) {
-                                const msg = memoizedMessages[i];
-                                if (msg.role === "tool_call" && typeof msg.content === "object" && msg.content !== null) {
-                                  const c = msg.content as any;
-                                  if (c.tool_call_id) {
-                                    groupToolCallIds.add(c.tool_call_id);
-                                  }
-                                } else if (msg.role === "tool_result") {
-                                  continue; // tool_results are part of the group
-                                } else {
-                                  break; // Hit a non-tool message, stop
-                                }
-                              }
-                              
-                              // Build traces for this group
-                              const groupTraces = new Map<string, typeof traces extends Map<string, infer V> ? V : never>();
-                              for (const toolCallId of groupToolCallIds) {
-                                if (traces.has(toolCallId)) {
-                                  groupTraces.set(toolCallId, traces.get(toolCallId)!);
-                                }
-                              }
-                              
-                              if (groupTraces.size > 0) {
-                                return (
-                                  <div key={index} className="pt-3 pl-3 pr-3">
-                                    <ExecutionTraceTimeline 
-                                      traces={groupTraces} 
-                                      isExpanded={hasActiveTraces()}
-                                    />
+                            };
+
+                            // Messages before last user (no min-height)
+                            const beforeContent = lastUserIndex > 0 
+                              ? memoizedMessages.slice(0, lastUserIndex).map((msg, idx) => renderMessage(msg, idx))
+                              : null;
+
+                            // Last user message + all AI response (with min-height)
+                            const lastTurnContent = lastUserIndex >= 0 ? (
+                              <div key="last-turn" style={{ minHeight: `calc(100vh - ${ASSISTANT_MIN_HEIGHT_OFFSET}px)` }}>
+                                {memoizedMessages.slice(lastUserIndex).map((msg, idx) => renderMessage(msg, lastUserIndex + idx))}
+                                {gettingResponse &&
+                                  memoizedMessages.length > 0 &&
+                                  memoizedMessages[memoizedMessages.length - 1].role === "user" && (
+                                  <div className="pl-5 pt-2">
+                                    <LoadingWidget size={40} strokeWidthRatio={8} color="currentColor" cycleDuration={0.9} />
                                   </div>
-                                );
-                              }
-                              
-                              return null;
-                            }
-                            
-                            return null;
-                          })}
-                          {gettingResponse &&
-                            memoizedMessages.length > 0 &&
-                            memoizedMessages[memoizedMessages.length - 1].role === "user" && (
-                            <div className="pl-5 pt-2">
-                              <LoadingWidget
-                                size={40}
-                                strokeWidthRatio={8}
-                                color="currentColor"
-                                cycleDuration={0.9}
-                              />
-                            </div>
-                          )}
-                          {/* Show active traces during live streaming - they may not match tool_call IDs yet */}
-                          {gettingResponse && hasActiveTraces() && (
-                            <div className="pt-3 pl-3 pr-3">
-                              <ExecutionTraceTimeline 
-                                traces={traces} 
-                                isExpanded={true}
-                              />
-                            </div>
-                          )}
+                                )}
+                                {gettingResponse && hasActiveTraces() && (
+                                  <div className="pt-3 pl-3 pr-3">
+                                    <ExecutionTraceTimeline traces={traces} isExpanded={true} />
+                                  </div>
+                                )}
+                              </div>
+                            ) : null;
+
+                            return <>{beforeContent}{lastTurnContent}</>;
+                          })()}
                           <div id="last-message" className="h-1"></div>
                           {/* Spacer to allow scrolling user message to top when waiting for AI response */}
                           {gettingResponse && <div style={{ height: `calc(100vh - ${SPACER_OFFSET}px)` }} />}

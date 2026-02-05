@@ -1111,7 +1111,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
               >
                 <HeartPulse 
                   size={14} 
-                  className={rtlConnected ? 'text-green-500 animate-heartbeat' : 'text-red-400 opacity-50'}
+                  className={rtlConnected ? 'text-red-500 animate-heartbeat' : 'text-gray-400 opacity-50'}
                 />
               </span>
               <span>Version 5.0.0 <i>(beta)</i></span>

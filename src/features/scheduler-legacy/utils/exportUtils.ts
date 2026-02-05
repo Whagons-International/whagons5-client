@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import type { SchedulerEvent, SchedulerResource } from "../types/scheduler";
 
 export async function exportToPDF(
@@ -45,48 +45,54 @@ export async function exportToPNG(
   link.click();
 }
 
-export function exportToExcel(
+export async function exportToExcel(
   events: SchedulerEvent[],
   resources: SchedulerResource[],
   filename: string = "scheduler.xlsx"
-): void {
+): Promise<void> {
   // Create resource map for lookup
   const resourceMap = new Map(resources.map((r) => [r.id, r]));
 
-  // Transform events to Excel rows
-  const rows = events.map((event) => {
+  // Create workbook and worksheet
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("Schedule");
+
+  // Define columns
+  worksheet.columns = [
+    { header: "Task Name", key: "taskName", width: 30 },
+    { header: "Resource", key: "resource", width: 25 },
+    { header: "Team", key: "team", width: 20 },
+    { header: "Start Date", key: "startDate", width: 20 },
+    { header: "End Date", key: "endDate", width: 20 },
+    { header: "Duration (hours)", key: "duration", width: 15 },
+  ];
+
+  // Add data rows
+  events.forEach((event) => {
     const resource = resourceMap.get(event.resourceId);
-    return {
-      "Task Name": event.name,
-      "Resource": resource?.name || `User ${event.resourceId}`,
-      "Team": resource?.teamName || "",
-      "Start Date": event.startDate.toLocaleString(),
-      "End Date": event.endDate.toLocaleString(),
-      "Duration (hours)": (
+    worksheet.addRow({
+      taskName: event.name,
+      resource: resource?.name || `User ${event.resourceId}`,
+      team: resource?.teamName || "",
+      startDate: event.startDate.toLocaleString(),
+      endDate: event.endDate.toLocaleString(),
+      duration: (
         (event.endDate.getTime() - event.startDate.getTime()) /
         (1000 * 60 * 60)
       ).toFixed(2),
-    };
+    });
   });
 
-  // Create workbook and worksheet
-  const worksheet = XLSX.utils.json_to_sheet(rows);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Schedule");
+  // Style header row
+  worksheet.getRow(1).font = { bold: true };
 
-  // Auto-size columns
-  const maxWidth = 50;
-  const colWidths = Object.keys(rows[0] || {}).map((key) => ({
-    wch: Math.min(
-      Math.max(
-        key.length,
-        ...rows.map((row) => String(row[key as keyof typeof row]).length)
-      ),
-      maxWidth
-    ),
-  }));
-  worksheet["!cols"] = colWidths;
-
-  // Save file
-  XLSX.writeFile(workbook, filename);
+  // Generate buffer and download
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }

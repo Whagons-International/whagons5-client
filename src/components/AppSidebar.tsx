@@ -30,9 +30,10 @@ import {
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
 import { RootState } from '@/store';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 // import { useAuth } from '@/providers/AuthProvider'; // Currently not used, uncomment when needed
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Collapsible,
   CollapsibleContent,
@@ -49,7 +50,7 @@ import AppSidebarWorkspaces from './AppSidebarWorkspaces';
 import AppSidebarBoards from './AppSidebarBoards';
 import { genericCaches } from '@/store/genericSlices';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { getGlobalRtl } from '@/store/realTimeListener/RTL';
+import { getRtlConnected, subscribeRtlConnected } from '@/store/realTimeListener/RTL';
 import {
   DndContext,
   closestCenter,
@@ -506,7 +507,10 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   const [defaultIcon, setDefaultIcon] = useState<any>(null);
   const [pinnedBoards, setPinnedBoardsState] = useState<number[]>([]);
   const [pinnedBoardsOrder, setPinnedBoardsOrderState] = useState<number[]>([]);
-  const [rtlConnected, setRtlConnected] = useState(false);
+  
+  // Subscribe to RTL connection status
+  const rtlConnected = useSyncExternalStore(subscribeRtlConnected, getRtlConnected);
+
   const hoverOpenTimerRef = useRef<number | null>(null);
   const hoverCloseTimerRef = useRef<number | null>(null);
   // const [boards, setBoards] = useState<{ id: string; name: string }[]>([]);
@@ -583,27 +587,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   // Note: clearError action not available in generic slices
 
   // Subscribe to RTL connection status
-  useEffect(() => {
-    const rtl = getGlobalRtl();
-    
-    // Check initial status
-    const status = rtl.connectionStatus;
-    setRtlConnected(status.connected);
-    
-    // Listen for status changes
-    const handleStatus = (data: { status: string }) => {
-      if (data.status === 'connected' || data.status === 'authenticated') {
-        setRtlConnected(true);
-      } else if (data.status === 'disconnected' || data.status === 'failed') {
-        setRtlConnected(false);
-      }
-    };
-    
-    rtl.on('connection:status', handleStatus);
-    return () => {
-      rtl.off('connection:status', handleStatus);
-    };
-  }, []);
+
 
   // Subscribe to pinned state changes
   useEffect(() => {
@@ -1105,15 +1089,19 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
         {showExpandedContent ? (
           <div style={{ padding: '4px 16px', fontSize: '12px', color: 'var(--sidebar-text-tertiary)', fontWeight: 400, marginTop: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span 
-                title={rtlConnected ? 'Real-time connected' : 'Real-time disconnected'}
-                style={{ display: 'flex', alignItems: 'center' }}
-              >
-                <HeartPulse 
-                  size={14} 
-                  className={rtlConnected ? 'text-red-500 animate-heartbeat' : 'text-gray-400 opacity-50'}
-                />
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span style={{ display: 'flex', alignItems: 'center', cursor: 'default' }}>
+                    <HeartPulse 
+                      size={14} 
+                      className={rtlConnected ? 'text-red-500 animate-heartbeat' : 'text-gray-400 opacity-50'}
+                    />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  {rtlConnected ? 'Real-time connected' : 'Real-time disconnected'}
+                </TooltipContent>
+              </Tooltip>
               <span>Version 5.0.0 <i>(beta)</i></span>
             </div>
             <AssistantWidget

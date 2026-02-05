@@ -21,6 +21,10 @@ export const loadAgGridModules = async (): Promise<boolean> => {
       'QuickFilterModule',
       'ClientSideRowModelModule',
       'InfiniteRowModelModule',
+      'RowStyleModule',
+      'CellStyleModule',
+      'RenderApiModule',
+      'ValidationModule',
       // enterprise
       'RowGroupingModule',
       'SetFilterModule',

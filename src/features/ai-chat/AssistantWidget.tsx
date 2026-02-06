@@ -17,6 +17,7 @@ import { useLanguage } from "@/providers/LanguageProvider";
 import { getEnvVariables } from "@/lib/getEnvVariables";
 import "./styles.css";
 
+import { Logger } from '@/utils/logger';
 const { VITE_DEVELOPMENT } = getEnvVariables();
 const IS_DEV = (import.meta as any).env?.DEV === true || VITE_DEVELOPMENT === "true";
 
@@ -74,7 +75,7 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
     if (!chat.conversationId || chat.messages.length === 0) return;
     const hasToolCalls = chat.messages.some(m => m.role === 'tool_call');
     if (!hasToolCalls) return;
-    console.log('[Traces] Synthesizing traces for:', chat.conversationId, 'messages:', chat.messages.length);
+    Logger.info('assistant', '[Traces] Synthesizing traces for:', chat.conversationId, 'messages:', chat.messages.length);
     synthesizedForConversationRef.current = chat.conversationId;
     loadTracesFromAPI(chat.conversationId, chat.messages);
   }, [useLegacyToolViz, chat.conversationId, chat.messages, chat.gettingResponse, loadTracesFromAPI]);

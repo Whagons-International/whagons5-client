@@ -1,6 +1,7 @@
 import type { ScaleTime } from "d3-scale";
 import type { SchedulerEvent, SchedulerResource, EventPosition } from "../types/scheduler";
 
+import { Logger } from '@/utils/logger';
 export function calculateEventPosition(
   event: SchedulerEvent,
   resourceIndex: number,
@@ -67,7 +68,7 @@ export function calculateAllEventPositions(
 
   // Log skipped events if any
   if (skippedEvents.length > 0) {
-    console.warn('[calculateAllEventPositions] Skipped events (user not in selectedUserIds):', {
+    Logger.warn('scheduler', '[calculateAllEventPositions] Skipped events (user not in selectedUserIds):', {
       count: skippedEvents.length,
       events: skippedEvents,
       availableResourceIds: resources.map(r => r.id),

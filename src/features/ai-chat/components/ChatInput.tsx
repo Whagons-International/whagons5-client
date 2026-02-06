@@ -6,6 +6,7 @@ import { MicOff } from "lucide-react";
 import { LiveAudioVisualizer } from "react-audio-visualize";
 import { useLanguage } from "@/providers/LanguageProvider";
 
+import { Logger } from '@/utils/logger';
 interface ChatInputProps {
   onSubmit: (content: string | ContentItem[]) => void;
   gettingResponse: boolean;
@@ -175,7 +176,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
           })
         );
       } catch (error) {
-        console.error("Error uploading file:", file.name, error);
+        Logger.error('assistant', "Error uploading file:", file.name, error);
         setContent(prev =>
           prev.filter(item => {
             if (isImage && isImageData(item.content) && item.content.url === blobUrl) {
@@ -240,7 +241,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>((props, ref) =
         }
 
         if (validContent.length === 0) {
-          console.error("No valid content (text or files) to send.");
+          Logger.error('assistant', "No valid content (text or files) to send.");
           return;
         }
 

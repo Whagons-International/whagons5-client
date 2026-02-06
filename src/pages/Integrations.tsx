@@ -13,6 +13,7 @@ import { useLanguage } from '@/providers/LanguageProvider';
 import toast from 'react-hot-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
+import { Logger } from '@/utils/logger';
 interface Webhook {
 	id?: number;
 	name: string;
@@ -56,7 +57,7 @@ const saveWebhooks = (webhooks: Webhook[]) => {
 	try {
 		localStorage.setItem(INTEGRATIONS_STORAGE_KEY, JSON.stringify(webhooks));
 	} catch (error) {
-		console.error('Error saving webhooks:', error);
+		Logger.error('ui', 'Error saving webhooks:', error);
 	}
 };
 
@@ -76,7 +77,7 @@ const saveApiKeys = (apiKeys: ApiKey[]) => {
 	try {
 		localStorage.setItem(API_KEYS_STORAGE_KEY, JSON.stringify(apiKeys));
 	} catch (error) {
-		console.error('Error saving API keys:', error);
+		Logger.error('ui', 'Error saving API keys:', error);
 	}
 };
 
@@ -118,7 +119,7 @@ function Integrations() {
 		//     const response = await api.get('/integrations/webhooks');
 		//     setWebhooks(response.data);
 		//   } catch (error) {
-		//     console.error('Error fetching webhooks:', error);
+		//     Logger.error('ui', 'Error fetching webhooks:', error);
 		//   }
 		// };
 		// fetchWebhooks();

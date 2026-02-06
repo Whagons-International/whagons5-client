@@ -4,6 +4,7 @@ import { removeTaskAsync, restoreTaskAsync } from '@/store/reducers/tasksSlice';
 import toast from 'react-hot-toast';
 import type { AppDispatch } from '@/store/store';
 
+import { Logger } from '@/utils/logger';
 export function useWorkspaceTaskActions(): {
   selectedIds: number[];
   setSelectedIds: (ids: number[]) => void;
@@ -32,7 +33,7 @@ export function useWorkspaceTaskActions(): {
         } catch (error: any) {
           const status = error?.response?.status || error?.status;
           if (status !== 403) {
-            console.error(`Failed to delete task ${taskId}:`, error);
+            Logger.error('workspaces', `Failed to delete task ${taskId}:`, error);
           }
           return { taskId, ok: false as const, error };
         }

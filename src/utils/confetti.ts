@@ -1,6 +1,7 @@
 // @ts-ignore - canvas-confetti types may not be perfect
 import confetti from 'canvas-confetti';
 
+import { Logger } from '@/utils/logger';
 export type CelebrationType = 'confetti' | 'fireworks' | 'hearts' | 'balloons' | 'sparkles' | 'ribbons' | 'none';
 
 const CELEBRATION_SETTING_KEY = 'wh-celebration-type';
@@ -16,7 +17,7 @@ export function getCelebrationType(): CelebrationType {
       return stored;
     }
   } catch (error) {
-    console.warn('[Celebration] Error reading localStorage:', error);
+    Logger.warn('confetti', '[Celebration] Error reading localStorage:', error);
   }
   return 'confetti';
 }
@@ -29,7 +30,7 @@ export function setCelebrationType(type: CelebrationType) {
   try {
     localStorage.setItem(CELEBRATION_SETTING_KEY, type);
   } catch (error) {
-    console.warn('[Celebration] Error saving to localStorage:', error);
+    Logger.warn('confetti', '[Celebration] Error saving to localStorage:', error);
   }
 }
 
@@ -342,7 +343,7 @@ function celebrateWithBalloons() {
       if (Date.now() > animationEnd) { clearInterval(interval); return; }
       launchBalloon(Math.random() * 0.7 + 0.15, balloonColors[Math.floor(Math.random() * balloonColors.length)], 0);
     }, 600);
-  } catch (error) { console.error('Balloons animation failed:', error); }
+  } catch (error) { Logger.error('confetti', 'Balloons animation failed:', error); }
 }
 
 // ─── canvas-confetti based: Sparkles ─────────────────────────────────────────
@@ -359,7 +360,7 @@ function celebrateWithSparkles() {
 
     for (let i = 0; i < 15; i++) setTimeout(createSparkle, i * 100);
     const interval = setInterval(() => { if (Date.now() > animationEnd) { clearInterval(interval); return; } createSparkle(); }, 150);
-  } catch (error) { console.error('Sparkles animation failed:', error); }
+  } catch (error) { Logger.error('confetti', 'Sparkles animation failed:', error); }
 }
 
 // ─── canvas-confetti based: Ribbons ──────────────────────────────────────────
@@ -376,7 +377,7 @@ function celebrateWithRibbons() {
 
     [0.2, 0.4, 0.6, 0.8].forEach((x, i) => setTimeout(() => createRibbon(x, ribbonColors[i % ribbonColors.length]), i * 200));
     const interval = setInterval(() => { if (Date.now() > animationEnd) { clearInterval(interval); return; } createRibbon(Math.random() * 0.7 + 0.15, ribbonColors[Math.floor(Math.random() * ribbonColors.length)]); }, 400);
-  } catch (error) { console.error('Ribbons animation failed:', error); }
+  } catch (error) { Logger.error('confetti', 'Ribbons animation failed:', error); }
 }
 
 /**

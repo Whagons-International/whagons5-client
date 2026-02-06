@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { ExecutionTrace, ToolCallTraces, isExecutionTrace } from '../models/traces';
 import { Message } from '../models';
 
+import { Logger } from '@/utils/logger';
 // Get environment variables
 const VITE_API_URL = (import.meta as any).env?.VITE_API_URL || '';
 const VITE_CHAT_URL = (import.meta as any).env?.VITE_CHAT_URL || '';
@@ -186,11 +187,11 @@ export function useExecutionTraces() {
 
             newTraceMap.set(toolCallId, toolCallTraces);
           }
-          console.log(`[Traces] Loaded ${apiTraces.length} persisted traces`);
+          Logger.info('assistant', `[Traces] Loaded ${apiTraces.length} persisted traces`);
         }
       }
     } catch (error) {
-      console.error('Error loading traces from API:', error);
+      Logger.error('assistant', 'Error loading traces from API:', error);
     }
 
     // Second, synthesize traces from tool_call/tool_result messages for regular tools
@@ -277,7 +278,7 @@ export function useExecutionTraces() {
         });
       }
 
-      console.log(`[Traces] Total traces after synthesis: ${newTraceMap.size} tool calls`);
+      Logger.info('assistant', `[Traces] Total traces after synthesis: ${newTraceMap.size} tool calls`);
     }
 
     setTraces(newTraceMap);

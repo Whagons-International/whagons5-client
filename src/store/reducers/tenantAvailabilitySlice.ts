@@ -2,6 +2,7 @@ import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { api } from '@/store/api/internalApi';
 import { DB } from '../indexedDB/DB';
 
+import { Logger } from '@/utils/logger';
 // State interface for tenant availability
 export interface TenantAvailabilityState {
   value: boolean | null; // null = unknown, true = exists (taken), false = available
@@ -53,7 +54,7 @@ const getCachedAvailability = async (tenantName: string): Promise<boolean | null
     // Cache expired, return null to trigger fresh check
     return null;
   } catch (error) {
-    console.warn('Failed to read tenant availability cache:', error);
+    Logger.warn('redux', 'Failed to read tenant availability cache:', error);
     return null;
   }
 };
@@ -74,7 +75,7 @@ const cacheAvailability = async (tenantName: string, exists: boolean): Promise<v
 
     await DB.put(CACHE_STORE, cacheEntry);
   } catch (error) {
-    console.warn('Failed to cache tenant availability:', error);
+    Logger.warn('redux', 'Failed to cache tenant availability:', error);
     // Don't throw - caching failure shouldn't break the flow
   }
 };
@@ -129,7 +130,7 @@ export const checkTenantAvailability = createAsyncThunk<
           const staleCache = await DB.get(CACHE_STORE, normalizedName);
           if (staleCache) {
             const cacheEntry = staleCache as TenantAvailabilityCache;
-            console.warn('Using stale cache due to network error:', error?.message);
+            Logger.warn('redux', 'Using stale cache due to network error:', error?.message);
             return cacheEntry.exists;
           }
         }

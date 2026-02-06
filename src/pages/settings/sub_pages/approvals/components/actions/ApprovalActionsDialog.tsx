@@ -10,6 +10,7 @@ import type { AppDispatch } from '@/store/store';
 import { actionsApi } from '@/api/whagonsActionsApi';
 import toast from 'react-hot-toast';
 
+import { Logger } from '@/utils/logger';
 interface ApprovalActionsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -78,7 +79,7 @@ export function ApprovalActionsDialog({ open, onOpenChange, approval }: Approval
         onOpenChange(false);
       }
     } catch (error) {
-      console.error('Failed to save approval actions:', error);
+      Logger.error('settings', 'Failed to save approval actions:', error);
       toast.error('Failed to save approval actions');
     } finally {
       setIsSaving(false);

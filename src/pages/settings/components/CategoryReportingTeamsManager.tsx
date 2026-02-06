@@ -10,6 +10,7 @@ import { RootState, AppDispatch } from "@/store/store";
 import { Category, Team } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
 
+import { Logger } from '@/utils/logger';
 export interface CategoryReportingTeamsManagerProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -116,7 +117,7 @@ export function CategoryReportingTeamsManager({
         onOpenChange(false);
       }
     } catch (e: any) {
-      console.error('Error saving reporting teams', e);
+      Logger.error('settings', 'Error saving reporting teams', e);
       setInternalError(e?.message || 'Failed to save reporting teams');
     } finally {
       setInternalSaving(false);

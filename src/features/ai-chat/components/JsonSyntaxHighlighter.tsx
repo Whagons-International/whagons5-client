@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 
+import { Logger } from '@/utils/logger';
 interface JsonSyntaxHighlighterProps {
   content: any;
 }
@@ -16,7 +17,7 @@ const JsonSyntaxHighlighter: React.FC<JsonSyntaxHighlighterProps> = ({ content }
       }
       return JSON.stringify(content, null, 2);
     } catch (e) {
-      console.error("Error formatting JSON:", e);
+      Logger.error('assistant', "Error formatting JSON:", e);
       return String(content);
     }
   }, [content]);

@@ -10,6 +10,7 @@ import { buildApproverDetails } from './ApprovalPopup';
 import { promptForComment } from '../columnUtils/promptForComment';
 import { decideApprovalAndSync } from '@/store/actions/approvalDecisions';
 
+import { Logger } from '@/utils/logger';
 // Simple SLA indicator for the approval popup header
 function renderSlaPillSimple(slaId: any, slaMap: Record<number, any>) {
   const sla = slaMap?.[Number(slaId)];
@@ -204,7 +205,7 @@ export function createStatusColumn(opts: ColumnBuilderOptions) {
             } catch {}
             onSuccess?.();
           } catch (e) {
-            console.warn('approval decision failed', e);
+            Logger.warn('workspaces', 'approval decision failed', e);
             try {
               const msg = (e as any)?.response?.data?.message || 'Failed to record approval decision';
               window.dispatchEvent(new CustomEvent('wh:approvalDecision:error', {

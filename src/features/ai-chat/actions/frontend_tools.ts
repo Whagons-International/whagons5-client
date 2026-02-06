@@ -11,6 +11,7 @@ import { handleUpdateKpi } from './updateKpi';
 import { handleDeleteKpi } from './deleteKpi';
 import { handleListKpi } from './listKpi';
 
+import { Logger } from '@/utils/logger';
 export interface FrontendToolResult {
   action: string;
   [key: string]: any;
@@ -31,7 +32,7 @@ export type NavigateCallback = (path: string) => void;
  */
 function handleBrowserAlert(result: FrontendToolResult, sendMessage?: SendMessageCallback): boolean {
   if (result.action === "browser_alert" && result.message) {
-    console.log('[BROWSER_ALERT]', result.message);
+    Logger.info('assistant', '[BROWSER_ALERT]', result.message);
     alert(result.message);
     return true;
   }
@@ -43,7 +44,7 @@ function handleBrowserAlert(result: FrontendToolResult, sendMessage?: SendMessag
  */
 function handleBrowserPrompt(result: FrontendToolResult, sendMessage?: SendMessageCallback): boolean {
   if (result.action === "browser_prompt" && result.message) {
-    console.log('[BROWSER_PROMPT]', result.message);
+    Logger.info('assistant', '[BROWSER_PROMPT]', result.message);
     
     // Show the prompt dialog with optional default value
     const userInput = prompt(result.message, result.default_value || '');
@@ -56,14 +57,14 @@ function handleBrowserPrompt(result: FrontendToolResult, sendMessage?: SendMessa
         : userInput;
       
       // Log metadata only, not the actual user input to avoid PII exposure
-      console.log('[BROWSER_PROMPT] User responded', userInput.trim() === '' ? '(empty)' : '(non-empty)');
+      Logger.info('assistant', '[BROWSER_PROMPT] User responded', userInput.trim() === '' ? '(empty)' : '(non-empty)');
       
       // Send it back as a message
       setTimeout(() => {
         sendMessage(responseMessage);
       }, 100); // Small delay to ensure UI updates
     } else {
-      console.log('[BROWSER_PROMPT] User cancelled the prompt');
+      Logger.info('assistant', '[BROWSER_PROMPT] User cancelled the prompt');
       if (sendMessage) {
         setTimeout(() => {
           sendMessage('(User cancelled the prompt)');
@@ -148,7 +149,7 @@ function handleBrowserNavigate(result: FrontendToolResult, sendMessage?: SendMes
   const path = result.path || result.data?.path;
   
   if (!path) {
-    console.warn('[BROWSER_NAVIGATE] No path provided');
+    Logger.warn('assistant', '[BROWSER_NAVIGATE] No path provided');
     return false;
   }
 
@@ -157,19 +158,19 @@ function handleBrowserNavigate(result: FrontendToolResult, sendMessage?: SendMes
   
   if (!validation.valid) {
     // Log error and do not navigate
-    console.error('[BROWSER_NAVIGATE] Validation failed:', validation.error, 'Path:', path);
+    Logger.error('assistant', '[BROWSER_NAVIGATE] Validation failed:', validation.error, 'Path:', path);
     return false;
   }
 
   // Path is valid, proceed with navigation
-  console.log('[BROWSER_NAVIGATE] Navigating to:', path);
+  Logger.info('assistant', '[BROWSER_NAVIGATE] Navigating to:', path);
   
   if (navigate) {
     navigate(path);
     return true;
   } else {
     // Fallback to window.location if navigate callback is not provided
-    console.warn('[BROWSER_NAVIGATE] Navigate callback not provided, using window.location');
+    Logger.warn('assistant', '[BROWSER_NAVIGATE] Navigate callback not provided, using window.location');
     window.location.href = path;
     return true;
   }
@@ -212,7 +213,7 @@ export function processFrontendTool(toolName: string, result: any, sendMessage?:
       try {
         resultData = JSON.parse(resultData);
       } catch (e) {
-        console.error(`[FrontendTools] Failed to parse result for ${toolName}:`, e);
+        Logger.error('assistant', `[FrontendTools] Failed to parse result for ${toolName}:`, e);
         return false;
       }
     }
@@ -220,7 +221,7 @@ export function processFrontendTool(toolName: string, result: any, sendMessage?:
     // Execute the handler with optional callbacks
     return handler(resultData, sendMessage, navigate);
   } catch (error) {
-    console.error(`[FrontendTools] Error processing ${toolName}:`, error);
+    Logger.error('assistant', `[FrontendTools] Error processing ${toolName}:`, error);
     return false;
   }
 }

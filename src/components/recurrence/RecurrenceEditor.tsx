@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/providers/LanguageProvider";
 import { CalendarIcon, RefreshCw } from "lucide-react";
 
+import { Logger } from '@/utils/logger';
 // Day of week options for weekly recurrence
 const WEEKDAYS = [
   { value: RRule.MO, label: "Monday", short: "Mon" },
@@ -144,7 +145,7 @@ export const RecurrenceEditor: React.FC<RecurrenceEditorProps> = ({
       // Mark as hydrated after successfully parsing initialRRule
       setIsHydrated(true);
     } catch (e) {
-      console.warn("Failed to parse initial RRule:", e);
+      Logger.warn('ui', "Failed to parse initial RRule:", e);
       // Even on error, mark as hydrated to allow defaults
       setIsHydrated(true);
     }
@@ -223,7 +224,7 @@ export const RecurrenceEditor: React.FC<RecurrenceEditorProps> = ({
         onChange(rruleOnly, readable);
       }
     } catch (e) {
-      console.warn("Failed to build RRule:", e);
+      Logger.warn('ui', "Failed to build RRule:", e);
     }
   }, [frequency, interval, selectedWeekdays, monthlyType, monthDay, monthOrdinal, monthWeekday, endType, count, untilDate, dtstart, onChange, isHydrated]);
 

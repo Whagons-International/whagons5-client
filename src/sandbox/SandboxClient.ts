@@ -1,6 +1,7 @@
 import { RpcRequestSchema, RpcResponseSchema, type RpcError, type RpcRequest, type RpcResponse } from './rpcSchemas';
 import { AddUserParamsSchema, type AddUserParams } from './toolRegistry';
 
+import { Logger } from '@/utils/logger';
 type WorkerToMainMessage =
   | { t: 'RPC_REQUEST'; payload: RpcRequest }
   | { t: 'RUN_RESULT'; rid: number; ok: boolean; result?: unknown; error?: string };
@@ -104,7 +105,7 @@ export class SandboxClient {
   private async addUser(params: AddUserParams): Promise<any> {
     // Stub implementation (for now): just log + return a fake "created user" payload.
     // Later this will drive the UI on the main thread.
-    console.log('[Sandbox API] addUser called:', params);
+    Logger.info('ui', '[Sandbox API] addUser called:', params);
     return {
       ok: true,
       userId: `usr_mock_${Date.now()}`,

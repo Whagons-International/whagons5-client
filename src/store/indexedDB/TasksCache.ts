@@ -4,6 +4,7 @@ import { DB } from "./DB";
 import { api } from "@/store/api/internalApi";
 import { TaskEvents } from "@/store/eventEmiters/taskEvents";
 
+import { Logger } from '@/utils/logger';
 export class TasksCache {
 
     private static initPromise: Promise<boolean> | null = null;
@@ -13,7 +14,7 @@ export class TasksCache {
         return localStorage.getItem('wh-debug-integrity') === 'true';
     }
     private static dlog(...args: any[]) {
-        if (this.debug) console.log('[TasksCache]', ...args);
+        if (this.debug) Logger.info('cache', '[TasksCache]', ...args);
     }
 
     private static _memTasks: Task[] | null = null;
@@ -54,7 +55,7 @@ export class TasksCache {
                             const result = await this._doInit();
                             resolve(result);
                         } catch (error) {
-                            console.error('Error during delayed initialization:', error);
+                            Logger.error('cache', 'Error during delayed initialization:', error);
                             resolve(false);
                         }
                     } else {
@@ -241,12 +242,12 @@ export class TasksCache {
                 if (this._memSharedTasks && (now - this._memSharedTasksStamp) < this.MEM_TTL_MS) {
                     tasks = this._memSharedTasks;
                     if (localStorage.getItem('wh-debug-shared') === 'true') {
-                        console.log('[TasksCache] Using cached shared tasks from memory:', tasks.length);
+                        Logger.info('cache', '[TasksCache] Using cached shared tasks from memory:', tasks.length);
                     }
                 } else {
                     tasks = await this.getSharedTasks();
                     if (localStorage.getItem('wh-debug-shared') === 'true') {
-                        console.log('[TasksCache] Loaded shared tasks from DB:', tasks.length, 'tasks');
+                        Logger.info('cache', '[TasksCache] Loaded shared tasks from DB:', tasks.length, 'tasks');
                     }
                     // Always update memory cache with current results (even if empty)
                     this._memSharedTasks = tasks;
@@ -294,13 +295,13 @@ export class TasksCache {
                         return Number.isFinite(taskWsId) && taskWsId === wsId;
                     });
                     if (localStorage.getItem('wh-debug-shared') === 'true') {
-                        console.log('[TasksCache] Filtered by workspace_id:', beforeCount, '->', tasks.length);
+                        Logger.info('cache', '[TasksCache] Filtered by workspace_id:', beforeCount, '->', tasks.length);
                     }
                 }
             } else if (sharedWithMe && params.workspace_id) {
                 // Log warning if workspace_id is set when viewing shared tasks (shouldn't happen)
                 if (localStorage.getItem('wh-debug-shared') === 'true') {
-                    console.warn('[TasksCache] WARNING: workspace_id filter ignored for shared tasks. workspace_id:', params.workspace_id);
+                    Logger.warn('cache', '[TasksCache] WARNING: workspace_id filter ignored for shared tasks. workspace_id:', params.workspace_id);
                 }
             }
             if (params.status_id && !filterModelKeys.has('status_id')) {
@@ -446,7 +447,7 @@ export class TasksCache {
                 // const pageSize = endRow - startRow; // retained for clarity
                 
                 if (localStorage.getItem('wh-debug-shared') === 'true' && sharedWithMe) {
-                    console.log('[TasksCache] Returning shared tasks:', {
+                    Logger.info('cache', '[TasksCache] Returning shared tasks:', {
                         total: tasks.length,
                         startRow,
                         endRow,
@@ -463,7 +464,7 @@ export class TasksCache {
             } else {
                 // Return all tasks
                 if (localStorage.getItem('wh-debug-shared') === 'true' && sharedWithMe) {
-                    console.log('[TasksCache] Returning all shared tasks:', {
+                    Logger.info('cache', '[TasksCache] Returning all shared tasks:', {
                         total: tasks.length,
                         workspace_id_filter: params.workspace_id,
                         shared_with_me: sharedWithMe
@@ -476,7 +477,7 @@ export class TasksCache {
                 };
             }
         } catch (error) {
-            console.error("queryTasks", error);
+            Logger.error('cache', "queryTasks", error);
             throw error;
         }
     }
@@ -488,15 +489,15 @@ export class TasksCache {
         // Debug logging if enabled
         const debugFilters = typeof localStorage !== 'undefined' && localStorage.getItem('wh-debug-filters') === 'true';
         if (debugFilters) {
-            console.log('[TasksCache] applyFilterModel - filterModel:', JSON.stringify(filterModel, null, 2));
-            console.log('[TasksCache] applyFilterModel - tasks before filter:', tasks.length);
+            Logger.info('cache', '[TasksCache] applyFilterModel - filterModel:', JSON.stringify(filterModel, null, 2));
+            Logger.info('cache', '[TasksCache] applyFilterModel - tasks before filter:', tasks.length);
             
             // Log sample of task priority_ids if filtering by priority
             if (filterModel.priority_id) {
                 const samplePriorities = tasks.slice(0, 10).map(t => ({ id: t.id, priority_id: t.priority_id }));
-                console.log('[TasksCache] applyFilterModel - sample task priority_ids:', samplePriorities);
+                Logger.info('cache', '[TasksCache] applyFilterModel - sample task priority_ids:', samplePriorities);
                 const allPriorities = [...new Set(tasks.map(t => t.priority_id).filter(p => p != null))];
-                console.log('[TasksCache] applyFilterModel - all unique priority_ids in tasks:', allPriorities);
+                Logger.info('cache', '[TasksCache] applyFilterModel - all unique priority_ids in tasks:', allPriorities);
             }
         }
         
@@ -504,7 +505,7 @@ export class TasksCache {
             for (const [column, filterDetails] of Object.entries(filterModel)) {
                 const matches = this.taskMatchesFilter(task, column, filterDetails as any);
                 if (debugFilters && column === 'priority_id') {
-                    console.log(`[TasksCache] task ${task.id} priority_id=${task.priority_id} (type: ${typeof task.priority_id}), filter=${JSON.stringify(filterDetails)}, matches=${matches}`);
+                    Logger.info('cache', `[TasksCache] task ${task.id} priority_id=${task.priority_id} (type: ${typeof task.priority_id}), filter=${JSON.stringify(filterDetails)}, matches=${matches}`);
                 }
                 if (!matches) {
                     return false;
@@ -514,10 +515,10 @@ export class TasksCache {
         });
         
         if (debugFilters) {
-            console.log('[TasksCache] applyFilterModel - tasks after filter:', filtered.length);
+            Logger.info('cache', '[TasksCache] applyFilterModel - tasks after filter:', filtered.length);
         }
         if (filtered.length === 0 && tasks.length > 0) {
-            console.warn('[TasksCache] applyFilterModel - WARNING: Filter resulted in 0 tasks but had', tasks.length, 'tasks before filtering');
+            Logger.warn('cache', '[TasksCache] applyFilterModel - WARNING: Filter resulted in 0 tasks but had', tasks.length, 'tasks before filtering');
         }
         
         return filtered;

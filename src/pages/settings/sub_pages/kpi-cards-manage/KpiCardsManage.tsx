@@ -82,6 +82,7 @@ import toast from 'react-hot-toast';
 import KpiCardBuilder from '../kpi/KpiCardBuilder';
 import { reorderKpiCardsAsync } from '@/store/actions/kpiCards';
 
+import { Logger } from '@/utils/logger';
 interface KpiQueryConfig {
   filters?: Record<string, any>;
   is_default?: boolean;
@@ -315,7 +316,7 @@ export default function KpiCardsManage() {
 
     // If either card is a fallback (negative ID), skip API call
     if (activeId < 0 || overId < 0) {
-      console.log('[KpiCardsManage] Fallback cards involved, skipping persistence');
+      Logger.info('settings', '[KpiCardsManage] Fallback cards involved, skipping persistence');
       return;
     }
 
@@ -323,7 +324,7 @@ export default function KpiCardsManage() {
     const newIndex = previousCards.findIndex(card => card.id === overId);
 
     if (oldIndex === -1 || newIndex === -1) {
-      console.warn('[KpiCardsManage] Could not find cards to reorder', { activeId, overId });
+      Logger.warn('settings', '[KpiCardsManage] Could not find cards to reorder', { activeId, overId });
       return;
     }
 
@@ -347,7 +348,7 @@ export default function KpiCardsManage() {
       await dispatch(reorderKpiCardsAsync({ cards: reorderData })).unwrap();
       toast.success(t('kpiCards.reordered', 'Cards reordered successfully'));
     } catch (error: any) {
-      console.error('Error reordering cards:', error);
+      Logger.error('settings', 'Error reordering cards:', error);
       setCards(previousCards);
       toast.error(t('errors.reorderFailed', 'Failed to reorder cards'));
     }
@@ -387,7 +388,7 @@ export default function KpiCardsManage() {
           : t('kpiCards.disabled', 'KPI card disabled')
       );
     } catch (error: any) {
-      console.error('Error toggling card:', error);
+      Logger.error('settings', 'Error toggling card:', error);
       // Dismiss loading and show error
       toast.dismiss(loadingToast);
       toast.error(t('errors.toggleFailed', 'Failed to toggle card'));
@@ -398,7 +399,7 @@ export default function KpiCardsManage() {
 
   const handleSave = async (cardData: Partial<KpiCard>) => {
     try {
-      console.log('[KpiCardsManage] Saving card data:', cardData);
+      Logger.info('settings', '[KpiCardsManage] Saving card data:', cardData);
       
       if (editingCard) {
         // Update existing card
@@ -415,8 +416,8 @@ export default function KpiCardsManage() {
       setIsBuilderOpen(false);
       setEditingCard(null);
     } catch (error: any) {
-      console.error('[KpiCardsManage] Error saving card:', error);
-      console.error('[KpiCardsManage] Validation errors:', error?.response?.data?.errors);
+      Logger.error('settings', '[KpiCardsManage] Error saving card:', error);
+      Logger.error('settings', '[KpiCardsManage] Validation errors:', error?.response?.data?.errors);
       
       // Show specific validation errors if available
       if (error?.response?.data?.errors) {
@@ -437,7 +438,7 @@ export default function KpiCardsManage() {
       setIsBuilderOpen(false);
       setEditingCard(null);
     } catch (error: any) {
-      console.error('[KpiCardsManage] Error deleting card:', error);
+      Logger.error('settings', '[KpiCardsManage] Error deleting card:', error);
       toast.error(t('errors.deleteFailed', 'Failed to delete card'));
     }
   };

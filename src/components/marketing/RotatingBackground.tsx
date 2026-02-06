@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import MistEffect from "./MistEffect";
 
+import { Logger } from '@/utils/logger';
 type RotatingBackgroundProps = {
   images: string[];
   /** Defaults to 10s */
@@ -127,8 +128,8 @@ export default function RotatingBackground({
   useEffect(() => {
     if (current) {
       const shouldShow = hasCloudsOrMountains(current);
-      console.log('[RotatingBackground] Current image:', current);
-      console.log('[RotatingBackground] Should show mist:', shouldShow);
+      Logger.info('ui', '[RotatingBackground] Current image:', current);
+      Logger.info('ui', '[RotatingBackground] Should show mist:', shouldShow);
     }
   }, [current]);
   

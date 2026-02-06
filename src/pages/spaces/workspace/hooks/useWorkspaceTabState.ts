@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { getCurrentWorkspaceTabFromUrl, type Location } from '../utils/routing';
 import { WORKSPACE_TAB_PATHS, type WorkspaceTabKey } from '../constants';
 
+import { Logger } from '@/utils/logger';
 export function useWorkspaceTabState(params: {
   location: Location;
   workspaceBasePath: string;
@@ -37,7 +38,7 @@ export function useWorkspaceTabState(params: {
       const key = `wh_workspace_last_tab_${id}`;
       localStorage.setItem(key, activeTab);
     } catch (error) {
-      console.error('[Workspace] Error saving last tab:', error);
+      Logger.error('workspaces', '[Workspace] Error saving last tab:', error);
     }
   }, [activeTab, location.pathname, invalidWorkspaceRoute, invalidWorkspaceId]);
   
@@ -66,20 +67,20 @@ export function useWorkspaceTabState(params: {
         if (savedTab !== 'grid' && isExactWorkspaceRoot) {
           const savedTabPath = WORKSPACE_TAB_PATHS[savedTab as WorkspaceTabKey];
           const targetPath = `${workspaceBasePath}${savedTabPath}`;
-          console.log(`[Workspace] Restoring last tab for workspace ${workspaceKey}:`, savedTab, '→', targetPath);
+          Logger.info('workspaces', `[Workspace] Restoring last tab for workspace ${workspaceKey}:`, savedTab, '→', targetPath);
           
           setTimeout(() => {
             navigate(targetPath, { replace: true });
           }, 0);
         } else if (savedTab === 'grid' && !isExactWorkspaceRoot) {
-          console.log(`[Workspace] Navigating to root for workspace ${workspaceKey}`);
+          Logger.info('workspaces', `[Workspace] Navigating to root for workspace ${workspaceKey}`);
           setTimeout(() => {
             navigate(workspaceBasePath, { replace: true });
           }, 0);
         }
       }
     } catch (error) {
-      console.error('[Workspace] Error restoring last tab:', error);
+      Logger.error('workspaces', '[Workspace] Error restoring last tab:', error);
     }
   }, [location.pathname, navigate, workspaceBasePath, invalidWorkspaceRoute, invalidWorkspaceId]);
 

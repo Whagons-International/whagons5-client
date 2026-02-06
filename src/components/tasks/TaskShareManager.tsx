@@ -18,6 +18,7 @@ import { genericActions } from '@/store/genericSlices';
 import { actionsApi } from '@/api/whagonsActionsApi';
 import type { RootState } from '@/store/store';
 
+import { Logger } from '@/utils/logger';
 interface TaskShare {
   id: number;
   task_id: number;
@@ -72,7 +73,7 @@ export default function TaskShareManager({ taskId, onShareChange }: TaskShareMan
       onShareChange?.();
       toast.success('Share revoked successfully');
     } catch (err: any) {
-      console.error('Failed to revoke share:', err);
+      Logger.error('tasks', 'Failed to revoke share:', err);
       toast.error(err?.response?.data?.message || 'Failed to revoke share');
     } finally {
       setRevoking(false);

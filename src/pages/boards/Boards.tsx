@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Logger } from '@/utils/logger';
 import {
   Select,
   SelectContent,
@@ -66,16 +67,16 @@ function Boards() {
 
     setIsSubmitting(true);
     try {
-      console.log('[Boards] Creating board with data:', formData);
+      Logger.info('boards', '[Boards] Creating board with data:', formData);
       const result = await dispatch(genericActions.boards.addAsync(formData) as any);
-      console.log('[Boards] Board created, result:', result);
-      console.log('[Boards] Current boards in state:', boards);
+      Logger.info('boards', '[Boards] Board created, result:', result);
+      Logger.info('boards', '[Boards] Current boards in state:', boards);
       setIsCreateDialogOpen(false);
       setFormData({ name: '', description: '', visibility: 'private' });
       // Note: We rely on the optimistic update from addAsync
       // No need to call fetchFromAPI as it might prune the board if there's a timing issue
     } catch (error) {
-      console.error('Failed to create board:', error);
+      Logger.error('boards', 'Failed to create board:', error);
     } finally {
       setIsSubmitting(false);
     }

@@ -16,6 +16,7 @@ import { getFileUrl } from '@/api/assetApi';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 
+import { Logger } from '@/utils/logger';
 dayjs.extend(relativeTime);
 
 interface PostItemProps {
@@ -211,7 +212,7 @@ export function PostItem({
                     alt={attachment.file_name || ''}
                     className="w-full h-auto object-cover aspect-square"
                     onError={(e) => {
-                      console.error('Failed to load image:', imageUrl, attachment);
+                      Logger.error('boards', 'Failed to load image:', imageUrl, attachment);
                       // Hide broken image
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}

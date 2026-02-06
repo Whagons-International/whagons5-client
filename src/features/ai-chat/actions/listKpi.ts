@@ -8,6 +8,7 @@
 
 import type { FrontendToolResult, SendMessageCallback, NavigateCallback } from './frontend_tools';
 
+import { Logger } from '@/utils/logger';
 // ─── Handler for the tool_result pathway (FRONTEND_TOOL_HANDLERS) ────────────
 
 export function handleListKpi(
@@ -37,7 +38,7 @@ export function handleListKpi(
     color: c.display_config?.color,
   }));
 
-  console.log(`[List_Kpi] Found ${summary.length} KPI card(s)`);
+  Logger.info('assistant', `[List_Kpi] Found ${summary.length} KPI card(s)`);
   if (sendMessage) sendMessage(`Found ${summary.length} KPI card(s).`);
 
   return true;
@@ -73,7 +74,7 @@ export async function handleListKpiPrompt(
       helper_text: c.display_config?.helperText,
     }));
 
-    console.log(`[List_Kpi] Returning ${summary.length} KPI card(s)`);
+    Logger.info('assistant', `[List_Kpi] Returning ${summary.length} KPI card(s)`);
 
     send({
       type: 'frontend_tool_response',
@@ -82,7 +83,7 @@ export async function handleListKpiPrompt(
     });
   } catch (error: any) {
     const errMsg = error?.message || String(error);
-    console.error('[List_Kpi] Failed:', errMsg);
+    Logger.error('assistant', '[List_Kpi] Failed:', errMsg);
     send({
       type: 'frontend_tool_response',
       tool: data?.tool,

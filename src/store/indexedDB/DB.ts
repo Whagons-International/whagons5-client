@@ -1,6 +1,7 @@
 import { auth } from '@/firebase/firebaseConfig';
 
 
+import { Logger } from '@/utils/logger';
 // Current database version - increment when schema changes
 const CURRENT_DB_VERSION = '1.21.0';
 const DB_VERSION_KEY = 'indexeddb_version';
@@ -42,13 +43,13 @@ export class DB {
       // Wait for a user id if not provided
       const userID = await DB.waitForUID(uid);
       if (!userID) {
-        try { console.warn('DB.init: no user id available after waiting'); } catch {}
+        try { Logger.warn('cache', 'DB.init: no user id available after waiting'); } catch {}
         DB.initPromise = null;
         return false as any;
       }
 
       try {
-        console.log('DB.init: starting', {
+        Logger.info('cache', 'DB.init: starting', {
           uid: userID,
           secureContext: (globalThis as any).isSecureContext,
           hasIndexedDB: typeof indexedDB !== 'undefined',
@@ -61,7 +62,7 @@ export class DB {
       const shouldResetDatabase = storedVersion !== CURRENT_DB_VERSION;
 
       if (shouldResetDatabase && storedVersion) {
-        console.log(
+        Logger.info('cache', 
           `DB.init: Version changed from ${storedVersion} to ${CURRENT_DB_VERSION}, resetting database`,
           userID
         );
@@ -76,7 +77,7 @@ export class DB {
       // Wrap in a Promise to await db setup
       const db = await new Promise<IDBDatabase>((resolve, _reject) => {
         request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
-          try { console.log('DB.init: onupgradeneeded'); } catch {}
+          try { Logger.info('cache', 'DB.init: onupgradeneeded'); } catch {}
           const db = (event.target as IDBOpenDBRequest).result;
           if (!db.objectStoreNames.contains('workspaces')) {
             db.createObjectStore('workspaces', { keyPath: 'id' });
@@ -469,14 +470,14 @@ export class DB {
         };
 
         request.onerror = () => {
-          console.error('DB.init: Error opening database:', request.error);
+          Logger.error('cache', 'DB.init: Error opening database:', request.error);
           _reject(request.error as any);
         };
         request.onblocked = () => {
-          console.warn('DB.init: open request blocked - another tab/window may be holding the database open');
+          Logger.warn('cache', 'DB.init: open request blocked - another tab/window may be holding the database open');
         };
         request.onsuccess = () => {
-          try { console.log('DB.init: open success'); } catch {}
+          try { Logger.info('cache', 'DB.init: open success'); } catch {}
           resolve(request.result);
         };
       });
@@ -484,7 +485,7 @@ export class DB {
       DB.db = db;
       try {
         DB.db.onversionchange = () => {
-          try { console.warn('DB.onversionchange: closing DB connection'); } catch {}
+          try { Logger.warn('cache', 'DB.onversionchange: closing DB connection'); } catch {}
           try { DB.db?.close(); } catch {}
           DB.inited = false;
           DB.deleting = false; // Reset deletion flag on version change
@@ -492,7 +493,7 @@ export class DB {
       } catch {}
       DB.inited = true;
       DB.deleting = false; // Ensure deletion flag is cleared after successful init
-      try { console.log('DB.init: DB assigned and inited set to true'); } catch {}
+      try { Logger.info('cache', 'DB.init: DB assigned and inited set to true'); } catch {}
       DB.initPromise = null as any;
       return true as any;
     })();
@@ -514,7 +515,7 @@ export class DB {
       }
       if (DB.inited && DB.db) return true;
       if (Date.now() - start > timeoutMs) {
-        try { console.warn('DB.whenReady: timed out waiting for DB readiness'); } catch {}
+        try { Logger.warn('cache', 'DB.whenReady: timed out waiting for DB readiness'); } catch {}
         return false;
       }
     }
@@ -561,16 +562,16 @@ export class DB {
       localStorage.removeItem(`tasksCacheInitialized-${userId}`);
       localStorage.removeItem(`tasksCacheLastUpdated-${userId}`);
 
-      console.log(`Cleared all cache flags for user ${userId}`);
+      Logger.info('cache', `Cleared all cache flags for user ${userId}`);
     }
 
     // First close our own connection to the database if it exists
     if (DB.inited && DB.db) {
       try {
         DB.db.close();
-        console.log('Closed existing database connection');
+        Logger.info('cache', 'Closed existing database connection');
       } catch (err) {
-        console.error('Error closing database connection:', err);
+        Logger.error('cache', 'Error closing database connection:', err);
       }
       DB.inited = false;
       DB.db = undefined as unknown as IDBDatabase;
@@ -579,7 +580,7 @@ export class DB {
     return new Promise<void>((resolve, _reject) => {
       // Create a timeout to prevent indefinite hanging
       const timeout = setTimeout(() => {
-        console.warn('Database deletion timed out after 5 seconds');
+        Logger.warn('cache', 'Database deletion timed out after 5 seconds');
         DB.deleting = false; // Reset flag on timeout
         resolve(); // Resolve anyway to prevent hanging
       }, 5000);
@@ -589,14 +590,14 @@ export class DB {
 
         request.onsuccess = () => {
           clearTimeout(timeout);
-          console.log('Database successfully deleted');
+          Logger.info('cache', 'Database successfully deleted');
           DB.deleting = false; // Reset flag on success
           resolve();
         };
 
         request.onerror = () => {
           clearTimeout(timeout);
-          console.error('Error deleting database:', request.error);
+          Logger.error('cache', 'Error deleting database:', request.error);
           DB.deleting = false; // Reset flag on error
           // Still resolve to prevent hanging
           resolve();
@@ -604,12 +605,12 @@ export class DB {
 
         // Critical: Handle blocked events
         request.onblocked = () => {
-          console.warn('Database deletion blocked - connections still open');
+          Logger.warn('cache', 'Database deletion blocked - connections still open');
           // We'll continue waiting for the timeout
         };
       } catch (err) {
         clearTimeout(timeout);
-        console.error('Exception during database deletion:', err);
+        Logger.error('cache', 'Exception during database deletion:', err);
         DB.deleting = false; // Reset flag on exception
         resolve(); // Resolve anyway to prevent hanging
       }
@@ -770,16 +771,16 @@ export class DB {
   public static async getAll(storeName: string): Promise<any[]> {
     return DB.runExclusive(storeName, async () => {
       if (DB.nuking) {
-        console.warn('[DB] getAll skipped during nuking');
+        Logger.warn('cache', '[DB] getAll skipped during nuking');
         return [] as any[];
       }
       if (DB.deleting) {
-        console.warn('[DB] getAll skipped during deletion');
+        Logger.warn('cache', '[DB] getAll skipped during deletion');
         return [] as any[];
       }
       if (!DB.inited) await DB.init();
       if (!DB.inited || !DB.db) {
-        console.warn(`[DB] getAll: DB not initialized for ${storeName}`);
+        Logger.warn('cache', `[DB] getAll: DB not initialized for ${storeName}`);
         return [] as any[];
       }
 
@@ -802,7 +803,7 @@ export class DB {
       } catch (error: any) {
         // Catch InvalidStateError specifically - DB connection is closing
         if (error?.name === 'InvalidStateError' || error?.message?.includes('connection is closing')) {
-          console.warn(`[DB] getAll: InvalidStateError for ${storeName}, retrying after DB reinit`);
+          Logger.warn('cache', `[DB] getAll: InvalidStateError for ${storeName}, retrying after DB reinit`);
           // Reset state
           DB.inited = false;
           DB.db = undefined as unknown as IDBDatabase;
@@ -811,7 +812,7 @@ export class DB {
           // Retry init and operation once
           await DB.init();
           if (!DB.inited || !DB.db || DB.deleting) {
-            console.warn(`[DB] getAll: DB not ready after retry for ${storeName}`);
+            Logger.warn('cache', `[DB] getAll: DB not ready after retry for ${storeName}`);
             return [] as any[];
           }
           // Retry the transaction
@@ -843,16 +844,16 @@ export class DB {
   ): Promise<any | null> {
     return DB.runExclusive(storeName, async () => {
       if (DB.nuking) {
-        console.warn('[DB] get skipped during nuking');
+        Logger.warn('cache', '[DB] get skipped during nuking');
         return null;
       }
       if (DB.deleting) {
-        console.warn('[DB] get skipped during deletion');
+        Logger.warn('cache', '[DB] get skipped during deletion');
         return null;
       }
       if (!DB.inited) await DB.init();
       if (!DB.inited || !DB.db) {
-        console.warn(`[DB] get: DB not initialized for ${storeName}`);
+        Logger.warn('cache', `[DB] get: DB not initialized for ${storeName}`);
         return null;
       }
       // Use an explicit transaction and await its completion for consistent reads
@@ -874,7 +875,7 @@ export class DB {
       } catch (error: any) {
         // Catch InvalidStateError specifically - DB connection is closing
         if (error?.name === 'InvalidStateError' || error?.message?.includes('connection is closing')) {
-          console.warn(`[DB] get: InvalidStateError for ${storeName}, retrying after DB reinit`);
+          Logger.warn('cache', `[DB] get: InvalidStateError for ${storeName}, retrying after DB reinit`);
           // Reset state
           DB.inited = false;
           DB.db = undefined as unknown as IDBDatabase;
@@ -883,7 +884,7 @@ export class DB {
           // Retry init and operation once
           await DB.init();
           if (!DB.inited || !DB.db || DB.deleting) {
-            console.warn(`[DB] get: DB not ready after retry for ${storeName}`);
+            Logger.warn('cache', `[DB] get: DB not ready after retry for ${storeName}`);
             return null;
           }
           // Retry the transaction
@@ -915,14 +916,14 @@ export class DB {
 
     return DB.runExclusive(storeName, async () => {
       if (DB.deleting) {
-        console.warn('[DB] put skipped during deletion');
+        Logger.warn('cache', '[DB] put skipped during deletion');
         return;
       }
       if (!DB.inited) await DB.init();
 
       // Debug: Log only if there's an issue
       if (!rowCopy) {
-        console.log(`DB.put: Received row parameter`, {
+        Logger.info('cache', `DB.put: Received row parameter`, {
           storeName,
           originalRow: row,
           rowCopy,
@@ -933,7 +934,7 @@ export class DB {
 
       // Validate the row copy
       if (!rowCopy) {
-        console.error(`DB.put: Row copy is null/undefined for ${storeName}`, {
+        Logger.error('cache', `DB.put: Row copy is null/undefined for ${storeName}`, {
           originalRow: row,
           rowCopy
         });
@@ -944,7 +945,7 @@ export class DB {
       try {
         const dbg = localStorage.getItem('wh-debug-cache') === 'true';
         if (dbg) {
-          console.log('DB.put: pre-encrypt', {
+          Logger.info('cache', 'DB.put: pre-encrypt', {
             storeName,
             rowHasId: rowCopy && (rowCopy.id !== undefined && rowCopy.id !== null),
             rowId: rowCopy?.id,
@@ -965,13 +966,13 @@ export class DB {
           const dbg = localStorage.getItem('wh-debug-cache') === 'true';
           if (dbg) {
             const kp = (store as any)?.keyPath;
-            console.log('DB.put: target store', { storeName, keyPath: kp, payloadHasId: payload?.id !== undefined && payload?.id !== null, payloadId: payload?.id });
+            Logger.info('cache', 'DB.put: target store', { storeName, keyPath: kp, payloadHasId: payload?.id !== undefined && payload?.id !== null, payloadId: payload?.id });
           }
         } catch {}
         const putRequest = store.put(payload);
 
         putRequest.onerror = (event) => {
-          console.error(`DB.put: IndexedDB put request failed for ${storeName}`, {
+          Logger.error('cache', `DB.put: IndexedDB put request failed for ${storeName}`, {
             error: putRequest.error,
             event,
             payload,
@@ -986,7 +987,7 @@ export class DB {
       } catch (error: any) {
         // Catch InvalidStateError specifically - DB connection is closing
         if (error?.name === 'InvalidStateError' || error?.message?.includes('connection is closing')) {
-          console.warn(`[DB] put: InvalidStateError for ${storeName}, retrying after DB reinit`);
+          Logger.warn('cache', `[DB] put: InvalidStateError for ${storeName}, retrying after DB reinit`);
           // Reset state
           DB.inited = false;
           DB.db = undefined as unknown as IDBDatabase;
@@ -995,7 +996,7 @@ export class DB {
           // Retry init and operation once
           await DB.init();
           if (!DB.inited || !DB.db || DB.deleting) {
-            console.warn(`[DB] put: DB not ready after retry for ${storeName}`);
+            Logger.warn('cache', `[DB] put: DB not ready after retry for ${storeName}`);
             return;
           }
           // Retry the transaction
@@ -1003,7 +1004,7 @@ export class DB {
           const store = tx.objectStore(storeName as any);
           const putRequest = store.put(payload);
           putRequest.onerror = (event) => {
-            console.error(`DB.put: IndexedDB put request failed for ${storeName}`, {
+            Logger.error('cache', `DB.put: IndexedDB put request failed for ${storeName}`, {
               error: putRequest.error,
               event,
               payload,
@@ -1026,7 +1027,7 @@ export class DB {
   public static async bulkPut(storeName: string, rows: any[]): Promise<void> {
     return DB.runExclusive(storeName, async () => {
       if (DB.deleting) {
-        console.warn('[DB] bulkPut skipped during deletion');
+        Logger.warn('cache', '[DB] bulkPut skipped during deletion');
         return;
       }
       if (!DB.inited) await DB.init();
@@ -1045,7 +1046,7 @@ export class DB {
       } catch (error: any) {
         // Catch InvalidStateError specifically - DB connection is closing
         if (error?.name === 'InvalidStateError' || error?.message?.includes('connection is closing')) {
-          console.warn(`[DB] bulkPut: InvalidStateError for ${storeName}, retrying after DB reinit`);
+          Logger.warn('cache', `[DB] bulkPut: InvalidStateError for ${storeName}, retrying after DB reinit`);
           // Reset state
           DB.inited = false;
           DB.db = undefined as unknown as IDBDatabase;
@@ -1054,7 +1055,7 @@ export class DB {
           // Retry init and operation once
           await DB.init();
           if (!DB.inited || !DB.db || DB.deleting) {
-            console.warn(`[DB] bulkPut: DB not ready after retry for ${storeName}`);
+            Logger.warn('cache', `[DB] bulkPut: DB not ready after retry for ${storeName}`);
             return;
           }
           // Retry the transaction
@@ -1089,7 +1090,7 @@ export class DB {
       const deleteRequest = store.delete(DB.toKey(key));
       
       deleteRequest.onerror = (event) => {
-        console.error(`DB.delete: IndexedDB delete request failed for ${storeName}`, {
+        Logger.error('cache', `DB.delete: IndexedDB delete request failed for ${storeName}`, {
           error: deleteRequest.error,
           event,
           key,
@@ -1108,7 +1109,7 @@ export class DB {
   public static async clear(storeName: string): Promise<void> {
     // Debug logging (can be enabled via localStorage.getItem('wh-debug-db') === 'true')
     if (typeof localStorage !== 'undefined' && localStorage.getItem('wh-debug-db') === 'true') {
-      console.log(`[DB] Clearing IndexedDB store: ${storeName}`);
+      Logger.info('cache', `[DB] Clearing IndexedDB store: ${storeName}`);
     }
     return DB.runExclusive(storeName, async () => {
       if (!DB.inited) await DB.init();
@@ -1121,7 +1122,7 @@ export class DB {
       const clearRequest = store.clear();
       
       clearRequest.onerror = (event) => {
-        console.error(`DB.clear: IndexedDB clear request failed for ${storeName}`, {
+        Logger.error('cache', `DB.clear: IndexedDB clear request failed for ${storeName}`, {
           error: clearRequest.error,
           event,
           storeName

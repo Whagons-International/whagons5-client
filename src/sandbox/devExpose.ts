@@ -1,5 +1,6 @@
 import { SandboxClient } from './SandboxClient';
 
+import { Logger } from '@/utils/logger';
 export function exposeSandboxToWindow(): void {
   // Dev-only helper so you can test quickly from the browser console:
   //   await window.__whSandbox.run(`const r = await api.addUser({email:"a@b.com",name:"Ada"}); return r;`)
@@ -8,7 +9,7 @@ export function exposeSandboxToWindow(): void {
   const w = window as any;
   if (w.__whSandbox) return;
   w.__whSandbox = new SandboxClient();
-  console.log(
+  Logger.info('ui', 
     '[Sandbox] Dev helper ready: window.__whSandbox.run(code). Example:',
     'await window.__whSandbox.run(`const r = await api.addUser({ email: "a@b.com", name: "Ada" }); return r;`)'
   );

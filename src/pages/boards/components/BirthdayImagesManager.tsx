@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
+import { Logger } from '@/utils/logger';
 interface BirthdayImage {
   id: string | number;
   file_path: string;
@@ -91,7 +92,7 @@ export function BirthdayImagesManager({
 
       onImagesChange?.();
     } catch (error) {
-      console.error('Failed to upload birthday image:', error);
+      Logger.error('boards', 'Failed to upload birthday image:', error);
       alert(t('boards.birthday.uploadFailed', 'Failed to upload image'));
     } finally {
       setIsUploading(false);
@@ -110,7 +111,7 @@ export function BirthdayImagesManager({
       await dispatch(genericActions.boardBirthdayImages.removeAsync(imageId) as any);
       onImagesChange?.();
     } catch (error) {
-      console.error('Failed to delete birthday image:', error);
+      Logger.error('boards', 'Failed to delete birthday image:', error);
       alert(t('boards.birthday.deleteFailed', 'Failed to delete image'));
     } finally {
       setDeletingId(null);

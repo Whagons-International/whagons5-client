@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { useState, useCallback, useMemo, useRef, lazy, Suspense } from "react";
 
+import { Logger } from '@/utils/logger';
 // Lazy load AgGridReact component
 const AgGridReact = lazy(() => import('ag-grid-react').then(module => ({ default: module.AgGridReact })));
 
@@ -125,7 +126,7 @@ function CreationTab({
   // Get rows function for categories
   const getCategoryRows = useCallback(
     async (params: any) => {
-      console.log('Fetching categories for range', params.startRow, 'to', params.endRow);
+      Logger.info('ui', 'Fetching categories for range', params.startRow, 'to', params.endRow);
 
       try {
         if (!workspaceFilters) {
@@ -146,7 +147,7 @@ function CreationTab({
 
         params.successCallback(rowsThisPage, filteredCategories.length);
       } catch (error) {
-        console.error('Failed to fetch categories:', error);
+        Logger.error('ui', 'Failed to fetch categories:', error);
         params.failCallback();
       }
     },

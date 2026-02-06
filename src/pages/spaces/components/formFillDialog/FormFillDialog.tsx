@@ -15,11 +15,12 @@ import { genericActions } from '@/store/genericSlices';
 import { AppDispatch, RootState } from '@/store/store';
 import { Loader2 } from 'lucide-react';
 
+import { Logger } from '@/utils/logger';
 function safeJsonParse(text: string, fallback: any = {}) {
   try {
     return JSON.parse(text);
   } catch (error) {
-    console.error('JSON parse error:', error);
+    Logger.error('ui', 'JSON parse error:', error);
     return fallback;
   }
 }
@@ -146,7 +147,7 @@ export function FormFillDialog({
       // Close dialog on success
       onOpenChange(false);
     } catch (err: any) {
-      console.error('Error saving form:', err);
+      Logger.error('ui', 'Error saving form:', err);
       setError(err?.message || 'Failed to save form. Please try again.');
     } finally {
       setIsSubmitting(false);

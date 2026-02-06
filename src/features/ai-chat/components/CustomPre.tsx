@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import Prism from "prismjs";
 
+import { Logger } from '@/utils/logger';
 interface CustomPreProps {
   children: any;
 }
@@ -30,7 +31,7 @@ const CustomPre: React.FC<CustomPreProps> = (props) => {
           }
         }
       } catch (e) {
-        console.warn(`Failed to load language: ${initialLang}`, e);
+        Logger.warn('assistant', `Failed to load language: ${initialLang}`, e);
       }
     }
   }, [props.children]);
@@ -55,7 +56,7 @@ const CustomPre: React.FC<CustomPreProps> = (props) => {
                   }
                 }
               } catch (e) {
-                console.warn(`Failed to load language: ${lang}`, e);
+                Logger.warn('assistant', `Failed to load language: ${lang}`, e);
               }
             }
           }

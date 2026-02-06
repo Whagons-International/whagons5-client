@@ -1,3 +1,4 @@
+import { Logger } from '@/utils/logger';
 /**
  * Task Creation Preferences - localStorage utilities for tracking
  * favorites and recent selections in task creation dialogs.
@@ -94,7 +95,7 @@ export function saveTaskCreationHistory(workspaceId: number, history: TaskCreati
     history.lastUpdated = new Date().toISOString();
     localStorage.setItem(key, JSON.stringify(history));
   } catch (e) {
-    console.warn('[TaskCreationPreferences] Failed to save history:', e);
+    Logger.warn('tasks', '[TaskCreationPreferences] Failed to save history:', e);
   }
 }
 

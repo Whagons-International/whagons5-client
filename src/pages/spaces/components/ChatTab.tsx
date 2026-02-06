@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 import { uploadWorkspaceResource, getWorkspaceResourceUrl } from "@/api/workspaceResourcesApi";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { Logger } from '@/utils/logger';
 import {
   faFile,
   faFilePdf,
@@ -142,7 +143,7 @@ export default function ChatTab({ workspaceId }: { workspaceId: string | undefin
 
       await dispatch(genericActions.workspaceChat.addAsync(chatMessage)).unwrap();
     } catch (error: any) {
-      console.error("Failed to send message:", error);
+      Logger.error('ui', "Failed to send message:", error);
       setInput(messageText);
 
       const errorMessage = error?.response?.data?.message || error?.message || t('workspace.collab.chat.failedToSend', 'Failed to send message. Please try again.');
@@ -176,7 +177,7 @@ export default function ChatTab({ workspaceId }: { workspaceId: string | undefin
       };
       await dispatch(genericActions.workspaceChat.addAsync(chatMessage)).unwrap();
     } catch (error: any) {
-      console.error("Failed to upload attachment:", error);
+      Logger.error('ui', "Failed to upload attachment:", error);
       alert(`Error: ${error?.response?.data?.message || error?.message || 'Failed to upload attachment.'}`);
     }
   };

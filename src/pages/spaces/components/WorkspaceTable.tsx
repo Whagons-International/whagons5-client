@@ -57,6 +57,7 @@ import { buildGetRows } from './workspaceTable/grid/dataSource';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { useSpotVisibility } from '@/hooks/useSpotVisibility';
 
+import { Logger } from '@/utils/logger';
 // Lazy load AgGridReact component
 const AgGridReact = lazy(() => import('ag-grid-react').then(module => ({ default: module.AgGridReact }))) as any;
 
@@ -164,7 +165,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   useEffect(() => {
     loadAgGridModules()
       .then(() => setModulesLoaded(true))
-      .catch(console.error);
+      .catch((err) => Logger.error('workspaces', 'Failed to load AG Grid modules:', err));
   }, []);
 
   // Redux state management
@@ -382,7 +383,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           });
         } catch (e) {
           // Ignore errors, grid might not be ready
-          console.debug('Failed to refresh row classes for animation:', e);
+          Logger.debug('workspaces', 'Failed to refresh row classes for animation:', e);
         }
       }, 250); // Wait 250ms to ensure grid refresh has completed and rows are rendered
       
@@ -517,7 +518,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       return globalRoles.map((r: any) => typeof r === 'object' ? Number(r.id) : Number(r)).filter(Number.isFinite);
     })(),
     onDeleteTask: handleDeleteTask,
-    onLogTask: (id: number) => console.info('Log action selected (placeholder) for task', id),
+    onLogTask: (id: number) => Logger.info('workspaces', 'Log action selected (placeholder) for task', id),
     slaMap,
     taskFormsMap,
     formVersionMap,

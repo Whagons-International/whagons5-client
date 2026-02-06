@@ -10,6 +10,7 @@ import { Message } from './models/models';
 import componentsJson from './components/components.json';
 import { useTheme } from '@/providers/ThemeProvider';
 
+import { Logger } from '@/utils/logger';
 const components = componentsJson as any;
 const HOST = import.meta.env.VITE_CHAT_HOST;
 
@@ -37,7 +38,7 @@ const loadLanguage = async (language: string) => {
     const languageData = components.languages[language];
 
     if (!languageData) {
-      console.warn(`Language "${language}" not found in components.json.`);
+      Logger.warn('ui', `Language "${language}" not found in components.json.`);
       return;
     }
 
@@ -60,17 +61,17 @@ const loadLanguage = async (language: string) => {
     }
     const scriptText = await response.text();
 
-    // console.log("Script: ", language)
-    // console.log(scriptText);
+    // Logger.info('ui', "Script: ", language)
+    // Logger.info('ui', scriptText);
 
     // Execute the script.  Important: This is where the Prism component is registered.
     eval(scriptText); // VERY CAREFUL.  See security notes below.
 
     loadedLanguages[language] = true;
-    // console.log(`Language "${language}" loaded successfully.`);
+    // Logger.info('ui', `Language "${language}" loaded successfully.`);
     Prism.highlightAll();
   } catch (error) {
-    console.error(`Error loading language "${language}":`, error);
+    Logger.error('ui', `Error loading language "${language}":`, error);
     // Consider a fallback (e.g., plain text highlighting)
   }
 };
@@ -81,7 +82,7 @@ function CustomPre({ children }: any) {
   const language = children?.props?.className?.replace('language-', '') || '';
 
   useEffect(() => {
-    // console.log(language, " detected")
+    // Logger.info('ui', language, " detected")
     if (language && !loadedLanguages[language]) {
       loadLanguage(language); // Load the language if it's not already loaded.
     }
@@ -246,8 +247,8 @@ function ChatWindow() {
                 //Skip empty lines
                 try {
                   const parsedObject = JSON.parse(line);
-                  // console.log(line);
-                  // console.log('Parsed JSON object', parsedObject.content);
+                  // Logger.info('ui', line);
+                  // Logger.info('ui', 'Parsed JSON object', parsedObject.content);
 
                   // Access content correctly (adjust if your structure is different)
                   (assistantMessage.content as String) = parsedObject.content;
@@ -257,11 +258,11 @@ function ChatWindow() {
                   setMessages(updatedMessages);
                 } catch (error) {
                   if (error instanceof SyntaxError) {
-                    console.log(
+                    Logger.info('ui', 
                       'Waiting for more data. Partial chunk received.',
                     );
                   } else {
-                    console.error('Error parsing JSON:', error);
+                    Logger.error('ui', 'Error parsing JSON:', error);
                   }
                 }
               }
@@ -275,7 +276,7 @@ function ChatWindow() {
         if (buffer.trim() !== '') {
           try {
             const parsedObject = JSON.parse(buffer);
-            // console.log('Received and parsed:', parsedObject);
+            // Logger.info('ui', 'Received and parsed:', parsedObject);
             if (
               parsedObject &&
               parsedObject.parts &&
@@ -288,13 +289,13 @@ function ChatWindow() {
             const updatedMessages = [...messages, newMessage, assistantMessage];
             setMessages(updatedMessages);
           } catch (error) {
-            console.error('Error parsing JSON line:', error, 'Line:', buffer);
+            Logger.error('ui', 'Error parsing JSON line:', error, 'Line:', buffer);
           }
         }
       } catch (error) {
-        console.error('Error sending messages:', error);
+        Logger.error('ui', 'Error sending messages:', error);
       }
-      // console.log(messages);
+      // Logger.info('ui', messages);
 
       setGettingResponse(false);
     }
@@ -317,15 +318,15 @@ function ChatWindow() {
       }
 
       const data = await response.json();
-      // console.log(data);
+      // Logger.info('ui', data);
       setMessages(data.chat_history);
     } catch (error) {
-      console.error('Failed to fetch chat history:', error);
+      Logger.error('ui', 'Failed to fetch chat history:', error);
     }
   };
 
   const handleFileAttachment = () => {
-    console.log('File attachment initiated');
+    Logger.info('ui', 'File attachment initiated');
   };
 
   const toggleListening = () => {

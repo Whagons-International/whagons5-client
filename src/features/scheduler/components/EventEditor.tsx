@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { SchedulerEvent, SchedulerResource } from "../types/scheduler";
+import { Logger } from '@/utils/logger';
 import {
   combineLocalDateAndTime,
   formatLocalDateInput,
@@ -117,7 +118,7 @@ export default function EventEditor({
 
       onClose();
     } catch (error) {
-      console.error("Failed to save event:", error);
+      Logger.error('scheduler', "Failed to save event:", error);
       alert("Failed to save event. Please try again.");
     } finally {
       setIsSaving(false);

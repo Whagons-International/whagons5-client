@@ -1,5 +1,6 @@
 import { Message } from "../models";
 
+import { Logger } from '@/utils/logger';
 export interface Conversation {
   id: string;
   title: string;
@@ -46,7 +47,7 @@ export function getConversations(): Conversation[] {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(deduplicated));
       } catch (e) {
-        console.error("Failed to save updated message counts:", e);
+        Logger.error('assistant', "Failed to save updated message counts:", e);
       }
     }
     
@@ -55,7 +56,7 @@ export function getConversations(): Conversation[] {
       new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
   } catch (error) {
-    console.error("Failed to load conversations:", error);
+    Logger.error('assistant', "Failed to load conversations:", error);
     return [];
   }
 }
@@ -88,7 +89,7 @@ export function saveConversation(conversation: Conversation): void {
     
     localStorage.setItem(STORAGE_KEY, JSON.stringify(uniqueConversations));
   } catch (error) {
-    console.error("Failed to save conversation:", error);
+    Logger.error('assistant', "Failed to save conversation:", error);
   }
 }
 
@@ -104,7 +105,7 @@ export function deleteConversation(conversationId: string): void {
     // Also delete the messages
     localStorage.removeItem(`${MESSAGES_STORAGE_PREFIX}${conversationId}`);
   } catch (error) {
-    console.error("Failed to delete conversation:", error);
+    Logger.error('assistant', "Failed to delete conversation:", error);
   }
 }
 
@@ -146,7 +147,7 @@ export function saveMessages(conversationId: string, messages: Message[]): void 
       });
     }
   } catch (error) {
-    console.error("Failed to save messages:", error);
+    Logger.error('assistant', "Failed to save messages:", error);
   }
 }
 
@@ -159,7 +160,7 @@ export function loadMessages(conversationId: string): Message[] {
     if (!stored) return [];
     return JSON.parse(stored) as Message[];
   } catch (error) {
-    console.error("Failed to load messages:", error);
+    Logger.error('assistant', "Failed to load messages:", error);
     return [];
   }
 }

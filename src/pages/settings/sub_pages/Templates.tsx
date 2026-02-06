@@ -28,6 +28,7 @@ import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import { useLanguage } from "@/providers/LanguageProvider";
 
+import { Logger } from '@/utils/logger';
 // Custom component for async icon loading in Templates
 const CategoryIconRenderer = ({ iconClass }: { iconClass?: string }) => {
   const [icon, setIcon] = useState<any>(faTags);
@@ -45,7 +46,7 @@ const CategoryIconRenderer = ({ iconClass }: { iconClass?: string }) => {
         const loadedIcon = await iconService.getIcon(last);
         setIcon(loadedIcon || faTags);
       } catch (error) {
-        console.error('Error loading category icon:', error);
+        Logger.error('settings', 'Error loading category icon:', error);
         setIcon(faTags);
       }
     };
@@ -262,7 +263,7 @@ function Templates() {
       }) as any);
       setSelectedRequirement('');
     } catch (error) {
-      console.error('Failed to add mapping:', error);
+      Logger.error('settings', 'Failed to add mapping:', error);
     }
   };
 
@@ -270,7 +271,7 @@ function Templates() {
     try {
       await dispatch(genericActions.complianceMappings.removeAsync(mappingId) as any);
     } catch (error) {
-      console.error('Failed to remove mapping:', error);
+      Logger.error('settings', 'Failed to remove mapping:', error);
     }
   };
 
@@ -299,7 +300,7 @@ function Templates() {
         a.click();
         a.remove();
     })
-    .catch(err => console.error('SOP Download failed', err));
+    .catch(err => Logger.error('settings', 'SOP Download failed', err));
   };
 
   // Helper functions
@@ -437,7 +438,7 @@ function Templates() {
         tasksOverTime
       });
     } catch (error) {
-      console.error('Error calculating statistics:', error);
+      Logger.error('settings', 'Error calculating statistics:', error);
     } finally {
       setStatsLoading(false);
       isCalculatingRef.current = false;
@@ -875,7 +876,7 @@ function Templates() {
 
       // approvals logic removed
     } catch (err: any) {
-      console.error('Edit template submit failed:', err);
+      Logger.error('settings', 'Edit template submit failed:', err);
       // Handle validation errors and API errors
       const errorMsg = err?.message || tt('validation.genericError', 'An error occurred while updating the template');
       setFormError(errorMsg);
@@ -906,7 +907,7 @@ function Templates() {
       // Clear any previous error messages after successful update
       (window as any).__settings_error = null;
     } catch (err: any) {
-      console.error('Direct save failed:', err);
+      Logger.error('settings', 'Direct save failed:', err);
       (window as any).__settings_error = (err?.message || 'Update failed');
     }
   };

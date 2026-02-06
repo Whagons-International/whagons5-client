@@ -12,6 +12,7 @@ import toast from "react-hot-toast";
 import { useLanguage } from "@/providers/LanguageProvider";
 import { useSpotVisibility } from "@/hooks/useSpotVisibility";
 
+import { Logger } from '@/utils/logger';
 function createStatusMap(statuses: any[]) {
   const m: Record<number, any> = {};
   for (const s of statuses || []) m[Number(s.id)] = s;
@@ -110,7 +111,7 @@ export default function TaskListTab({
   const handleDeleteTask = async (taskId: number) => {
     const numericId = Number(taskId);
     if (!Number.isFinite(numericId)) {
-      console.warn("Invalid task id for delete", taskId);
+      Logger.warn('tasks', "Invalid task id for delete", taskId);
       return;
     }
     
@@ -189,7 +190,7 @@ export default function TaskListTab({
       const status = e?.response?.status || e?.status;
       // Only log and show errors for non-403 errors (403 errors are handled by API interceptor)
       if (status !== 403) {
-        console.error("Failed to delete task", e);
+        Logger.error('tasks', "Failed to delete task", e);
         const errorMessage = e?.message || e?.response?.data?.message || e?.toString() || "Failed to delete task";
         setActionError(errorMessage);
         toast.error(errorMessage, { duration: 5000 });
@@ -246,7 +247,7 @@ export default function TaskListTab({
           getStatusIcon={getStatusIcon}
           density={density}
           onDelete={() => handleDeleteTask(Number(task?.id))}
-          onLog={() => console.info("Log action selected (placeholder) for task", task?.id)}
+          onLog={() => Logger.info('tasks', "Log action selected (placeholder) for task", task?.id)}
           rowIndex={index}
         />
       ))}

@@ -9,6 +9,7 @@ import { store } from "../store";
 import { genericInternalActions } from "../genericSlices";
 import { getTasksFromIndexedDB } from "../reducers/tasksSlice";
 
+import { Logger } from '@/utils/logger';
 /**
  * Check if a task is visible to the current user based on spot assignments.
  * Reads auth user info from the module-level spot visibility state
@@ -91,10 +92,10 @@ export async function syncReduxForTable(table: string): Promise<void> {
 		try {
 			await sync();
 		} catch (error) {
-			console.error('CacheRegistry: Error syncing Redux for table:', table, error);
+			Logger.error('cache', 'CacheRegistry: Error syncing Redux for table:', table, error);
 		}
 	} else {
-		console.warn('CacheRegistry: No sync handler found for table:', table);
+		Logger.warn('cache', 'CacheRegistry: No sync handler found for table:', table);
 	}
 }
 

@@ -1,5 +1,6 @@
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 
+import { Logger } from '@/utils/logger';
 export interface KpiCard {
   id: number;
   name: string;
@@ -95,7 +96,7 @@ export async function executeKpiQuery(
         return { value: 0 };
     }
   } catch (error) {
-    console.error('[KpiCardService] Error executing query:', error);
+    Logger.error('kpi', '[KpiCardService] Error executing query:', error);
     return { value: 0 };
   }
 }
@@ -150,7 +151,7 @@ export async function calculateTrend(
 
     return trend;
   } catch (error) {
-    console.error('[KpiCardService] Error calculating trend:', error);
+    Logger.error('kpi', '[KpiCardService] Error calculating trend:', error);
     return Array(days).fill(0);
   }
 }

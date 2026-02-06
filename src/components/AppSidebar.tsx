@@ -67,6 +67,7 @@ import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } 
 import { CSS } from '@dnd-kit/utilities';
 import { useBranding } from '@/providers/BrandingProvider';
 
+import { Logger } from '@/utils/logger';
 // Global pinned state management
 let isPinnedGlobal = localStorage.getItem('sidebarPinned') === 'true';
 const pinnedStateCallbacks: ((pinned: boolean) => void)[] = [];
@@ -234,7 +235,7 @@ const loadPluginsConfig = (): PluginConfig[] => {
       });
     }
   } catch (error) {
-    console.error('Error loading plugins config:', error);
+    Logger.error('ui', 'Error loading plugins config:', error);
   }
   return getDefaultPluginsConfig();
 };
@@ -248,7 +249,7 @@ export const setPluginsConfig = (configs: PluginConfig[]) => {
     const toStore = configs.map(({ id, enabled, pinned }) => ({ id, enabled, pinned }));
     localStorage.setItem(PLUGINS_STORAGE_KEY, JSON.stringify(toStore));
   } catch (error) {
-    console.error('Error saving plugins config:', error);
+    Logger.error('ui', 'Error saving plugins config:', error);
   }
   pluginConfigCallbacks.forEach((callback) => callback(configs));
 };
@@ -293,7 +294,7 @@ export const setPinnedPluginsOrder = (order: string[]) => {
   try {
     localStorage.setItem(PINNED_ORDER_STORAGE_KEY, JSON.stringify(order));
   } catch (error) {
-    console.error('Error saving pinned plugins order:', error);
+    Logger.error('ui', 'Error saving pinned plugins order:', error);
   }
 };
 
@@ -559,7 +560,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
             await cache.getAll();
           }
         } catch (error) {
-          console.error('Error loading boards:', error);
+          Logger.error('ui', 'Error loading boards:', error);
         }
       };
       loadBoards();
@@ -634,7 +635,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
           setPinnedBoardsOrderState(JSON.parse(storedOrder));
         }
       } catch (error) {
-        console.error('Error loading pinned boards:', error);
+        Logger.error('ui', 'Error loading pinned boards:', error);
       }
     };
     
@@ -669,7 +670,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
         const icon = await iconService.getIcon('building');
         setDefaultIcon(icon);
       } catch (error) {
-        console.error('Error loading default icon:', error);
+        Logger.error('ui', 'Error loading default icon:', error);
         // Set a fallback icon to prevent the component from not rendering
         setDefaultIcon('fa-building');
       }
@@ -694,7 +695,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
         const icons = await iconService.loadIcons(iconNames);
         setWorkspaceIcons(icons);
       } catch (error) {
-        console.error('Error loading workspace icons:', error);
+        Logger.error('ui', 'Error loading workspace icons:', error);
       }
     };
 
@@ -787,7 +788,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   // Temporarily commented out to debug workspace rendering
   /*
   if (!defaultIcon) {
-    console.log('AppSidebar: Default icon not loaded yet, skipping render');
+    Logger.info('ui', 'AppSidebar: Default icon not loaded yet, skipping render');
     return null;
   }
   */

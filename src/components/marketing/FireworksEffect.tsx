@@ -11,163 +11,172 @@ interface Particle {
   vy: number;
   life: number;
   maxLife: number;
-  color: string;
+  r: number;
+  g: number;
+  b: number;
   size: number;
-  trail: { x: number; y: number }[];
+  friction: number;
 }
 
-interface Firework {
-  particles: Particle[];
+interface Rocket {
+  x: number;
+  y: number;
+  targetY: number;
+  speed: number;
+  r: number;
+  g: number;
+  b: number;
   active: boolean;
 }
 
-export default function FireworksEffect({ onClose }: FireworksEffectProps) {
+export default function FireworksEffect({ onClose: _onClose }: FireworksEffectProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fireworksRef = useRef<Firework[]>([]);
+  const particlesRef = useRef<Particle[]>([]);
+  const rocketsRef = useRef<Rocket[]>([]);
   const animationFrameRef = useRef<number>();
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Set canvas size to window size
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     };
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener("resize", resizeCanvas);
 
-    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ff8800'];
+    const colors = [
+      [255, 80, 80], [80, 255, 120], [80, 140, 255],
+      [255, 230, 50], [255, 80, 220], [50, 230, 255],
+      [255, 160, 40], [200, 100, 255],
+    ];
 
-    // Convert hex to rgba
-    const hexToRgba = (hex: string, alpha: number) => {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    };
-
-    // Create a firework explosion
-    const createFirework = (x: number, y: number) => {
-      const particles: Particle[] = [];
-      const particleCount = 50;
-      const color = colors[Math.floor(Math.random() * colors.length)];
-
-      for (let i = 0; i < particleCount; i++) {
-        const angle = (Math.PI * 2 * i) / particleCount;
-        const velocity = Math.random() * 3 + 2;
-        const maxLife = Math.random() * 60 + 60;
-        
-        particles.push({
-          x,
-          y,
+    const createExplosion = (x: number, y: number, cr: number, cg: number, cb: number) => {
+      const count = 80 + Math.floor(Math.random() * 40);
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const velocity = Math.random() * 5 + 2;
+        particlesRef.current.push({
+          x, y,
           vx: Math.cos(angle) * velocity,
           vy: Math.sin(angle) * velocity,
-          life: maxLife,
-          maxLife: maxLife,
-          color,
-          size: Math.random() * 4 + 3,
-          trail: [],
+          life: 50 + Math.random() * 40,
+          maxLife: 90,
+          r: Math.max(0, Math.min(255, cr + Math.floor((Math.random() - 0.5) * 60))),
+          g: Math.max(0, Math.min(255, cg + Math.floor((Math.random() - 0.5) * 60))),
+          b: Math.max(0, Math.min(255, cb + Math.floor((Math.random() - 0.5) * 60))),
+          size: Math.random() * 3 + 2,
+          friction: 0.97 + Math.random() * 0.015,
         });
       }
-
-      fireworksRef.current.push({ particles, active: true });
+      // Add a few bright white sparkle particles
+      for (let i = 0; i < 15; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const velocity = Math.random() * 2 + 0.5;
+        particlesRef.current.push({
+          x, y,
+          vx: Math.cos(angle) * velocity,
+          vy: Math.sin(angle) * velocity,
+          life: 20 + Math.random() * 20,
+          maxLife: 40,
+          r: 255, g: 255, b: 220,
+          size: Math.random() * 2 + 1,
+          friction: 0.95,
+        });
+      }
     };
 
-    // Launch fireworks periodically
-    const launchInterval = setInterval(() => {
-      const x = Math.random() * canvas.width * 0.6 + canvas.width * 0.2;
-      const y = Math.random() * canvas.height * 0.4 + canvas.height * 0.1;
-      createFirework(x, y);
-    }, 1000);
+    const launchRocket = () => {
+      const c = colors[Math.floor(Math.random() * colors.length)];
+      rocketsRef.current.push({
+        x: Math.random() * canvas.width * 0.6 + canvas.width * 0.2,
+        y: canvas.height + 10,
+        targetY: Math.random() * canvas.height * 0.4 + canvas.height * 0.08,
+        speed: 6 + Math.random() * 4,
+        r: c[0], g: c[1], b: c[2],
+        active: true,
+      });
+    };
 
-    // Animation loop
+    let launchTimeout: ReturnType<typeof setTimeout>;
+    const scheduleLaunch = () => {
+      launchTimeout = setTimeout(() => {
+        if (rocketsRef.current.length < 4 && particlesRef.current.length < 600) {
+          launchRocket();
+          // Sometimes double launch
+          if (Math.random() > 0.5) {
+            setTimeout(launchRocket, 100 + Math.random() * 200);
+          }
+        }
+        scheduleLaunch();
+      }, 600 + Math.random() * 500);
+    };
+    scheduleLaunch();
+
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      fireworksRef.current = fireworksRef.current.filter(firework => {
-        if (!firework.active) return false;
+      // Rockets
+      for (let i = rocketsRef.current.length - 1; i >= 0; i--) {
+        const r = rocketsRef.current[i];
+        if (!r.active) { rocketsRef.current.splice(i, 1); continue; }
 
-        let activeParticles = 0;
+        r.y -= r.speed;
+        r.x += (Math.random() - 0.5) * 0.5;
 
-        firework.particles.forEach(particle => {
-          if (particle.life <= 0) return;
+        // Rocket head
+        ctx.fillStyle = "rgba(255,255,220,0.95)";
+        ctx.fillRect(r.x - 2, r.y - 2, 4, 4);
+        // Small glow around rocket
+        ctx.fillStyle = `rgba(${r.r},${r.g},${r.b},0.3)`;
+        ctx.fillRect(r.x - 4, r.y - 4, 8, 8);
 
-          // Add current position to trail
-          particle.trail.push({ x: particle.x, y: particle.y });
-          if (particle.trail.length > 8) {
-            particle.trail.shift();
-          }
+        if (r.y <= r.targetY) {
+          createExplosion(r.x, r.y, r.r, r.g, r.b);
+          r.active = false;
+        }
+      }
 
-          // Update particle
-          particle.x += particle.vx;
-          particle.y += particle.vy;
-          particle.vy += 0.1; // Gravity
-          particle.life--;
+      // Particles
+      const particles = particlesRef.current;
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.vx *= p.friction;
+        p.vy *= p.friction;
+        p.vy += 0.04;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life--;
 
-          const opacity = particle.life / particle.maxLife;
-          
-          // Draw trail
-          particle.trail.forEach((pos, i) => {
-            const trailOpacity = (i / particle.trail.length) * opacity * 0.5;
-            const trailSize = particle.size * (i / particle.trail.length);
-            
-            ctx.beginPath();
-            ctx.arc(pos.x, pos.y, trailSize, 0, Math.PI * 2);
-            ctx.fillStyle = hexToRgba(particle.color, trailOpacity);
-            ctx.fill();
-          });
-          
-          // Draw particle with glow
-          ctx.shadowBlur = 15;
-          ctx.shadowColor = particle.color;
-          ctx.beginPath();
-          ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-          ctx.fillStyle = hexToRgba(particle.color, opacity);
-          ctx.fill();
-          ctx.shadowBlur = 0;
+        if (p.life <= 0) {
+          particles[i] = particles[particles.length - 1];
+          particles.pop();
+          continue;
+        }
 
-          if (particle.life > 0) activeParticles++;
-        });
-
-        firework.active = activeParticles > 0;
-        return firework.active;
-      });
+        const alpha = p.life / p.maxLife;
+        const s = p.size * (0.4 + alpha * 0.6); // Don't shrink to nothing
+        ctx.fillStyle = `rgba(${p.r},${p.g},${p.b},${alpha})`;
+        ctx.fillRect(p.x - s, p.y - s, s * 2, s * 2);
+      }
 
       animationFrameRef.current = requestAnimationFrame(animate);
     };
     animate();
 
     return () => {
-      window.removeEventListener('resize', resizeCanvas);
-      clearInterval(launchInterval);
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      window.removeEventListener("resize", resizeCanvas);
+      clearTimeout(launchTimeout);
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
   }, []);
 
   return (
     <div className="fixed inset-0 pointer-events-none z-[9999]">
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full"
-      />
-      {onClose && (
-        <div className="fixed bottom-4 right-4 pointer-events-auto bg-black/90 dark:bg-white/95 backdrop-blur-md border-2 border-white/30 dark:border-black/30 text-white dark:text-black px-4 py-2 rounded-lg shadow-2xl transition-all hover:scale-105">
-          <button
-            onClick={onClose}
-            className="text-center"
-          >
-            <div className="font-semibold text-sm">Fireworks</div>
-            <div className="text-xs font-medium opacity-90">(Ctrl+E)</div>
-          </button>
-        </div>
-      )}
+      <canvas ref={canvasRef} className="w-full h-full" />
     </div>
   );
 }

@@ -25,6 +25,7 @@ export interface UserData {
   url_picture?: string | null;
   color?: string | null;
   global_roles?: Array<{ id: number; name: string }> | string[] | null; // Can be objects (from API) or strings (for update)
+  spots?: number[] | null; // Spot IDs for spot-based task visibility
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;

@@ -75,6 +75,8 @@ export function calculateDayMinutes(start: string, end: string, isOvernight = fa
  * Calculate weekly hours for a fixed schedule
  */
 export function calculateFixedWeeklyHours(config: FixedScheduleConfig): number {
+  if (!config?.days) return 40;
+
   let totalMinutes = 0;
 
   for (const day of DAYS_OF_WEEK) {
@@ -95,7 +97,7 @@ export function calculateFixedWeeklyHours(config: FixedScheduleConfig): number {
  * Calculate average weekly hours for a rotating schedule
  */
 export function calculateRotatingWeeklyHours(config: RotatingScheduleConfig): number {
-  if (!config.shifts?.length || !config.rotation?.pattern?.length) {
+  if (!config?.shifts?.length || !config?.rotation?.pattern?.length) {
     return 40;
   }
 
@@ -126,6 +128,7 @@ export function calculateRotatingWeeklyHours(config: RotatingScheduleConfig): nu
  * Calculate weekly hours for a flexible schedule
  */
 export function calculateFlexibleWeeklyHours(config: FlexibleScheduleConfig): number {
+  if (!config) return 40;
   const targetHours = config.dailyHours?.target ?? 8;
   const workingDays = config.workingDays ?? ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 

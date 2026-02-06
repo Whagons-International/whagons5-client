@@ -104,6 +104,11 @@ const genericSliceConfigs = [
     // KPI Cards (Custom dashboard metrics)
     { name: 'kpiCards', table: 'wh_kpi_cards', endpoint: '/kpi-cards', store: 'kpi_cards', hashFields: ['id','name','type','query_config','display_config','position','is_enabled','updated_at'] },
 
+    // Documents & Protocols
+    { name: 'documents', table: 'wh_documents', endpoint: '/documents', store: 'documents', hashFields: ['id','uuid','workspace_id','title','description','document_type','file_path','file_url','file_name','file_extension','file_size','version','is_public','requires_acknowledgment','created_by','updated_at'] },
+    { name: 'documentAssociations', table: 'wh_document_associations', endpoint: '/document-associations', store: 'document_associations', hashFields: ['id','document_id','associable_type','associable_id','inherit_to_children','updated_at'] },
+    { name: 'documentAcknowledgments', table: 'wh_document_acknowledgments', endpoint: '/document-acknowledgments', store: 'document_acknowledgments', hashFields: ['id','document_id','user_id','acknowledged_at','ip_address','updated_at'] },
+
     // Working Hours Plugin
     { name: 'countryConfigs', table: 'wh_country_configs', endpoint: '/country-configs', store: 'country_configs', hashFields: ['id','country_code','country_name','default_weekly_hours','max_daily_hours','min_break_after_hours','min_break_duration_minutes','overtime_threshold_daily','overtime_threshold_weekly','settings','is_active','updated_at'] },
     { name: 'overtimeRules', table: 'wh_overtime_rules', endpoint: '/overtime-rules', store: 'overtime_rules', hashFields: ['id','name','description','country_config_id','daily_threshold_hours','weekly_threshold_hours','require_approval','max_overtime_daily','max_overtime_weekly','is_active','updated_at'] },
@@ -111,11 +116,21 @@ const genericSliceConfigs = [
     { name: 'holidayCalendars', table: 'wh_holiday_calendars', endpoint: '/holiday-calendars', store: 'holiday_calendars', hashFields: ['id','name','country_config_id','region_code','calendar_year','source','last_synced_at','is_active','updated_at'] },
     { name: 'holidays', table: 'wh_holidays', endpoint: '/holidays', store: 'holidays', hashFields: ['id','holiday_calendar_id','name','description','date','holiday_type','is_half_day','is_recurring','affects_overtime','is_active','updated_at'] },
     { name: 'workingSchedules', table: 'wh_working_schedules', endpoint: '/working-schedules', store: 'working_schedules', hashFields: ['id','name','description','schedule_type','weekly_hours','country_config_id','holiday_calendar_id','overtime_rule_id','is_default','is_active','created_by','updated_at'] },
-    { name: 'workingScheduleDays', table: 'wh_working_schedule_days', endpoint: '/working-schedule-days', store: 'working_schedule_days', hashFields: ['id','working_schedule_id','day_of_week','shift_number','start_time','end_time','is_working_day','is_overnight','expected_hours','updated_at'] },
-    { name: 'workingScheduleBreaks', table: 'wh_working_schedule_breaks', endpoint: '/working-schedule-breaks', store: 'working_schedule_breaks', hashFields: ['id','working_schedule_day_id','break_type','start_time','duration_minutes','is_paid','updated_at'] },
     { name: 'scheduleAssignments', table: 'wh_schedule_assignments', endpoint: '/schedule-assignments', store: 'schedule_assignments', hashFields: ['id','working_schedule_id','assignable_type','assignable_id','priority','effective_from','effective_to','is_active','created_by','updated_at'] },
     { name: 'timeOffTypes', table: 'wh_time_off_types', endpoint: '/time-off-types', store: 'time_off_types', hashFields: ['id','name','code','description','color','requires_approval','approval_id','max_days_per_year','is_paid','is_active','updated_at'] },
     { name: 'timeOffRequests', table: 'wh_time_off_requests', endpoint: '/time-off-requests', store: 'time_off_requests', hashFields: ['id','user_id','time_off_type_id','start_date','end_date','start_half_day','end_half_day','total_days','reason','status','approved_by','approved_at','rejection_reason','created_by','updated_at'] },
+
+    // Asset Management Plugin
+    { name: 'assetTypes', table: 'wh_asset_types', endpoint: '/asset-types', store: 'asset_types', hashFields: ['id','name','color','icon','updated_at'] },
+    { name: 'assetItems', table: 'wh_asset_items', endpoint: '/asset-items', store: 'asset_items', hashFields: ['id','name','parent_id','asset_type_id','spot_id','serial_number','model','manufacturer','purchase_date','purchase_cost','warranty_expiration','status','qr_code','notes','assigned_user_id','assigned_team_id','updated_at'] },
+    { name: 'assetMaintenanceSchedules', table: 'wh_asset_maintenance_schedules', endpoint: '/asset-maintenance-schedules', store: 'asset_maintenance_schedules', hashFields: ['id','asset_item_id','title','description','frequency_value','frequency_unit','next_due_date','last_performed_at','workspace_id','category_id','assigned_team_id','is_active','updated_at'] },
+    { name: 'assetMaintenanceLogs', table: 'wh_asset_maintenance_logs', endpoint: '/asset-maintenance-logs', store: 'asset_maintenance_logs', hashFields: ['id','asset_item_id','schedule_id','task_id','performed_by','performed_at','notes','cost','updated_at'] },
+    { name: 'assetCustomFields', table: 'wh_asset_custom_fields', endpoint: '/asset-custom-fields', store: 'asset_custom_fields', hashFields: ['id','name','field_type','options','validation_rules','asset_type_id','is_required','default_value','sort_order','updated_at'] },
+    { name: 'assetCustomFieldValues', table: 'wh_asset_custom_field_values', endpoint: '/asset-custom-field-values', store: 'asset_custom_field_values', hashFields: ['id','asset_item_id','field_id','name','type','value','value_numeric','value_date','value_json','updated_at'] },
+
+    // QR Code Plugin
+    { name: 'qrCodes', table: 'wh_qr_codes', endpoint: '/qr-codes', store: 'qr_codes', hashFields: ['id','uuid','entity_type','entity_id','action','content_format','is_active','is_public','updated_at'] },
+    { name: 'qrScanLogs', table: 'wh_qr_scan_logs', endpoint: '/qr-scan-logs', store: 'qr_scan_logs', hashFields: ['id','qr_code_id','user_id','ip_address','scanned_at'] },
 
     // Notifications (client-side only, no backend table)
     { name: 'notifications', table: '', endpoint: '', store: 'notifications', hashFields: [] },
@@ -183,6 +198,10 @@ export const {
     boardAttachments,
     boardBirthdayImages,
     jobPositions,
+    // Documents & Protocols
+    documents,
+    documentAssociations,
+    documentAcknowledgments,
     complianceStandards,
     complianceRequirements,
     complianceMappings,
@@ -197,11 +216,19 @@ export const {
     holidayCalendars,
     holidays,
     workingSchedules,
-    workingScheduleDays,
-    workingScheduleBreaks,
     scheduleAssignments,
     timeOffTypes,
     timeOffRequests,
+    // Asset Management Plugin
+    assetTypes,
+    assetItems,
+    assetMaintenanceSchedules,
+    assetMaintenanceLogs,
+    assetCustomFields,
+    assetCustomFieldValues,
+    // QR Code Plugin
+    qrCodes,
+    qrScanLogs,
     notifications,
 } = genericSlices.slices;
 
@@ -273,6 +300,10 @@ export const genericEventNames = {
     boardAttachments: genericSlices.slices.boardAttachments.eventNames,
     boardBirthdayImages: genericSlices.slices.boardBirthdayImages.eventNames,
     jobPositions: genericSlices.slices.jobPositions.eventNames,
+    // Documents & Protocols
+    documents: genericSlices.slices.documents.eventNames,
+    documentAssociations: genericSlices.slices.documentAssociations.eventNames,
+    documentAcknowledgments: genericSlices.slices.documentAcknowledgments.eventNames,
     complianceStandards: genericSlices.slices.complianceStandards.eventNames,
     complianceRequirements: genericSlices.slices.complianceRequirements.eventNames,
     complianceMappings: genericSlices.slices.complianceMappings.eventNames,
@@ -287,11 +318,19 @@ export const genericEventNames = {
     holidayCalendars: genericSlices.slices.holidayCalendars.eventNames,
     holidays: genericSlices.slices.holidays.eventNames,
     workingSchedules: genericSlices.slices.workingSchedules.eventNames,
-    workingScheduleDays: genericSlices.slices.workingScheduleDays.eventNames,
-    workingScheduleBreaks: genericSlices.slices.workingScheduleBreaks.eventNames,
     scheduleAssignments: genericSlices.slices.scheduleAssignments.eventNames,
     timeOffTypes: genericSlices.slices.timeOffTypes.eventNames,
     timeOffRequests: genericSlices.slices.timeOffRequests.eventNames,
+    // Asset Management Plugin
+    assetTypes: genericSlices.slices.assetTypes.eventNames,
+    assetItems: genericSlices.slices.assetItems.eventNames,
+    assetMaintenanceSchedules: genericSlices.slices.assetMaintenanceSchedules.eventNames,
+    assetMaintenanceLogs: genericSlices.slices.assetMaintenanceLogs.eventNames,
+    assetCustomFields: genericSlices.slices.assetCustomFields.eventNames,
+    assetCustomFieldValues: genericSlices.slices.assetCustomFieldValues.eventNames,
+    // QR Code Plugin
+    qrCodes: genericSlices.slices.qrCodes.eventNames,
+    qrScanLogs: genericSlices.slices.qrScanLogs.eventNames,
     notifications: genericSlices.slices.notifications.eventNames,
 } as const;
 
@@ -365,6 +404,10 @@ export const genericInternalActions = {
     boardAttachments: genericSlices.slices.boardAttachments.actions,
     boardBirthdayImages: genericSlices.slices.boardBirthdayImages.actions,
     jobPositions: genericSlices.slices.jobPositions.actions,
+    // Documents & Protocols
+    documents: genericSlices.slices.documents.actions,
+    documentAssociations: genericSlices.slices.documentAssociations.actions,
+    documentAcknowledgments: genericSlices.slices.documentAcknowledgments.actions,
     complianceStandards: genericSlices.slices.complianceStandards.actions,
     complianceRequirements: genericSlices.slices.complianceRequirements.actions,
     complianceMappings: genericSlices.slices.complianceMappings.actions,
@@ -379,11 +422,19 @@ export const genericInternalActions = {
     holidayCalendars: genericSlices.slices.holidayCalendars.actions,
     holidays: genericSlices.slices.holidays.actions,
     workingSchedules: genericSlices.slices.workingSchedules.actions,
-    workingScheduleDays: genericSlices.slices.workingScheduleDays.actions,
-    workingScheduleBreaks: genericSlices.slices.workingScheduleBreaks.actions,
     scheduleAssignments: genericSlices.slices.scheduleAssignments.actions,
     timeOffTypes: genericSlices.slices.timeOffTypes.actions,
     timeOffRequests: genericSlices.slices.timeOffRequests.actions,
+    // Asset Management Plugin
+    assetTypes: genericSlices.slices.assetTypes.actions,
+    assetItems: genericSlices.slices.assetItems.actions,
+    assetMaintenanceSchedules: genericSlices.slices.assetMaintenanceSchedules.actions,
+    assetMaintenanceLogs: genericSlices.slices.assetMaintenanceLogs.actions,
+    assetCustomFields: genericSlices.slices.assetCustomFields.actions,
+    assetCustomFieldValues: genericSlices.slices.assetCustomFieldValues.actions,
+    // QR Code Plugin
+    qrCodes: genericSlices.slices.qrCodes.actions,
+    qrScanLogs: genericSlices.slices.qrScanLogs.actions,
     notifications: genericSlices.slices.notifications.actions,
 } as const;
 
@@ -449,6 +500,10 @@ export const genericActions = {
     boardAttachments: publicActions(genericInternalActions.boardAttachments),
     boardBirthdayImages: publicActions(genericInternalActions.boardBirthdayImages),
     jobPositions: publicActions(genericInternalActions.jobPositions),
+    // Documents & Protocols
+    documents: publicActions(genericInternalActions.documents),
+    documentAssociations: publicActions(genericInternalActions.documentAssociations),
+    documentAcknowledgments: publicActions(genericInternalActions.documentAcknowledgments),
     complianceStandards: publicActions(genericInternalActions.complianceStandards),
     complianceRequirements: publicActions(genericInternalActions.complianceRequirements),
     complianceMappings: publicActions(genericInternalActions.complianceMappings),
@@ -463,10 +518,18 @@ export const genericActions = {
     holidayCalendars: publicActions(genericInternalActions.holidayCalendars),
     holidays: publicActions(genericInternalActions.holidays),
     workingSchedules: publicActions(genericInternalActions.workingSchedules),
-    workingScheduleDays: publicActions(genericInternalActions.workingScheduleDays),
-    workingScheduleBreaks: publicActions(genericInternalActions.workingScheduleBreaks),
     scheduleAssignments: publicActions(genericInternalActions.scheduleAssignments),
     timeOffTypes: publicActions(genericInternalActions.timeOffTypes),
     timeOffRequests: publicActions(genericInternalActions.timeOffRequests),
+    // Asset Management Plugin
+    assetTypes: publicActions(genericInternalActions.assetTypes),
+    assetItems: publicActions(genericInternalActions.assetItems),
+    assetMaintenanceSchedules: publicActions(genericInternalActions.assetMaintenanceSchedules),
+    assetMaintenanceLogs: publicActions(genericInternalActions.assetMaintenanceLogs),
+    assetCustomFields: publicActions(genericInternalActions.assetCustomFields),
+    assetCustomFieldValues: publicActions(genericInternalActions.assetCustomFieldValues),
+    // QR Code Plugin
+    qrCodes: publicActions(genericInternalActions.qrCodes),
+    qrScanLogs: publicActions(genericInternalActions.qrScanLogs),
     notifications: publicActions(genericInternalActions.notifications),
 } as const;

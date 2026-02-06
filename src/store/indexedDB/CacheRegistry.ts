@@ -1,4 +1,6 @@
 import { TasksCache } from "./TasksCache";
+import { isTaskVisibleForUser } from "@/hooks/useSpotVisibility";
+import { getSpotVisibilityState } from "../spotVisibilityState";
 
 // Import generic caches (handles all CRUD tables except tasks)
 import { genericCaches } from "../genericSlices";
@@ -6,6 +8,18 @@ import { genericCaches } from "../genericSlices";
 import { store } from "../store";
 import { genericInternalActions } from "../genericSlices";
 import { getTasksFromIndexedDB } from "../reducers/tasksSlice";
+
+/**
+ * Check if a task is visible to the current user based on spot assignments.
+ * Reads auth user info from the module-level spot visibility state
+ * (updated by AuthProvider) and spots from the Redux store.
+ */
+function isTaskVisibleForCurrentUser(task: any): boolean {
+	const state = store.getState();
+	const { userSpots, isAdmin } = getSpotVisibilityState();
+	const allSpots = (state as any)?.spots?.value ?? [];
+	return isTaskVisibleForUser(task, userSpots, isAdmin, allSpots);
+}
 
 type CacheHandler = {
 	add: (row: any) => Promise<void>;
@@ -16,9 +30,20 @@ type CacheHandler = {
 
 const cacheByTable: Record<string, CacheHandler> = {
 	// Only custom cache with advanced features (tasks)
+	// Spot-based visibility: skip adding/updating tasks the user shouldn't see
 	wh_tasks: {
-		add: (row) => TasksCache.addTask(row),
-		update: (id, row) => TasksCache.updateTask(String(id), row),
+		add: async (row) => {
+			if (!isTaskVisibleForCurrentUser(row)) return;
+			await TasksCache.addTask(row);
+		},
+		update: async (id, row) => {
+			if (!isTaskVisibleForCurrentUser(row)) {
+				// Task moved to a spot the user can't see — remove it locally
+				await TasksCache.deleteTask(String(id));
+				return;
+			}
+			await TasksCache.updateTask(String(id), row);
+		},
 		remove: (id) => TasksCache.deleteTask(String(id)),
 		getAll: () => TasksCache.getTasks(),
 	},

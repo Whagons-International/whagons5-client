@@ -10,18 +10,20 @@ interface FixedScheduleConfigProps {
 }
 
 export function FixedScheduleConfig({ config, onChange }: FixedScheduleConfigProps) {
+  // Ensure config.days exists, falling back to empty object to prevent crashes
+  const days = config?.days ?? {};
   const weeklyHours = calculateFixedWeeklyHours(config);
 
   const handleDayToggle = (day: DayOfWeek, enabled: boolean) => {
     onChange({
       ...config,
       days: {
-        ...config.days,
+        ...days,
         [day]: {
-          ...config.days[day],
+          ...days[day],
           enabled,
-          start: config.days[day]?.start || '09:00',
-          end: config.days[day]?.end || '17:00',
+          start: days[day]?.start || '09:00',
+          end: days[day]?.end || '17:00',
         },
       },
     });
@@ -31,9 +33,9 @@ export function FixedScheduleConfig({ config, onChange }: FixedScheduleConfigPro
     onChange({
       ...config,
       days: {
-        ...config.days,
+        ...days,
         [day]: {
-          ...config.days[day]!,
+          ...days[day]!,
           [field]: value,
         },
       },
@@ -44,9 +46,9 @@ export function FixedScheduleConfig({ config, onChange }: FixedScheduleConfigPro
     onChange({
       ...config,
       days: {
-        ...config.days,
+        ...days,
         [day]: {
-          ...config.days[day]!,
+          ...days[day]!,
           is_overnight: isOvernight,
         },
       },
@@ -73,7 +75,7 @@ export function FixedScheduleConfig({ config, onChange }: FixedScheduleConfigPro
 
         {/* Days */}
         {DAYS_OF_WEEK.map((day) => {
-          const dayConfig = config.days[day];
+          const dayConfig = days[day];
           const isEnabled = dayConfig?.enabled ?? false;
 
           return (

@@ -159,19 +159,22 @@ export const CreateApprovalDialog = ({
               id="deadline_type"
               label={ta("fields.deadlineType", "Deadline Type")}
               value={formData.deadline_type}
-              onChange={(v) => setFormData((p) => ({ ...p, deadline_type: v as any }))}
+              onChange={(v) => setFormData((p) => ({ ...p, deadline_type: v as any, ...(v === "none" ? { deadline_value: "" } : {}) }))}
               options={[
+                { value: "none", label: ta("options.deadlineType.none", "None") },
                 { value: "hours", label: ta("options.deadlineType.hours", "Hours") },
                 { value: "date", label: ta("options.deadlineType.date", "Date") },
               ]}
             />
-            <TextField
-              id="deadline_value"
-              label={formData.deadline_type === "hours" ? ta("fields.deadlineHours", "Deadline (hours)") : ta("fields.deadlineDate", "Deadline (date)")}
-              type={formData.deadline_type === "hours" ? "number" : "date"}
-              value={formData.deadline_value}
-              onChange={(v) => setFormData((p) => ({ ...p, deadline_value: v }))}
-            />
+            {formData.deadline_type !== "none" && (
+              <TextField
+                id="deadline_value"
+                label={formData.deadline_type === "hours" ? ta("fields.deadlineHours", "Deadline (hours)") : ta("fields.deadlineDate", "Deadline (date)")}
+                type={formData.deadline_type === "hours" ? "number" : "date"}
+                value={formData.deadline_value}
+                onChange={(v) => setFormData((p) => ({ ...p, deadline_value: v }))}
+              />
+            )}
           </div>
         </TabsContent>
       </Tabs>

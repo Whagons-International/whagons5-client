@@ -22,6 +22,7 @@ export function useGridRefresh(opts: {
   suppressPersistRef: React.MutableRefObject<boolean>;
   debugFilters: React.MutableRefObject<boolean>;
   setClientRows: (rows: any[]) => void;
+  spotVisibilityFilterRef?: React.MutableRefObject<(task: any) => boolean>;
 }) {
   const {
     modulesLoaded,
@@ -39,6 +40,7 @@ export function useGridRefresh(opts: {
     suppressPersistRef,
     debugFilters,
     setClientRows,
+    spotVisibilityFilterRef,
   } = opts;
 
   const refreshGrid = useCallback(async () => {
@@ -64,6 +66,7 @@ export function useGridRefresh(opts: {
           tagMapRef,
           taskTagsRef,
           sortModel,
+          spotVisibilityFilterRef,
         });
 
         setClientRows(rows);

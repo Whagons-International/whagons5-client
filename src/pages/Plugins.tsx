@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import { useAuth } from '@/providers/AuthProvider';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse, faClock, faFileAlt, faChartBar, faChartLine, faGripVertical, faCog, faLock, faCheck, faStar, faHammer, faBell, faPlus, faPuzzlePiece, faEdit, faTrash, faLink, faTrophy, faRocket, faHotel, faCalendar } from '@fortawesome/free-solid-svg-icons';
+import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse, faClock, faFileAlt, faChartBar, faChartLine, faGripVertical, faCog, faLock, faCheck, faStar, faHammer, faBell, faPlus, faPuzzlePiece, faEdit, faTrash, faLink, faTrophy, faRocket, faHotel, faCalendar, faQrcode } from '@fortawesome/free-solid-svg-icons';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { getPluginsConfig, subscribeToPluginsConfig } from '@/components/AppSidebar';
 import { Pin, X } from 'lucide-react';
@@ -200,6 +200,7 @@ function PluginCardDisplay({
 			motivation: 'hover:border-yellow-500/40 hover:shadow-yellow-500/20',
 			'hotel-analytics': 'hover:border-emerald-500/40 hover:shadow-emerald-500/20',
 			'working-hours': 'hover:border-orange-500/40 hover:shadow-orange-500/20',
+			'qr-codes': 'hover:border-cyan-500/40 hover:shadow-cyan-500/20',
 		};
 		
 		return borderColors[pluginId] || 'hover:border-gray-500/40 hover:shadow-gray-500/20';
@@ -890,6 +891,21 @@ function Plugins() {
 					'Improve guest satisfaction through faster response times'
 				]
 			},
+			'qr-codes': {
+				features: [
+					'Generate QR codes for spots, tasks, forms, documents, and assets',
+					'Public scanning with optional authentication',
+					'Scan analytics with time-of-day and location tracking',
+					'Batch QR code generation and export',
+					'Configurable actions: view, create task, open form, navigate'
+				],
+				benefits: [
+					'Enable quick access to any entity via QR scan',
+					'Track scan activity and identify high-traffic areas',
+					'Streamline field operations with scan-to-action workflows',
+					'Generate QR labels for physical spaces and equipment'
+				]
+			},
 			'working-hours': {
 				features: [
 					'Define flexible working schedules (fixed, rotating, flexible)',
@@ -945,6 +961,22 @@ function Plugins() {
 		}
 		if (pluginId === 'working-hours') {
 			navigate('/settings/working-hours');
+			return;
+		}
+		if (pluginId === 'assets') {
+			navigate('/assets');
+			return;
+		}
+		if (pluginId === 'qr-codes') {
+			if (isEnabled) {
+				navigate('/plugins/qr-codes/settings');
+			} else {
+				const details = getPluginDetails(pluginId);
+				if (details) {
+					setSelectedPlugin(details);
+					setIsModalOpen(true);
+				}
+			}
 			return;
 		}
 		if (isEnabled) {
@@ -1117,6 +1149,14 @@ function Plugins() {
 				description: t('plugins.workingHours.description', 'Define working schedules, manage holidays, and handle time-off requests'),
 				icon: faCalendar,
 				color: 'text-orange-500',
+				configurable: true,
+			},
+			{
+				id: 'qr-codes',
+				title: t('plugins.qrCodes.title', 'QR Codes'),
+				description: t('plugins.qrCodes.description', 'Generate and manage QR codes for spots, tasks, forms, and more'),
+				icon: faQrcode,
+				color: 'text-cyan-500',
 				configurable: true,
 			},
 		];

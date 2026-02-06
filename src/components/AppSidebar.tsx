@@ -26,6 +26,8 @@ import {
   LineChart, // Add LineChart icon for analytics
   Hotel, // Add Hotel icon for hotel analytics
   HeartPulse, // Add HeartPulse icon for real-time status
+  Package, // Add Package icon for assets
+  QrCode, // Add QrCode icon for QR codes
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -187,9 +189,27 @@ const getDefaultPluginsConfig = (): PluginConfig[] => [
     enabled: true,
     pinned: false,
     name: 'Working Hours',
-    icon: FileText, // Using FileText as Calendar icon, can be changed later
-    iconColor: '#f97316', // orange-500
+    icon: FileText,
+    iconColor: '#f97316',     // orange-500
     route: '/working-hours',
+  },
+  {
+    id: 'assets',
+    enabled: false,
+    pinned: false,
+    name: 'Assets',
+    icon: Package,
+    iconColor: '#0ea5e9',     // sky-500
+    route: '/assets',
+  },
+  {
+    id: 'qr-codes',
+    enabled: false,
+    pinned: false,
+    name: 'QR Codes',
+    icon: QrCode,
+    iconColor: '#06b6d4',     // cyan-500
+    route: '/qr-codes',
   },
 ];
 

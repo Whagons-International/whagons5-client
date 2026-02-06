@@ -229,7 +229,7 @@ export interface Approval {
     trigger_conditions?: ApprovalCondition[] | null;
     require_rejection_comment: boolean;
     block_editing_during_approval: boolean;
-    deadline_type: 'hours' | 'date' | string;
+    deadline_type: 'none' | 'hours' | 'date' | string;
     deadline_value?: string | null;
     order_index?: number;
     is_active: boolean;
@@ -275,6 +275,7 @@ export interface User {
     updated_at: string;
     deleted_at?: string | null;
     organization_name?: string | null;
+    spots?: number[] | null;
 }
 
 export interface Role {
@@ -696,3 +697,166 @@ export interface BoardMessage {
     updated_at: string;
     deleted_at?: string | null;
 }
+
+// Documents & Protocols
+export type DocumentType = 'MANUAL' | 'POLICY' | 'FORM' | 'CERTIFICATE' | 'SDS' | 'OTHER';
+export type AssociableType = 'spot' | 'spot_type' | 'team' | 'category' | 'workspace';
+
+export interface Document {
+    id: number;
+    uuid: string;
+    workspace_id: number;
+    
+    // Document metadata
+    title: string;
+    description?: string | null;
+    document_type?: DocumentType | null;
+    tags: string[];
+    
+    // File information
+    file_path: string;
+    file_url?: string | null;
+    file_name: string;
+    file_extension: string;
+    file_size: number;
+    
+    // Versioning
+    version: number;
+    parent_document_id?: number | null;
+    
+    // Validity
+    effective_date?: string | null;
+    expiration_date?: string | null;
+    is_expired?: boolean;
+    is_expiring_soon?: boolean;
+    
+    // Access control
+    is_public: boolean;
+    requires_acknowledgment: boolean;
+    
+    // Audit
+    created_by?: number | null;
+    updated_by?: number | null;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+    
+    // Relations (optional, when loaded)
+    associations?: DocumentAssociation[];
+    acknowledgments_count?: number;
+    creator?: {
+        id: number;
+        name: string;
+    };
+}
+
+export interface DocumentAssociation {
+    id: number;
+    document_id: number;
+    associable_type: AssociableType;
+    associable_id: number;
+    inherit_to_children: boolean;
+    created_at: string;
+    updated_at: string;
+    
+    // Relations (optional, when loaded)
+    document?: Document;
+}
+
+// Asset Management
+export type AssetStatus = 'active' | 'inactive' | 'maintenance' | 'retired';
+export type AssetCustomFieldType = 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'CHECKBOX' | 'RADIO' | 'DATE' | 'TIME' | 'DATETIME' | 'LIST' | 'MULTI_SELECT';
+
+export interface AssetType {
+    id: number;
+    name: string;
+    color?: string | null;
+    icon?: string | null;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+}
+
+export interface AssetItem {
+    id: number;
+    name: string;
+    parent_id?: number | null;
+    asset_type_id: number;
+    spot_id?: number | null;
+    serial_number?: string | null;
+    model?: string | null;
+    manufacturer?: string | null;
+    purchase_date?: string | null;
+    purchase_cost?: number | null;
+    warranty_expiration?: string | null;
+    status: AssetStatus;
+    qr_code?: string | null;
+    notes?: string | null;
+    assigned_user_id?: number | null;
+    assigned_team_id?: number | null;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+}
+
+export interface AssetMaintenanceSchedule {
+    id: number;
+    asset_item_id: number;
+    title: string;
+    description?: string | null;
+    frequency_value: number;
+    frequency_unit: 'days' | 'weeks' | 'months' | 'years';
+    next_due_date: string;
+    last_performed_at?: string | null;
+    workspace_id?: number | null;
+    category_id?: number | null;
+    assigned_team_id?: number | null;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+}
+
+export interface AssetMaintenanceLog {
+    id: number;
+    asset_item_id: number;
+    schedule_id?: number | null;
+    task_id?: number | null;
+    performed_by?: number | null;
+    performed_at: string;
+    notes?: string | null;
+    cost?: number | null;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+}
+
+export interface AssetCustomField {
+    id: number;
+    name: string;
+    field_type: AssetCustomFieldType;
+    options?: any[] | null;
+    validation_rules?: any[] | null;
+    asset_type_id: number;
+    is_required: boolean;
+    default_value?: string | null;
+    sort_order: number;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+}
+
+export interface AssetCustomFieldValue {
+    id: number;
+    asset_item_id: number;
+    field_id: number;
+    name: string;
+    type: AssetCustomFieldType;
+    value?: string | null;
+    value_numeric?: number | null;
+    value_date?: string | null;
+    value_json?: any | null;
+    created_at: string;
+    updated_at: string;
+}
+

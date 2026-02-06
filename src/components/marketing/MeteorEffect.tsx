@@ -12,133 +12,158 @@ interface Meteor {
   angle: number;
   opacity: number;
   active: boolean;
+  size: number; // head size
+  trail: { x: number; y: number; alpha: number }[];
+  color: { r: number; g: number; b: number };
+  sparkles: { dx: number; dy: number; life: number; maxLife: number }[];
 }
 
-export default function MeteorEffect({ onClose }: MeteorEffectProps) {
+export default function MeteorEffect({ onClose: _onClose }: MeteorEffectProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const meteorsRef = useRef<Meteor[]>([]);
   const animationFrameRef = useRef<number>();
-  const [isDarkMode, setIsDarkMode] = useState(() => 
-    document.documentElement.classList.contains('dark')
+  const [isDarkMode, setIsDarkMode] = useState(() =>
+    document.documentElement.classList.contains("dark")
   );
 
   useEffect(() => {
-    // Detect theme changes
     const updateThemeState = () => {
-      setIsDarkMode(document.documentElement.classList.contains('dark'));
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
     };
-
     const observer = new MutationObserver(updateThemeState);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class']
-    });
-
-    const mql = window.matchMedia('(prefers-color-scheme: dark)');
-    mql.addEventListener('change', updateThemeState);
-
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    const mql = window.matchMedia("(prefers-color-scheme: dark)");
+    mql.addEventListener("change", updateThemeState);
     return () => {
       observer.disconnect();
-      mql.removeEventListener('change', updateThemeState);
+      mql.removeEventListener("change", updateThemeState);
     };
   }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Set canvas size to window size
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     };
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener("resize", resizeCanvas);
 
-    // Initialize meteors
+    const meteorColors = isDarkMode
+      ? [
+          { r: 255, g: 255, b: 255 },
+          { r: 200, g: 220, b: 255 },
+          { r: 255, g: 200, b: 150 }, // warm orange tint
+          { r: 180, g: 220, b: 255 },
+        ]
+      : [
+          { r: 60, g: 80, b: 130 },
+          { r: 80, g: 100, b: 160 },
+          { r: 100, g: 70, b: 50 },
+          { r: 70, g: 90, b: 140 },
+        ];
+
     const initMeteors = () => {
-      const count = 15;
+      const count = 18;
       meteorsRef.current = [];
       for (let i = 0; i < count; i++) {
         meteorsRef.current.push({
-          x: Math.random() * canvas.width,
-          y: -100,
-          length: Math.random() * 80 + 40,
-          speed: Math.random() * 8 + 12,
-          angle: Math.PI / 4 + (Math.random() - 0.5) * 0.5,
-          opacity: Math.random() * 0.5 + 0.5,
+          x: 0, y: 0,
+          length: Math.random() * 100 + 50,
+          speed: Math.random() * 10 + 14,
+          angle: Math.PI / 4 + (Math.random() - 0.5) * 0.4,
+          opacity: 0,
           active: false,
+          size: Math.random() * 2 + 2,
+          trail: [],
+          color: meteorColors[Math.floor(Math.random() * meteorColors.length)],
+          sparkles: [],
         });
       }
     };
     initMeteors();
 
-    // Spawn meteors randomly
     const spawnInterval = setInterval(() => {
-      const inactiveMeteor = meteorsRef.current.find(m => !m.active);
-      if (inactiveMeteor && Math.random() > 0.5) {
-        inactiveMeteor.x = Math.random() * canvas.width;
-        inactiveMeteor.y = -100;
-        inactiveMeteor.active = true;
+      const inactive = meteorsRef.current.find((m) => !m.active);
+      if (inactive && Math.random() > 0.4) {
+        inactive.x = Math.random() * canvas.width * 0.8;
+        inactive.y = -50;
+        inactive.active = true;
+        inactive.opacity = Math.random() * 0.4 + 0.6;
+        inactive.trail = [];
+        inactive.sparkles = [];
+        inactive.color = meteorColors[Math.floor(Math.random() * meteorColors.length)];
       }
-    }, 500);
+    }, 400);
 
-    // Animation loop
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      meteorsRef.current.forEach((meteor) => {
-        if (!meteor.active) return;
+      meteorsRef.current.forEach((m) => {
+        if (!m.active) return;
 
-        // Update position
-        meteor.x += Math.cos(meteor.angle) * meteor.speed;
-        meteor.y += Math.sin(meteor.angle) * meteor.speed;
+        // Store trail position
+        m.trail.push({ x: m.x, y: m.y, alpha: m.opacity });
+        if (m.trail.length > 20) m.trail.shift();
 
-        // Deactivate if off screen
-        if (meteor.y > canvas.height + 100 || meteor.x > canvas.width + 100) {
-          meteor.active = false;
+        // Spawn sparkles along trail
+        if (Math.random() > 0.5) {
+          m.sparkles.push({
+            dx: (Math.random() - 0.5) * 6,
+            dy: (Math.random() - 0.5) * 6,
+            life: 15 + Math.random() * 10,
+            maxLife: 25,
+          });
+        }
+
+        m.x += Math.cos(m.angle) * m.speed;
+        m.y += Math.sin(m.angle) * m.speed;
+
+        if (m.y > canvas.height + 100 || m.x > canvas.width + 100) {
+          m.active = false;
           return;
         }
 
-        // Draw meteor trail with theme-aware colors
-        const gradient = ctx.createLinearGradient(
-          meteor.x,
-          meteor.y,
-          meteor.x - Math.cos(meteor.angle) * meteor.length,
-          meteor.y - Math.sin(meteor.angle) * meteor.length
-        );
-        
-        if (isDarkMode) {
-          // Light colors for dark mode
-          gradient.addColorStop(0, `rgba(255, 255, 255, ${meteor.opacity})`);
-          gradient.addColorStop(0.5, `rgba(200, 200, 255, ${meteor.opacity * 0.5})`);
-          gradient.addColorStop(1, 'rgba(200, 200, 255, 0)');
-        } else {
-          // Dark colors for light mode
-          gradient.addColorStop(0, `rgba(60, 80, 120, ${meteor.opacity})`);
-          gradient.addColorStop(0.5, `rgba(80, 100, 150, ${meteor.opacity * 0.6})`);
-          gradient.addColorStop(1, 'rgba(100, 120, 180, 0)');
+        const { r, g, b } = m.color;
+
+        // Draw trail (fading segments)
+        for (let i = 0; i < m.trail.length - 1; i++) {
+          const t = m.trail[i];
+          const frac = i / m.trail.length;
+          const a = frac * m.opacity * 0.5;
+          ctx.beginPath();
+          ctx.moveTo(t.x, t.y);
+          ctx.lineTo(m.trail[i + 1].x, m.trail[i + 1].y);
+          ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+          ctx.lineWidth = m.size * frac + 0.5;
+          ctx.stroke();
         }
 
-        ctx.strokeStyle = gradient;
-        ctx.lineWidth = isDarkMode ? 3 : 2.5;
-        ctx.shadowBlur = isDarkMode ? 10 : 8;
-        ctx.shadowColor = isDarkMode 
-          ? 'rgba(255, 255, 255, 0.5)' 
-          : 'rgba(60, 80, 120, 0.4)';
-
+        // Draw head glow
+        ctx.save();
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = `rgba(${r}, ${g}, ${b}, ${m.opacity * 0.6})`;
         ctx.beginPath();
-        ctx.moveTo(meteor.x, meteor.y);
-        ctx.lineTo(
-          meteor.x - Math.cos(meteor.angle) * meteor.length,
-          meteor.y - Math.sin(meteor.angle) * meteor.length
-        );
-        ctx.stroke();
+        ctx.arc(m.x, m.y, m.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${m.opacity})`;
+        ctx.fill();
+        ctx.restore();
 
-        ctx.shadowBlur = 0;
+        // Draw sparkles
+        m.sparkles = m.sparkles.filter((sp) => {
+          sp.life--;
+          if (sp.life <= 0) return false;
+          const sa = (sp.life / sp.maxLife) * m.opacity * 0.5;
+          ctx.beginPath();
+          ctx.arc(m.x + sp.dx * (1 - sp.life / sp.maxLife) * 3, m.y + sp.dy * (1 - sp.life / sp.maxLife) * 3, 0.8, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${sa})`;
+          ctx.fill();
+          return true;
+        });
       });
 
       animationFrameRef.current = requestAnimationFrame(animate);
@@ -146,20 +171,15 @@ export default function MeteorEffect({ onClose }: MeteorEffectProps) {
     animate();
 
     return () => {
-      window.removeEventListener('resize', resizeCanvas);
+      window.removeEventListener("resize", resizeCanvas);
       clearInterval(spawnInterval);
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
   }, [isDarkMode]);
 
   return (
     <div className="fixed inset-0 pointer-events-none z-[9999]">
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full"
-      />
+      <canvas ref={canvasRef} className="w-full h-full" />
     </div>
   );
 }

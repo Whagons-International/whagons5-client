@@ -24,6 +24,7 @@ import { getTasksFromIndexedDB, moveTaskThunk } from '@/store/reducers/tasksSlic
 import { useKanbanFilters } from './hooks/useKanbanFilters';
 import { useKanbanGrouping } from './hooks/useKanbanGrouping';
 import { exportToExcel } from './utils/exportUtils';
+import { useSpotVisibility } from '@/hooks/useSpotVisibility';
 import toast from 'react-hot-toast';
 
 export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
@@ -90,11 +91,17 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     }
   }, [viewMode, filters, groupBy, KANBAN_PREFS_KEY]);
 
-  // Filter tasks by workspace
+  // Spot-based visibility filtering
+  const { isTaskVisible } = useSpotVisibility();
+
+  // Filter tasks by workspace and spot visibility
   const workspaceTasks = useMemo(() => {
-    if (!workspaceId) return tasks;
-    return tasks.filter((task: Task) => task.workspace_id === parseInt(workspaceId));
-  }, [tasks, workspaceId]);
+    let filtered = tasks;
+    if (workspaceId) {
+      filtered = filtered.filter((task: Task) => task.workspace_id === parseInt(workspaceId));
+    }
+    return filtered.filter(isTaskVisible);
+  }, [tasks, workspaceId, isTaskVisible]);
 
   // Apply filters using the hook
   const filteredTasks = useKanbanFilters(workspaceTasks, filters);

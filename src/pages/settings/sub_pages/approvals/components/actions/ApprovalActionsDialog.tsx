@@ -87,7 +87,7 @@ export function ApprovalActionsDialog({ open, onOpenChange, approval }: Approval
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-visible flex flex-col">
+      <DialogContent className="max-h-[90vh] overflow-visible flex flex-col" style={{ maxWidth: 960 }}>
         <DialogHeader className="space-y-3 pb-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 border border-amber-500/20">

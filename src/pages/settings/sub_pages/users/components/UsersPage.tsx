@@ -8,7 +8,7 @@ import { Check, Copy as CopyIcon, Plus, Trash, Crown, Shield } from "lucide-reac
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { AppDispatch, RootState } from "@/store/store";
 import { useNavigate } from "react-router-dom";
-import { Team, UserTeam, Invitation, Role } from "@/store/types";
+import { Team, UserTeam, Invitation, Role, Spot } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Label } from "@/components/ui/label";
@@ -44,6 +44,7 @@ function Users() {
   const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
   const { value: invitations } = useSelector((state: RootState) => state.invitations) as { value: Invitation[]; loading: boolean };
   const { value: roles } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
+  const { value: allSpots } = useSelector((state: RootState) => state.spots) as { value: Spot[]; loading: boolean };
   
   // Use shared state management
   const {
@@ -176,6 +177,7 @@ function Users() {
   // Selected teams state (using string IDs for MultiSelect)
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [selectedGlobalRoles, setSelectedGlobalRoles] = useState<string[]>([]);
+  const [selectedSpots, setSelectedSpots] = useState<string[]>([]);
   const [createSelectedTeams, setCreateSelectedTeams] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   // Team-role assignments for edit dialog
@@ -234,10 +236,17 @@ function Users() {
         ? editingUser.global_roles.map((role: any) => typeof role === 'object' ? role.name : role)
         : [];
       setSelectedGlobalRoles(roleNames);
+
+      // Load existing spot assignments
+      const userSpots = Array.isArray(editingUser.spots)
+        ? editingUser.spots.map((s: any) => String(s))
+        : [];
+      setSelectedSpots(userSpots);
     } else {
-      // Reset selected teams and global roles when dialog closes
+      // Reset selected teams, global roles, and spots when dialog closes
       setSelectedTeams([]);
       setSelectedGlobalRoles([]);
+      setSelectedSpots([]);
       setEditTeamAssignments([]);
     }
   }, [editingUser, userTeams]);
@@ -984,6 +993,28 @@ function Users() {
     return [...globalRolesFromList, ...assignedRoleOptions];
   }, [roles, editingUser?.global_roles]);
 
+  // Build spot options with hierarchical path labels (e.g. "Building A > Floor 2 > Room 201")
+  const spotOptions = useMemo(() => {
+    const spotMap = new Map(allSpots.map(s => [s.id, s]));
+    const getPath = (spot: Spot): string => {
+      const parts: string[] = [spot.name];
+      let current = spot;
+      while (current.parent_id != null) {
+        const parent = spotMap.get(current.parent_id);
+        if (!parent) break;
+        parts.unshift(parent.name);
+        current = parent;
+      }
+      return parts.join(' > ');
+    };
+    return allSpots
+      .map(spot => ({
+        value: spot.id.toString(),
+        label: getPath(spot)
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [allSpots]);
+
   // Edit submit handler
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -997,7 +1028,8 @@ function Users() {
       color: editFormData.color || null,
       is_admin: editFormData.is_admin,
       has_active_subscription: editFormData.has_active_subscription,
-      global_roles: selectedGlobalRoles
+      global_roles: selectedGlobalRoles,
+      spots: selectedSpots.length > 0 ? selectedSpots.map(Number) : null
     };
     
     try {
@@ -1532,6 +1564,9 @@ function Users() {
                 <TabsTrigger value="permissions">
                   {tu('dialogs.editUser.tabs.permissions', 'Roles Globales')}
                 </TabsTrigger>
+                <TabsTrigger value="spots">
+                  {tu('dialogs.editUser.tabs.spots', 'Spots')}
+                </TabsTrigger>
               </TabsList>
             </div>
             <TabsContent value="basic" className="mt-4 min-h-[200px]">
@@ -1684,6 +1719,33 @@ function Users() {
                   />
                   <p className="text-xs text-muted-foreground">
                     {tu('dialogs.editUser.fields.globalRolesHelp', 'Global roles are optional. You can leave this field empty if you don\'t need to assign global roles to the user.')}
+                  </p>
+                </div>
+              </div>
+            </TabsContent>
+            <TabsContent value="spots" className="mt-4 min-h-[200px]">
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    {tu('dialogs.editUser.fields.visibleSpots', 'Visible Spots')}
+                    <span className="text-muted-foreground text-xs font-normal ml-1">
+                      ({tu('dialogs.editUser.fields.optional', 'Optional')})
+                    </span>
+                  </Label>
+                  <MultiSelect
+                    options={spotOptions}
+                    onValueChange={setSelectedSpots}
+                    defaultValue={selectedSpots}
+                    placeholder={
+                      allSpots.length === 0
+                        ? tu('multiSelect.noSpots', 'No spots available')
+                        : tu('multiSelect.selectSpots', 'Select spots (empty = see all tasks)...')
+                    }
+                    maxCount={10}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {tu('dialogs.editUser.fields.spotsHelp', 'Select which spots this user can see tasks for. Selecting a parent spot includes all child spots. Leave empty to allow the user to see all tasks.')}
                   </p>
                 </div>
               </div>

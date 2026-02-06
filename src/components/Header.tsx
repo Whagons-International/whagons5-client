@@ -14,7 +14,7 @@ import {
 import { User, LogOut, Plus, Layers, Search, Bell, X } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./ModeToggle";
-import { LaserPointerToggle } from "./LaserPointerToggle";
+
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store/store";
 import {
@@ -192,6 +192,21 @@ function Header() {
                     path += `/${seg}`;
                     const label = getLabel(seg, i);
                     acc.push({ label, to: `/settings${path}` });
+                }
+            }
+        } else if (parts[0] === 'admin' && parts[1] === 'plugins') {
+            // Special case for /admin/plugins: Inicio > Plugins (→ /plugins) > Manage Plugins
+            // "Plugins" breadcrumb should link to /plugins instead of /admin
+            acc.push({ label: t('breadcrumbs.plugins', 'Plugins'), to: '/plugins' });
+            acc.push({ label: t('plugins.manage', 'Manage Plugins'), to: '/admin/plugins' });
+        } else if (parts[0] === 'assets') {
+            acc.push({ label: t('breadcrumbs.plugins', 'Plugins'), to: '/plugins' });
+            acc.push({ label: t('plugins.assets.title', 'Assets'), to: '/assets' });
+            if (parts.length > 1) {
+                if (parts[1] === 'types') {
+                    acc.push({ label: t('assets.types.title', 'Asset Types'), to: '/assets/types' });
+                } else {
+                    acc.push({ label: t('assets.detail.title', 'Asset Detail'), to: location.pathname });
                 }
             }
         } else if (parts[0] === 'boards' && parts.length > 1) {
@@ -806,7 +821,6 @@ function Header() {
                             <span>{t('task.newTask', 'New Task')}</span>
                         </button>
                     )}
-                    <LaserPointerToggle className="h-9 w-9 hover:bg-accent/50 rounded-md transition-colors" />
                     <ModeToggle className="h-9 w-9 hover:bg-accent/50 rounded-md transition-colors" />
                     
                     {/* Profile with notification badge */}

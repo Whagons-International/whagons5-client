@@ -50,6 +50,7 @@ function Approvals() {
   });
 
   const renderDeadline = useCallback((type: string, value?: string | null) => {
+    if (type === "none") return "-";
     if (!value) return "-";
     if (type === "hours") return `${value} h`;
     if (type === "date") return value;
@@ -193,7 +194,7 @@ function Approvals() {
       trigger_conditions: Array.isArray((item as any).trigger_conditions) ? (item as any).trigger_conditions : [],
       require_rejection_comment: !!(item as any).require_rejection_comment,
       block_editing_during_approval: !!(item as any).block_editing_during_approval,
-      deadline_type: ((item as any).deadline_type as any) || "hours",
+      deadline_type: ((item as any).deadline_type as any) || "none",
       deadline_value: (item as any).deadline_value || "",
       order_index: (item as any).order_index ?? 0,
       is_active: !!(item as any).is_active,
@@ -213,7 +214,7 @@ function Approvals() {
         trigger_conditions: Array.isArray((item as any).trigger_conditions) ? (item as any).trigger_conditions : [],
         require_rejection_comment: !!(item as any).require_rejection_comment,
         block_editing_during_approval: !!(item as any).block_editing_during_approval,
-        deadline_type: ((item as any).deadline_type as any) || "hours",
+        deadline_type: ((item as any).deadline_type as any) || "none",
         deadline_value: (item as any).deadline_value || "",
         order_index: (item as any).order_index ?? 0,
         is_active: !!(item as any).is_active,
@@ -274,7 +275,7 @@ function Approvals() {
       require_rejection_comment: !!createFormData.require_rejection_comment,
       block_editing_during_approval: !!createFormData.block_editing_during_approval,
       deadline_type: createFormData.deadline_type,
-      deadline_value: createFormData.deadline_value || null,
+      deadline_value: createFormData.deadline_type === "none" ? null : (createFormData.deadline_value || null),
       order_index: maxOrder + 1,
       is_active: !!createFormData.is_active,
       deleted_at: null,
@@ -303,7 +304,7 @@ function Approvals() {
       require_rejection_comment: !!editFormData.require_rejection_comment,
       block_editing_during_approval: !!editFormData.block_editing_during_approval,
       deadline_type: editFormData.deadline_type,
-      deadline_value: editFormData.deadline_value || null,
+      deadline_value: editFormData.deadline_type === "none" ? null : (editFormData.deadline_value || null),
       order_index: editFormData.order_index ?? (item as any).order_index ?? 0,
       is_active: !!editFormData.is_active,
     };

@@ -1,3 +1,4 @@
+import { Logger } from '@/utils/logger';
 export class StreamingTtsPlayer {
   private audioCtx: AudioContext | null = null;
   private compressor: DynamicsCompressorNode | null = null;
@@ -86,7 +87,7 @@ export class StreamingTtsPlayer {
         decoded = await this.audioCtx.decodeAudioData(arrayBuffer.slice(0));
       } catch (e) {
         // Chunk boundaries can occasionally be undecodable; skip gracefully.
-        console.warn("[TTS] decodeAudioData failed, skipping chunk:", e);
+        Logger.warn('assistant', "[TTS] decodeAudioData failed, skipping chunk:", e);
         return;
       }
 
@@ -118,7 +119,7 @@ export class StreamingTtsPlayer {
       try {
         src.start(startAt);
       } catch (e) {
-        console.warn("[TTS] source.start failed:", e);
+        Logger.warn('assistant', "[TTS] source.start failed:", e);
         this.activeSources.delete(src);
         return;
       }

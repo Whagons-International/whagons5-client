@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 
+import { Logger } from '@/utils/logger';
 export interface UseWorkspaceChangeReturn {
   error: string | null;
 }
@@ -54,7 +55,7 @@ export function useWorkspaceChange(opts: {
         const errorMessage = `[useWorkspaceChange] Error during workspace change check for workspace ${workspaceId}`;
         const errorDetails = error?.message || error?.toString() || 'Unknown error';
         
-        console.error(errorMessage, {
+        Logger.error('workspaces', errorMessage, {
           workspaceId,
           error: errorDetails,
           stack: error?.stack,

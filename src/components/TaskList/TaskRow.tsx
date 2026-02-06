@@ -8,6 +8,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTags } from "@fortawesome/free-solid-svg-icons";
 import { iconService } from "@/database/iconService";
 import { useEffect, useState } from "react";
+import { Logger } from '@/utils/logger';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -99,7 +100,7 @@ export function TaskRow({
 
   const handleShare = () => {
     // Placeholder - will be implemented later
-    console.log('Share task:', task?.id);
+    Logger.info('tasks', 'Share task:', task?.id);
     // Could open task dialog to Share tab here
   };
 

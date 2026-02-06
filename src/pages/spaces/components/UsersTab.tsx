@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo, useRef, useEffect, lazy, Suspense } fro
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 
+import { Logger } from '@/utils/logger';
 // Lazy load AgGridReact component
 const AgGridReact = lazy(() => import('ag-grid-react').then(module => ({ default: module.AgGridReact })));
 
@@ -187,13 +188,13 @@ function UsersTab({
 
       // Check if data is already cached
       if (rowCache.current.has(cacheKey)) {
-        console.log(`Cache hit for users range ${params.startRow} to ${params.endRow}`);
+        Logger.info('ui', `Cache hit for users range ${params.startRow} to ${params.endRow}`);
         const cachedData = rowCache.current.get(cacheKey)!;
         params.successCallback(cachedData.rows, cachedData.rowCount);
         return;
       }
 
-      console.log('Fetching users for range', params.startRow, 'to', params.endRow, 'with team filter:', selectedTeamFilter);
+      Logger.info('ui', 'Fetching users for range', params.startRow, 'to', params.endRow, 'with team filter:', selectedTeamFilter);
 
       try {
         let filteredUsers = [...workspaceUsers];
@@ -217,7 +218,7 @@ function UsersTab({
 
         params.successCallback(rowsThisPage, filteredUsers.length);
       } catch (error) {
-        console.error('Failed to fetch users:', error);
+        Logger.error('ui', 'Failed to fetch users:', error);
         params.failCallback();
       }
     },

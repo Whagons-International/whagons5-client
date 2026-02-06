@@ -1,5 +1,6 @@
 import { iconService } from './iconService';
 
+import { Logger } from '@/utils/logger';
 /**
  * Initialize icon service
  * This should be called when the app starts
@@ -11,9 +12,9 @@ export async function initializeIcons(): Promise<void> {
     
     // Log cache statistics for debugging
     const stats = await iconService.getCacheStats();
-    // console.log('Icon cache initialized:', stats);
+    // Logger.info('icons', 'Icon cache initialized:', stats);
   } catch (error) {
-    console.error('Error initializing icon cache:', error);
+    Logger.error('icons', 'Error initializing icon cache:', error);
   }
 }
 
@@ -23,9 +24,9 @@ export async function initializeIcons(): Promise<void> {
 export async function preloadCommonIcons(): Promise<void> {
   try {
     await iconService.preloadCommonIcons();
-    console.log('Common icons preloaded');
+    Logger.info('icons', 'Common icons preloaded');
   } catch (error) {
-    console.error('Error preloading common icons:', error);
+    Logger.error('icons', 'Error preloading common icons:', error);
   }
 }
 

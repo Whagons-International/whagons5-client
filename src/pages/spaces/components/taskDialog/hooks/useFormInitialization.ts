@@ -2,6 +2,7 @@ import { useEffect, startTransition, useRef } from 'react';
 import { normalizeDefaultUserIds } from '../utils/fieldHelpers';
 import { getAssignedUserIdsFromTaskUsers } from '../../workspaceTable/utils/userUtils';
 
+import { Logger } from '@/utils/logger';
 export function useFormInitialization(params: any) {
   const {
     open,
@@ -90,7 +91,7 @@ export function useFormInitialization(params: any) {
             setStartDate(datePart);
             setStartTime(timePart?.substring(0, 5) || '');
           } else {
-            console.warn('[useFormInitialization] Invalid start_date format:', task.start_date);
+            Logger.warn('tasks', '[useFormInitialization] Invalid start_date format:', task.start_date);
             setStartDate('');
             setStartTime('');
           }
@@ -103,7 +104,7 @@ export function useFormInitialization(params: any) {
             setStartDate(`${year}-${month}-${day}`);
             setStartTime(`${String(startDateObj.getHours()).padStart(2, '0')}:${String(startDateObj.getMinutes()).padStart(2, '0')}`);
           } else {
-            console.warn('[useFormInitialization] Invalid start_date object:', task.start_date);
+            Logger.warn('tasks', '[useFormInitialization] Invalid start_date object:', task.start_date);
             setStartDate('');
             setStartTime('');
           }
@@ -124,7 +125,7 @@ export function useFormInitialization(params: any) {
             setDueDate(datePart);
             setDueTime(timePart?.substring(0, 5) || '');
           } else {
-            console.warn('[useFormInitialization] Invalid due_date format:', task.due_date);
+            Logger.warn('tasks', '[useFormInitialization] Invalid due_date format:', task.due_date);
             setDueDate('');
             setDueTime('');
           }
@@ -137,7 +138,7 @@ export function useFormInitialization(params: any) {
             setDueDate(`${year}-${month}-${day}`);
             setDueTime(`${String(dueDateObj.getHours()).padStart(2, '0')}:${String(dueDateObj.getMinutes()).padStart(2, '0')}`);
           } else {
-            console.warn('[useFormInitialization] Invalid due_date object:', task.due_date);
+            Logger.warn('tasks', '[useFormInitialization] Invalid due_date object:', task.due_date);
             setDueDate('');
             setDueTime('');
           }
@@ -216,7 +217,7 @@ export function useFormInitialization(params: any) {
         ? task.user_ids.map((id: any) => Number(id)).filter((n: any) => Number.isFinite(n))
         : [];
       
-      console.log('[useFormInitialization] Create mode - initial data:', {
+      Logger.info('tasks', '[useFormInitialization] Create mode - initial data:', {
         startDate: initialStartDate,
         startTime: initialStartTime,
         userIds: initialUserIds,
@@ -232,7 +233,7 @@ export function useFormInitialization(params: any) {
       
       // CRITICAL: Set user IDs from scheduler click IMMEDIATELY
       if (initialUserIds.length > 0) {
-        console.log('[useFormInitialization] Setting initial user_ids from scheduler:', initialUserIds);
+        Logger.info('tasks', '[useFormInitialization] Setting initial user_ids from scheduler:', initialUserIds);
         setSelectedUserIds(initialUserIds);
       }
       

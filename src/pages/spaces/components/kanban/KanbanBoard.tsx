@@ -27,6 +27,7 @@ import { exportToExcel } from './utils/exportUtils';
 import { useSpotVisibility } from '@/hooks/useSpotVisibility';
 import toast from 'react-hot-toast';
 
+import { Logger } from '@/utils/logger';
 export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
   const dispatch = useDispatch<AppDispatch>();
   
@@ -50,7 +51,7 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
         return JSON.parse(saved);
       }
     } catch (error) {
-      console.error('[Kanban] Error loading preferences:', error);
+      Logger.error('ui', '[Kanban] Error loading preferences:', error);
     }
     return {
       viewMode: 'compact',
@@ -87,7 +88,7 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
         groupBy,
       }));
     } catch (error) {
-      console.error('[Kanban] Error saving preferences:', error);
+      Logger.error('ui', '[Kanban] Error saving preferences:', error);
     }
   }, [viewMode, filters, groupBy, KANBAN_PREFS_KEY]);
 
@@ -168,7 +169,7 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
         try {
           unsub();
         } catch (error) {
-          console.error('[Kanban] Error unsubscribing from task event:', error);
+          Logger.error('ui', '[Kanban] Error unsubscribing from task event:', error);
         }
       });
     };
@@ -217,7 +218,7 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
       // Note: 403 errors are handled by the API interceptor which shows a toast
       // Other errors are silently rolled back (optimistic update reverted)
     } catch (error) {
-      console.error('Unexpected error in handleDragEnd:', error);
+      Logger.error('ui', 'Unexpected error in handleDragEnd:', error);
     }
   }, [dispatch, tasks]);
 
@@ -247,7 +248,7 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
       await exportToExcel(filteredTasks, statuses, filename);
       toast.success('Board exported successfully');
     } catch (error) {
-      console.error('Failed to export board:', error);
+      Logger.error('ui', 'Failed to export board:', error);
       toast.error('Failed to export board');
     }
   }, [filteredTasks, statuses]);

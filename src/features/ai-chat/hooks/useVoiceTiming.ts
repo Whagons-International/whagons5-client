@@ -1,5 +1,6 @@
 import { useRef } from "react";
 
+import { Logger } from '@/utils/logger';
 const IS_DEV = (import.meta as any).env?.DEV === true;
 
 /**
@@ -26,7 +27,7 @@ export function useVoiceTiming() {
     voiceTurnFirstAssistantPerfMsRef.current = 0;
     voiceTurnFirstTtsChunkPerfMsRef.current = 0;
     // eslint-disable-next-line no-console
-    console.debug("[VOICE]", {
+    Logger.debug('assistant', "[VOICE]", {
       turn: voiceTurnIdRef.current,
       event: "transcript_committed",
       chars: String(text || "").length,
@@ -41,7 +42,7 @@ export function useVoiceTiming() {
     voiceTurnSubmitPerfMsRef.current = performance.now();
     voiceTurnPlaybackRecordedRef.current = false;
     // eslint-disable-next-line no-console
-    console.debug("[VOICE]", {
+    Logger.debug('assistant', "[VOICE]", {
       turn: voiceTurnIdRef.current,
       event: "submit_begin",
       transcriptToSubmitMs:
@@ -56,7 +57,7 @@ export function useVoiceTiming() {
     if (!IS_DEV) return;
     voiceTurnWsSendPerfMsRef.current = performance.now();
     // eslint-disable-next-line no-console
-    console.debug("[VOICE]", { turn: voiceTurnIdRef.current, event: "ws_send" });
+    Logger.debug('assistant', "[VOICE]", { turn: voiceTurnIdRef.current, event: "ws_send" });
   };
 
   /** Record when the first assistant text chunk arrives (any streaming format). */
@@ -67,7 +68,7 @@ export function useVoiceTiming() {
     const t0 = voiceTurnTranscriptPerfMsRef.current || 0;
     const tSend = voiceTurnWsSendPerfMsRef.current || 0;
     // eslint-disable-next-line no-console
-    console.debug("[VOICE]", {
+    Logger.debug('assistant', "[VOICE]", {
       turn: voiceTurnIdRef.current,
       event: "first_assistant_chunk",
       transcriptToFirstTokenMs: t0 > 0 ? Math.max(0, voiceTurnFirstAssistantPerfMsRef.current - t0) : undefined,
@@ -86,7 +87,7 @@ export function useVoiceTiming() {
     const tFirstTok = voiceTurnFirstAssistantPerfMsRef.current || 0;
     const tFirstTts = voiceTurnFirstTtsChunkPerfMsRef.current || 0;
     // eslint-disable-next-line no-console
-    console.debug("[VOICE]", {
+    Logger.debug('assistant', "[VOICE]", {
       turn: voiceTurnIdRef.current,
       event: "first_tts_chunk",
       transcriptToFirstTtsMs: t0 > 0 ? Math.max(0, tFirstTts - t0) : undefined,

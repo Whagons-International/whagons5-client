@@ -5,6 +5,7 @@ import { getEnvVariables } from "@/lib/getEnvVariables";
 import { getCacheForTable } from "@/store/indexedDB/CacheRegistry";
 import { syncReduxForTable } from "@/store/indexedDB/CacheRegistry";
 
+import { Logger } from '@/utils/logger';
 interface RTLMessage {
   type: 'ping' | 'system' | 'error' | 'echo' | 'database';
   operation?: string;
@@ -54,7 +55,7 @@ export class RealTimeListener {
    */
   private debugLog(message: string, ...args: any[]): void {
     if (this.options.debug) {
-      console.log(`RTL: ${message}`, ...args);
+      Logger.info('rtl', `RTL: ${message}`, ...args);
     }
   }
 
@@ -154,8 +155,8 @@ export class RealTimeListener {
         return true;
       } catch (error) {
         this.debugLog('Server health check failed:', error);
-        console.warn('⚠️  WebSocket server appears to be offline (development health-check failed)');
-        console.warn('💡 Make sure your WebSocket server is running before connecting');
+        Logger.warn('rtl', '⚠️  WebSocket server appears to be offline (development health-check failed)');
+        Logger.warn('rtl', '💡 Make sure your WebSocket server is running before connecting');
         return false;
       }
     }
@@ -211,7 +212,7 @@ export class RealTimeListener {
       this.ws.onerror = this.handleError.bind(this);
 
     } catch (error) {
-      console.error('RTL: Failed to create WebSocket connection:', error);
+      Logger.error('rtl', 'RTL: Failed to create WebSocket connection:', error);
       this.isConnecting = false;
       this.emit('connection:error', { error: error instanceof Error ? error.message : String(error) });
       
@@ -285,7 +286,7 @@ export class RealTimeListener {
    */
   send(message: string | object): void {
     if (!this.isConnected || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn('RTL: Cannot send message - not connected');
+      Logger.warn('rtl', 'RTL: Cannot send message - not connected');
       return;
     }
 
@@ -324,7 +325,7 @@ export class RealTimeListener {
       
       this.handleRTLMessage(data);
     } catch (error) {
-      console.error('RTL: Failed to parse message:', error);
+      Logger.error('rtl', 'RTL: Failed to parse message:', error);
       this.emit('message:error', { error: 'Failed to parse message', rawData: event.data });
     }
   }
@@ -356,16 +357,16 @@ export class RealTimeListener {
    * Handle WebSocket error event
    */
   private handleError(error: Event): void {
-    console.error('RTL: WebSocket error:', error);
+    Logger.error('rtl', 'RTL: WebSocket error:', error);
     this.isConnecting = false;
     
     // More specific error message based on the current state
     const wsUrl = this.ws?.url || 'unknown';
     const errorMessage = this.getConnectionErrorMessage(wsUrl);
     
-    console.error('❌ WebSocket Connection Failed');
-    console.error('📍 URL:', wsUrl);
-    console.error('💡 Suggestion:', errorMessage);
+    Logger.error('rtl', '❌ WebSocket Connection Failed');
+    Logger.error('rtl', '📍 URL:', wsUrl);
+    Logger.error('rtl', '💡 Suggestion:', errorMessage);
     
     this.emit('connection:error', { error: errorMessage, url: wsUrl });
 
@@ -441,7 +442,7 @@ export class RealTimeListener {
    * Handle error messages
    */
   private handleErrorMessage(data: RTLMessage): void {
-    console.error('RTL: Received error message:', data);
+    Logger.error('rtl', 'RTL: Received error message:', data);
     this.emit('message:error', { message: data.message, data: data });
     
     if (data.operation === 'auth_error') {
@@ -467,7 +468,7 @@ export class RealTimeListener {
 
     // Route to appropriate cache by table name
     this.handleTablePublication(data).catch(error => {
-      console.error('Error handling table publication:', error);
+      Logger.error('rtl', 'Error handling table publication:', error);
     });
   }
 
@@ -504,7 +505,7 @@ export class RealTimeListener {
 
             // Check if the data has a valid ID before proceeding
             if (data.new_data.id === undefined || data.new_data.id === null) {
-              console.error(`RTL: Skipping INSERT for ${table} - missing ID`, data.new_data);
+              Logger.error('rtl', `RTL: Skipping INSERT for ${table} - missing ID`, data.new_data);
               return;
             }
 
@@ -516,7 +517,7 @@ export class RealTimeListener {
               const existingRecord = existing.find((record: any) => record.id === data.new_data.id);
 
               if (existingRecord) {
-                console.warn(`RTL: ID ${data.new_data.id} already exists in ${table}, skipping duplicate INSERT`, {
+                Logger.warn('rtl', `RTL: ID ${data.new_data.id} already exists in ${table}, skipping duplicate INSERT`, {
                   existing: existingRecord,
                   incoming: data.new_data
                 });
@@ -526,7 +527,7 @@ export class RealTimeListener {
               await cache.add(data.new_data);
               await syncReduxForTable(table);
             } catch (dbError) {
-              console.error(`RTL: IndexedDB error for ${table} with ID ${data.new_data.id}:`, dbError);
+              Logger.error('rtl', `RTL: IndexedDB error for ${table} with ID ${data.new_data.id}:`, dbError);
               // Don't throw - just log the error to prevent crashes
               return;
             }
@@ -568,7 +569,7 @@ export class RealTimeListener {
           break;
       }
     } catch (error) {
-      console.error('RTL cache handler error', { table, operation, error });
+      Logger.error('rtl', 'RTL cache handler error', { table, operation, error });
     }
   }
 

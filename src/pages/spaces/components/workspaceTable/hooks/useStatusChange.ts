@@ -11,6 +11,7 @@ import { useLanguage } from '@/providers/LanguageProvider';
 import { celebrateTaskCompletion } from '@/utils/confetti';
 import { computeApprovalStatusForTask } from '../utils/approvalStatus';
 
+import { Logger } from '@/utils/logger';
 type StatusMeta = { name: string; color?: string; icon?: string; action?: string; celebration_enabled?: boolean };
 type Category = { id: number; celebration_effect?: string | null };
 
@@ -48,7 +49,7 @@ export function useStatusChange(
             }
           }));
         } catch {
-          console.warn('Task status change blocked: approval pending or rejected');
+          Logger.warn('workspaces', 'Task status change blocked: approval pending or rejected');
         }
         return false;
       }
@@ -91,11 +92,11 @@ export function useStatusChange(
         
         return true;
       } catch (e: any) {
-        console.warn('Status change failed', e);
+        Logger.warn('workspaces', 'Status change failed', e);
         // 403 errors are handled by API interceptor - don't show duplicate toast
         const status = e?.response?.status || e?.status;
         if (status === 403) {
-          console.log('403 error caught, already handled by API interceptor');
+          Logger.info('workspaces', '403 error caught, already handled by API interceptor');
           return false;
         }
         

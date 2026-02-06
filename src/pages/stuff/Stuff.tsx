@@ -1,10 +1,11 @@
 import { query } from "../../database/Query";
 
+import { Logger } from '@/utils/logger';
 function Stuff() {
 
     const [stuff, setStuff] = query("stuff");
 
-    console.log(stuff);
+    Logger.info('ui', stuff);
 
     return ( 
         <div>

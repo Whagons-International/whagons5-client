@@ -12,6 +12,7 @@ import { TasksCache } from "@/store/indexedDB/TasksCache";
 import { TaskEvents } from "@/store/eventEmiters/taskEvents";
 import { useLanguage } from "@/providers/LanguageProvider";
 
+import { Logger } from '@/utils/logger';
 interface WorkspaceStatisticsProps {
   workspaceId: string | undefined;
 }
@@ -86,13 +87,13 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
           }
         }
         
-        console.log('[WorkspaceStatistics] Loading tasks with query:', query, 'workspaceId:', workspaceId);
+        Logger.info('workspaces', '[WorkspaceStatistics] Loading tasks with query:', query, 'workspaceId:', workspaceId);
         
         // Query tasks from cache
         const result = await TasksCache.queryTasks(query);
         const loadedTasks = result?.rows || [];
         
-        console.log('[WorkspaceStatistics] Loaded tasks:', loadedTasks.length, 'for workspace:', workspaceId);
+        Logger.info('workspaces', '[WorkspaceStatistics] Loaded tasks:', loadedTasks.length, 'for workspace:', workspaceId);
         
         // Only update if this is still the current workspace
         if (!cancelled && loadingWorkspaceRef.current === workspaceId) {
@@ -100,7 +101,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
           setIsLoadingTasks(false);
         }
       } catch (error) {
-        console.error('[WorkspaceStatistics] Error loading tasks:', error);
+        Logger.error('workspaces', '[WorkspaceStatistics] Error loading tasks:', error);
         if (!cancelled && loadingWorkspaceRef.current === workspaceId) {
           setWorkspaceTasks([]);
           setIsLoadingTasks(false);
@@ -130,11 +131,11 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
   // Calculate statistics
   const calculateStatistics = useCallback(async () => {
     if (isCalculatingRef.current) {
-      console.log('[WorkspaceStatistics] calculateStatistics: Already calculating, skipping...');
+      Logger.info('workspaces', '[WorkspaceStatistics] calculateStatistics: Already calculating, skipping...');
       return;
     }
     
-    console.log('[WorkspaceStatistics] calculateStatistics: Starting calculation with', {
+    Logger.info('workspaces', '[WorkspaceStatistics] calculateStatistics: Starting calculation with', {
       workspaceTasksCount: workspaceTasks.length,
       workspaceId
     });
@@ -361,7 +362,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
         tasksBySpot
       };
       
-      console.log('[WorkspaceStatistics] calculateStatistics: Calculation complete:', {
+      Logger.info('workspaces', '[WorkspaceStatistics] calculateStatistics: Calculation complete:', {
         totalTasks: finalStats.totalTasks,
         totalCategories: finalStats.totalCategories,
         totalTeams: finalStats.totalTeams,
@@ -372,7 +373,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
       
       setStatistics(finalStats);
     } catch (error) {
-      console.error('[WorkspaceStatistics] Error calculating statistics:', error);
+      Logger.error('workspaces', '[WorkspaceStatistics] Error calculating statistics:', error);
       // Set empty statistics on error to prevent infinite loading
       setStatistics({
         totalTasks: 0,
@@ -401,17 +402,17 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
   useEffect(() => {
     // Don't calculate while still loading tasks
     if (isLoadingTasks) {
-      console.log('[WorkspaceStatistics] Still loading tasks, waiting...');
+      Logger.info('workspaces', '[WorkspaceStatistics] Still loading tasks, waiting...');
       return;
     }
     
     // Don't calculate if already calculating
     if (isCalculatingRef.current) {
-      console.log('[WorkspaceStatistics] Already calculating, skipping...');
+      Logger.info('workspaces', '[WorkspaceStatistics] Already calculating, skipping...');
       return;
     }
     
-    console.log('[WorkspaceStatistics] Tasks loaded, calculating statistics...', {
+    Logger.info('workspaces', '[WorkspaceStatistics] Tasks loaded, calculating statistics...', {
       workspaceId,
       workspaceTasksLength: workspaceTasks.length
     });

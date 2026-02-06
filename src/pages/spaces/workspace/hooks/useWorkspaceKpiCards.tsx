@@ -31,6 +31,7 @@ import {
 import { WorkspaceStats } from './useWorkspaceStats';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
 
+import { Logger } from '@/utils/logger';
 // Icon mapping from string value to FontAwesome icon
 const FA_ICON_MAP: Record<string, IconDefinition> = {
   faChartBar,
@@ -507,7 +508,7 @@ export function useWorkspaceKpiCards(params: {
 
         if (!cancelled) setCustomComputed(next);
       } catch (error) {
-        console.error('[Workspace KPI] Error computing KPI cards:', error);
+        Logger.error('workspaces', '[Workspace KPI] Error computing KPI cards:', error);
       }
     };
 

@@ -2,6 +2,96 @@ git# Agents: Frontend Data Flow, Caching, and State Management
 
 This document explains the generic architecture and lifecycle applied across the frontend application, detailing how Redux, IndexedDB caching, real-time listeners, and event-driven updates work together to provide a seamless user experience. This complements the backend AGENTS.md by explaining the client-side data management patterns.
 
+## Logging System
+
+### IMPORTANT: Never Use console.log Directly
+
+**DO NOT** use `console.log`, `console.warn`, `console.error`, `console.info`, or `console.debug` directly in the codebase. All logging MUST go through the centralized Logger utility.
+
+### Usage
+
+```typescript
+import { Logger } from '@/utils/logger';
+
+// Use appropriate log levels
+Logger.debug('cache', 'Verbose debugging info');
+Logger.info('api', 'Request completed:', response);
+Logger.warn('auth', 'Token expiring soon');
+Logger.error('rtl', 'WebSocket connection failed:', error);
+
+// Scoped logger for a module
+const log = Logger.scope('cache');
+log.info('Cache initialized');
+log.error('Failed to sync:', error);
+
+// Performance timing
+const done = Logger.time('api', 'fetchUsers');
+await fetchUsers();
+done(); // Logs: "[DEBUG][API] fetchUsers: 123.45ms"
+```
+
+### Log Categories
+
+Choose the appropriate category based on the feature/module:
+
+| Category | Use For |
+|----------|---------|
+| `auth` | Authentication, Firebase, login/logout |
+| `api` | API requests/responses, HTTP calls |
+| `cache` | IndexedDB, GenericCache, TasksCache |
+| `rtl` | Real-time listener, WebSocket |
+| `redux` | Redux state management, slices |
+| `db` | DuckDB, database operations |
+| `assistant` | AI assistant, chat features |
+| `scheduler` | Scheduler features |
+| `forms` | Form handling |
+| `notifications` | Push notifications, FCM |
+| `integrity` | Cache integrity validation |
+| `ui` | UI components, rendering |
+| `perf` | Performance timing |
+| `tasks` | Tasks feature |
+| `workspaces` | Workspaces feature |
+| `boards` | Boards feature |
+| `settings` | Settings pages |
+| `icons` | Icon loading/caching |
+
+### Configuration
+
+Logging is configured via YAML files:
+
+- **Development**: `src/config/logging.dev.yaml` - All categories enabled by default
+- **Production**: `src/config/logging.prod.yaml` - No categories enabled (only errors show)
+
+```yaml
+# Example: Enable specific categories
+mode: categories
+categories:
+  - auth
+  - api
+  - cache
+```
+
+### Key Rules
+
+1. **Errors are ALWAYS logged** regardless of category settings
+2. **Never use console.* directly** - always use Logger.*
+3. **Choose the right category** based on the file/feature location
+4. **Use appropriate log levels**:
+   - `debug`: Verbose details for debugging
+   - `info`: General information, success messages
+   - `warn`: Warnings that don't prevent operation
+   - `error`: Errors (always logged)
+
+### Global Error Handling
+
+The Logger automatically catches:
+- Uncaught JavaScript errors (`window.onerror`)
+- Unhandled promise rejections (`unhandledrejection`)
+
+These are installed at app startup in `src/main.tsx`.
+
+---
+
 ## Overview
 
 - **API Integration**: RESTful endpoints with optimistic updates and error handling
@@ -175,7 +265,7 @@ useEffect(() => {
   const unsubscribe = genericActions.yourEntities.events.on(
     genericActions.yourEntities.eventNames.UPDATED,
     (data) => {
-      console.log('Entity updated:', data);
+      Logger.info('redux', 'Entity updated:', data);
     }
   );
   return unsubscribe;

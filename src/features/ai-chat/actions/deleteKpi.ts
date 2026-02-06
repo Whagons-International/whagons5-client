@@ -7,6 +7,7 @@
 
 import type { FrontendToolResult, SendMessageCallback, NavigateCallback } from './frontend_tools';
 
+import { Logger } from '@/utils/logger';
 // ─── Input normalization ─────────────────────────────────────────────────────
 
 function normalizeId(raw: Record<string, any>): number | null {
@@ -29,7 +30,7 @@ export function handleDeleteKpi(
   const id = normalizeId(rawInput);
 
   if (!id) {
-    console.error('[Delete_Kpi] Missing required field: id');
+    Logger.error('assistant', '[Delete_Kpi] Missing required field: id');
     if (sendMessage) sendMessage('Error deleting KPI card: "id" is required.');
     return true;
   }
@@ -40,23 +41,23 @@ export function handleDeleteKpi(
   const existingCard = kpiCards.find((c: any) => c.id === id);
 
   if (!existingCard) {
-    console.error(`[Delete_Kpi] KPI card #${id} not found`);
+    Logger.error('assistant', `[Delete_Kpi] KPI card #${id} not found`);
     if (sendMessage) sendMessage(`Error: KPI card #${id} not found.`);
     return true;
   }
 
-  console.log(`[Delete_Kpi] Deleting KPI card #${id}: "${existingCard.name}"`);
+  Logger.info('assistant', `[Delete_Kpi] Deleting KPI card #${id}: "${existingCard.name}"`);
 
   store
     .dispatch(genericActions.kpiCards.removeAsync(id) as any)
     .unwrap()
     .then(() => {
-      console.log('[Delete_Kpi] KPI card deleted successfully');
+      Logger.info('assistant', '[Delete_Kpi] KPI card deleted successfully');
       if (navigate) navigate('/settings/kpi-cards/manage');
       if (sendMessage) sendMessage(`KPI card "${existingCard.name}" deleted successfully.`);
     })
     .catch((error: any) => {
-      console.error('[Delete_Kpi] Failed to delete KPI card:', error);
+      Logger.error('assistant', '[Delete_Kpi] Failed to delete KPI card:', error);
       if (sendMessage) {
         const errMsg = error?.message || error?.response?.data?.message || 'Unknown error';
         sendMessage(`Failed to delete KPI card: ${errMsg}`);
@@ -109,11 +110,11 @@ export async function handleDeleteKpiPrompt(
     return true;
   }
 
-  console.log(`[Delete_Kpi] Deleting KPI card #${id}: "${existingCard.name}"`);
+  Logger.info('assistant', `[Delete_Kpi] Deleting KPI card #${id}: "${existingCard.name}"`);
 
   try {
     await store.dispatch(genericActions.kpiCards.removeAsync(id) as any).unwrap();
-    console.log('[Delete_Kpi] KPI card deleted successfully via prompt pathway');
+    Logger.info('assistant', '[Delete_Kpi] KPI card deleted successfully via prompt pathway');
 
     if (navigate) navigate('/settings/kpi-cards/manage');
 
@@ -127,7 +128,7 @@ export async function handleDeleteKpiPrompt(
     });
   } catch (error: any) {
     const errMsg = error?.message || error?.response?.data?.message || 'Unknown error';
-    console.error('[Delete_Kpi] Failed:', errMsg);
+    Logger.error('assistant', '[Delete_Kpi] Failed:', errMsg);
     send({
       type: 'frontend_tool_response',
       tool: data?.tool,

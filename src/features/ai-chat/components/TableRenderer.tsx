@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { LoadingWidget } from "./LoadingWidget";
 
+import { Logger } from '@/utils/logger';
 interface TableRow {
   cells: string[];
 }
@@ -188,7 +189,7 @@ const TableRenderer: React.FC<TableRendererProps> = (props) => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
     } catch (err) {
-      console.error('Failed to copy table:', err);
+      Logger.error('assistant', 'Failed to copy table:', err);
     }
   };
 

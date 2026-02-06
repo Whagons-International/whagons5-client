@@ -1,3 +1,4 @@
+import { Logger } from '@/utils/logger';
 // AG Grid setup and configuration utilities for WorkspaceTable
 
 export const AG_GRID_LICENSE = import.meta.env.VITE_AG_GRID_LICENSE_KEY as string | undefined;
@@ -43,12 +44,12 @@ export const loadAgGridModules = async (): Promise<boolean> => {
       const { LicenseManager } = enterprise;
       LicenseManager.setLicenseKey(AG_GRID_LICENSE);
     } else {
-      console.warn('AG Grid Enterprise license key (VITE_AG_GRID_LICENSE_KEY) is missing.');
+      Logger.warn('workspaces', 'AG Grid Enterprise license key (VITE_AG_GRID_LICENSE_KEY) is missing.');
     }
 
     return true;
   } catch (error) {
-    console.error('Failed to load AG Grid modules:', error);
+    Logger.error('workspaces', 'Failed to load AG Grid modules:', error);
     return false;
   }
 };

@@ -43,6 +43,7 @@ import { BirthdayImagesManager } from './components/BirthdayImagesManager';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 
+import { Logger } from '@/utils/logger';
 dayjs.extend(relativeTime);
 
 function BoardDetail() {
@@ -148,7 +149,7 @@ function BoardDetail() {
     // Validate boardId is available
     const currentBoardId = boardId ? parseInt(boardId) : null;
     if (!currentBoardId || currentBoardId <= 0) {
-      console.error('Invalid board ID:', boardId);
+      Logger.error('boards', 'Invalid board ID:', boardId);
       alert(t('boards.error.invalidBoard', 'Invalid board ID. Please refresh the page.'));
       throw new Error('Invalid board ID');
     }
@@ -164,13 +165,13 @@ function BoardDetail() {
         ends_at: null,
       };
       
-      console.log('Creating board message with data:', messageData);
+      Logger.info('boards', 'Creating board message with data:', messageData);
       const result = await dispatch(genericActions.boardMessages.addAsync(messageData) as any).unwrap();
-      console.log('Board message created successfully:', result);
+      Logger.info('boards', 'Board message created successfully:', result);
       return result;
     } catch (error: any) {
-      console.error('Failed to create message:', error);
-      console.error('Error details:', {
+      Logger.error('boards', 'Failed to create message:', error);
+      Logger.error('boards', 'Error details:', {
         message: error?.message,
         payload: error?.payload,
         response: error?.response?.data,
@@ -203,7 +204,7 @@ function BoardDetail() {
       await dispatch(genericActions.boardMessages.removeAsync(deleteMessageId) as any);
       setDeleteMessageId(null);
     } catch (error) {
-      console.error('Failed to delete message:', error);
+      Logger.error('boards', 'Failed to delete message:', error);
     }
   };
 
@@ -228,7 +229,7 @@ function BoardDetail() {
       }) as any);
       setEditMessage(null);
     } catch (error) {
-      console.error('Failed to update message:', error);
+      Logger.error('boards', 'Failed to update message:', error);
     }
   };
 
@@ -236,7 +237,7 @@ function BoardDetail() {
     try {
       await dispatch(genericActions.boardMessages.updateAsync({ id: messageId, updates: { is_pinned: isPinned } }) as any);
     } catch (error) {
-      console.error('Failed to pin message:', error);
+      Logger.error('boards', 'Failed to pin message:', error);
     }
   };
 
@@ -258,7 +259,7 @@ function BoardDetail() {
         role: 'member',
       });
     } catch (error) {
-      console.error('Failed to add member:', error);
+      Logger.error('boards', 'Failed to add member:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -270,7 +271,7 @@ function BoardDetail() {
     try {
       await dispatch(genericActions.boardMembers.removeAsync(memberId) as any);
     } catch (error) {
-      console.error('Failed to remove member:', error);
+      Logger.error('boards', 'Failed to remove member:', error);
     }
   };
 
@@ -310,7 +311,7 @@ function BoardDetail() {
       }) as any);
       setIsSettingsDialogOpen(false);
     } catch (error) {
-      console.error('Failed to update board:', error);
+      Logger.error('boards', 'Failed to update board:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -323,7 +324,7 @@ function BoardDetail() {
       setIsDeleteDialogOpen(false);
       navigate('/welcome');
     } catch (error) {
-      console.error('Failed to delete board:', error);
+      Logger.error('boards', 'Failed to delete board:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -339,7 +340,7 @@ function BoardDetail() {
         },
       }) as any);
     } catch (error) {
-      console.error('Failed to update birthday setting:', error);
+      Logger.error('boards', 'Failed to update birthday setting:', error);
       setBirthdayEnabled(!enabled); // Revert on error
     }
   };
@@ -353,7 +354,7 @@ function BoardDetail() {
         },
       }) as any);
     } catch (error) {
-      console.error('Failed to update birthday template:', error);
+      Logger.error('boards', 'Failed to update birthday template:', error);
     }
   };
 

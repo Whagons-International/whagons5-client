@@ -4,6 +4,7 @@ import { TasksCache } from "../indexedDB/TasksCache";
 import { TaskEvents } from "../eventEmiters/taskEvents";
 import { api } from "@/store/api/internalApi";
 
+import { Logger } from '@/utils/logger';
 /**
  * Apply pivot_changes from a task API response to the local taskUsers IndexedDB store.
  * pivot_changes: { created: [{id, task_id, user_id, ...}], deleted_user_ids: [userId, ...] }
@@ -35,7 +36,7 @@ export async function applyTaskUserPivotChanges(taskId: number, pivotChanges: { 
 
         await syncReduxForTable('wh_task_user');
     } catch (error) {
-        console.warn('applyTaskUserPivotChanges: failed', error);
+        Logger.warn('redux', 'applyTaskUserPivotChanges: failed', error);
     }
 }
 
@@ -77,7 +78,7 @@ export const addTaskAsync = createAsyncThunk(
             
             return newTask;
         } catch (error: any) {
-            console.error('Failed to add task:', error);
+            Logger.error('redux', 'Failed to add task:', error);
             const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to add task';
             // Preserve status code for permission checking
             const errorWithStatus = new Error(errorMessage) as any;
@@ -118,7 +119,7 @@ export const updateTaskAsync = createAsyncThunk(
             
             return updatedTask;
         } catch (error: any) {
-            console.error('Failed to update task:', error);
+            Logger.error('redux', 'Failed to update task:', error);
             const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to update task';
             // Preserve status code for permission checking (prevents duplicate toast for 403 errors)
             const errorWithStatus = new Error(errorMessage) as any;
@@ -145,7 +146,7 @@ export const removeTaskAsync = createAsyncThunk(
             const status = error.response?.status;
             // Only log non-403 errors (403 errors are expected permission denials)
             if (status !== 403) {
-                console.error('Failed to remove task:', error);
+                Logger.error('redux', 'Failed to remove task:', error);
             }
             const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to remove task';
             // Preserve status code for permission checking
@@ -198,7 +199,7 @@ export const moveTaskThunk = createAsyncThunk(
 
             return updatedTask;
         } catch (error: any) {
-            console.error('Failed to move task:', error);
+            Logger.error('redux', 'Failed to move task:', error);
             
             // Rollback: restore previous status in Redux
             dispatch(updateTaskLocally({ id: taskId, updates: { status_id: previousStatusId } }));
@@ -243,7 +244,7 @@ export const restoreTaskAsync = createAsyncThunk(
             
             return restoredTask;
         } catch (error: any) {
-            console.error('Failed to restore task:', error);
+            Logger.error('redux', 'Failed to restore task:', error);
             const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to restore task';
             return rejectWithValue(errorMessage);
         }

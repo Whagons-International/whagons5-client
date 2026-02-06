@@ -4,6 +4,7 @@ import { updateTaskAsync } from '@/store/reducers/tasksSlice';
 import { genericActions } from '@/store/genericSlices';
 import { isCustomFieldValueFilled, serializeCustomFieldPayload } from '../utils/customFieldSerialization';
 
+import { Logger } from '@/utils/logger';
 export function useCustomFieldSync(params: any) {
   const { categoryFields, customFieldValues, taskCustomFieldValues } = params;
   const dispatch = useDispatch<AppDispatch>();
@@ -71,7 +72,7 @@ export function useCustomFieldSync(params: any) {
       try {
         await dispatch(updateTaskAsync({ id: taskId, updates: {} } as any)).unwrap();
       } catch (err) {
-        console.warn('Failed to refresh task after custom field sync', err);
+        Logger.warn('tasks', 'Failed to refresh task after custom field sync', err);
       }
     }
   };

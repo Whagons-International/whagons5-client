@@ -11,6 +11,7 @@ import { genericActions, genericCaches, genericEventNames, genericEvents } from 
 import { Category } from "@/store/types";
 import { useLanguage } from "@/providers/LanguageProvider";
 
+import { Logger } from '@/utils/logger';
 type CategoryFieldAssignment = { 
   id: number; 
   field_id: number; 
@@ -93,7 +94,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category, variant = 
     try {
       lastMutationRef.current = Date.now();
       const dbg = true;
-      if (dbg) console.log('[CFM] addAssignment start', { category, newFieldId });
+      if (dbg) Logger.info('settings', '[CFM] addAssignment start', { category, newFieldId });
       const nextOrder = currentAssignments.length > 0 ? Math.max(...currentAssignments.map(a => a.order || 0)) + 1 : 0;
       // Optimistic local push to avoid flash if cache write lags
       const optimistic: any = {
@@ -114,7 +115,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category, variant = 
         order: nextOrder,
         default_value: null,
       } as any)).unwrap();
-      if (dbg) console.log('[CFM] addAssignment saved', saved);
+      if (dbg) Logger.info('settings', '[CFM] addAssignment saved', saved);
       setNewFieldId("");
       // Replace optimistic row with server row to prevent flash-removal
       setLocalAssignments(prev => {
@@ -124,7 +125,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category, variant = 
         return copy;
       });
     } catch (e: any) {
-      console.error('Error adding assignment', e?.response?.data || e);
+      Logger.error('settings', 'Error adding assignment', e?.response?.data || e);
       // If server add fails, remove our optimistic row
       setLocalAssignments(prev => prev.filter(r => r.id >= 0));
       const msg = e?.response?.data?.message || e?.response?.data?.error || (Array.isArray(e?.response?.data?.errors) ? e.response.data.errors.join(', ') : '') || e?.message || tc('errors.failedToAdd', 'Failed to add field');
@@ -140,7 +141,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category, variant = 
       await dispatch(genericActions.categoryCustomFields.removeAsync(assignment.id)).unwrap();
       setLocalAssignments(prev => prev.filter((r: any) => r?.id !== assignment.id));
     } catch (e) {
-      console.error('Error removing assignment', e);
+      Logger.error('settings', 'Error removing assignment', e);
     } finally {
       setAssignSubmitting(false);
     }
@@ -151,7 +152,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category, variant = 
       await dispatch(genericActions.categoryCustomFields.updateAsync({ id: assignmentId, updates } as any)).unwrap();
       setLocalAssignments(prev => prev.map((r: any) => (r?.id === assignmentId ? { ...r, ...(updates as any) } : r)));
     } catch (e) {
-      console.error('Error updating assignment', e);
+      Logger.error('settings', 'Error updating assignment', e);
     }
   };
 

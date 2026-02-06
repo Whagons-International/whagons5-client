@@ -1,5 +1,6 @@
 import { DB } from './DB';
 
+import { Logger } from '@/utils/logger';
 type AvatarRow = {
   id: number | string;
   data: string; // data URL (base64)
@@ -135,20 +136,20 @@ export class AvatarCache {
       this.memory.delete(userId);
       // Also clear from pending requests
       this.pending.delete(userId);
-      console.log('AvatarCache: Deleted cache for', userId);
+      Logger.info('cache', 'AvatarCache: Deleted cache for', userId);
     } catch (error) {
-      console.error('AvatarCache: Error deleting cache for', userId, error);
+      Logger.error('cache', 'AvatarCache: Error deleting cache for', userId, error);
     }
   }
 
   public static async deleteByAny(ids: Array<number | string | undefined | null>): Promise<void> {
     await this.init();
-    console.log('AvatarCache: deleteByAny called with ids:', ids);
+    Logger.info('cache', 'AvatarCache: deleteByAny called with ids:', ids);
     for (const id of ids) {
       if (id == null) continue;
       await this.delete(id);
     }
-    console.log('AvatarCache: deleteByAny completed');
+    Logger.info('cache', 'AvatarCache: deleteByAny completed');
   }
 }
 

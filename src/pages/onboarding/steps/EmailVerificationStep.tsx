@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { actionsApi } from '@/api/whagonsActionsApi';
 import { useLanguage } from '@/providers/LanguageProvider';
 
+import { Logger } from '@/utils/logger';
 interface EmailVerificationStepProps {
   email: string;
   onVerified: () => void;
@@ -22,7 +23,7 @@ const EmailVerificationStep: React.FC<EmailVerificationStepProps> = ({ email, on
         setTimeout(() => setResendSuccess(false), 3000);
       }
     } catch (error) {
-      console.error('Failed to resend verification email:', error);
+      Logger.error('auth', 'Failed to resend verification email:', error);
     } finally {
       setIsResending(false);
     }

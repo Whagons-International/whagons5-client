@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { convert, lighten, darken, mix, luminance } from 'colorizr';
+import { Logger } from '@/utils/logger';
 import {
   BRANDING_STORAGE_KEY,
   BrandingAssets,
@@ -333,7 +334,7 @@ const validatePattern = (pattern: string | undefined | null): string => {
   // Check for dangerous patterns
   for (const dangerousPattern of DANGEROUS_PATTERNS) {
     if (dangerousPattern.test(trimmed)) {
-      console.warn(`[BrandingProvider] Rejected dangerous pattern: ${trimmed.substring(0, 50)}...`);
+      Logger.warn('branding', `[BrandingProvider] Rejected dangerous pattern: ${trimmed.substring(0, 50)}...`);
       return 'none';
     }
   }
@@ -345,7 +346,7 @@ const validatePattern = (pattern: string | undefined | null): string => {
   );
   
   if (!startsWithAllowedFunction) {
-    console.warn(`[BrandingProvider] Pattern must start with an allowed gradient function: ${trimmed.substring(0, 50)}...`);
+    Logger.warn('branding', `[BrandingProvider] Pattern must start with an allowed gradient function: ${trimmed.substring(0, 50)}...`);
     return 'none';
   }
   
@@ -356,19 +357,19 @@ const validatePattern = (pattern: string | undefined | null): string => {
     if (char === '(') parenCount++;
     if (char === ')') parenCount--;
     if (parenCount < 0) {
-      console.warn(`[BrandingProvider] Invalid pattern syntax (unbalanced parentheses): ${trimmed.substring(0, 50)}...`);
+      Logger.warn('branding', `[BrandingProvider] Invalid pattern syntax (unbalanced parentheses): ${trimmed.substring(0, 50)}...`);
       return 'none';
     }
   }
   
   if (parenCount !== 0) {
-    console.warn(`[BrandingProvider] Invalid pattern syntax (unbalanced parentheses): ${trimmed.substring(0, 50)}...`);
+    Logger.warn('branding', `[BrandingProvider] Invalid pattern syntax (unbalanced parentheses): ${trimmed.substring(0, 50)}...`);
     return 'none';
   }
   
   // Check length limit to prevent extremely long patterns
   if (trimmed.length > 1000) {
-    console.warn(`[BrandingProvider] Pattern too long (max 1000 chars): ${trimmed.length} chars`);
+    Logger.warn('branding', `[BrandingProvider] Pattern too long (max 1000 chars): ${trimmed.length} chars`);
     return 'none';
   }
   
@@ -394,7 +395,7 @@ const validatePatternSize = (
   const SIZE_PATTERN = /^(\d+(\.\d+)?(px|em|rem|%|vh|vw))(\s+(\d+(\.\d+)?(px|em|rem|%|vh|vw)))?$/i;
   
   if (!SIZE_PATTERN.test(trimmed)) {
-    console.warn(`[BrandingProvider] Invalid pattern size format: ${trimmed}. Using default: ${defaultValue}`);
+    Logger.warn('branding', `[BrandingProvider] Invalid pattern size format: ${trimmed}. Using default: ${defaultValue}`);
     return defaultValue;
   }
   
@@ -405,7 +406,7 @@ const validatePatternSize = (
       const num = parseFloat(value);
       // Reasonable limits: 0-1000px, 0-100em, 0-100rem, 0-100%
       if (isNaN(num) || num < 0 || num > 1000) {
-        console.warn(`[BrandingProvider] Pattern size out of range: ${trimmed}. Using default: ${defaultValue}`);
+        Logger.warn('branding', `[BrandingProvider] Pattern size out of range: ${trimmed}. Using default: ${defaultValue}`);
         return defaultValue;
       }
     }
@@ -413,7 +414,7 @@ const validatePatternSize = (
   
   // Check length limit
   if (trimmed.length > 50) {
-    console.warn(`[BrandingProvider] Pattern size too long: ${trimmed.length} chars. Using default: ${defaultValue}`);
+    Logger.warn('branding', `[BrandingProvider] Pattern size too long: ${trimmed.length} chars. Using default: ${defaultValue}`);
     return defaultValue;
   }
   

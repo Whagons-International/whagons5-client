@@ -4,6 +4,7 @@
 
 import { useCallback } from 'react';
 
+import { Logger } from '@/utils/logger';
 export function useContextMenu(opts: {
   handleDeleteTask: (id: number) => void;
 }) {
@@ -22,7 +23,7 @@ export function useContextMenu(opts: {
       });
       items.push({
         name: 'Log (placeholder)',
-        action: () => console.info('Log action selected (placeholder) for task', id),
+        action: () => Logger.info('workspaces', 'Log action selected (placeholder) for task', id),
       });
       items.push('separator');
     }

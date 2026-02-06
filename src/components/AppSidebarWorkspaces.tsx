@@ -59,6 +59,7 @@ import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } 
 import { CSS } from '@dnd-kit/utilities';
 import { useLanguage } from '@/providers/LanguageProvider';
 
+import { Logger } from '@/utils/logger';
 const WS_ORDER_STORAGE = 'wh-workspace-order';
 
 const loadWorkspaceOrder = (): string[] => {
@@ -555,7 +556,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
       setSelectedCategoryId('none');
       setIsModalOpen(false);
     } catch (error: any) {
-      console.error('Error creating workspace:', error);
+      Logger.error('workspaces', 'Error creating workspace:', error);
       const errorMessage = error?.message || t('sidebar.failedToCreateWorkspace', 'Failed to create workspace. Please try again.');
       alert(errorMessage);
     }

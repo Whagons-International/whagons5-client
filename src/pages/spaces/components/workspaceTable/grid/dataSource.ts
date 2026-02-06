@@ -2,6 +2,7 @@
 
 import type React from 'react';
 
+import { Logger } from '@/utils/logger';
 const DEFAULT_SORT = [{ colId: 'id', sort: 'desc' }];
 const getSort = (s?: any[]) => Array.isArray(s) && s.length > 0 ? s : DEFAULT_SORT;
 const buildParams = (wr: React.MutableRefObject<string>, sm: any, pm: any, spm: any, um: any, tm: any, tt: any) => {
@@ -59,9 +60,9 @@ export function buildGetRows(TasksCache: any, refs: any) {
       normalized.filterModel = Object.keys(mergedFm).length > 0 ? normalizeFilterModelForQuery(mergedFm) : undefined;
       try {
         if (localStorage.getItem('wh-debug-filters') === 'true') {
-          console.log('[WT getRows] merged filter=', JSON.stringify(mergedFm, null, 2));
-          console.log('[WT getRows] normalized filterModel=', JSON.stringify(normalized.filterModel, null, 2));
-          console.log('[WT getRows] search=', searchRef.current, 'ws=', workspaceRef.current);
+          Logger.info('workspaces', '[WT getRows] merged filter=', JSON.stringify(mergedFm, null, 2));
+          Logger.info('workspaces', '[WT getRows] normalized filterModel=', JSON.stringify(normalized.filterModel, null, 2));
+          Logger.info('workspaces', '[WT getRows] search=', searchRef.current, 'ws=', workspaceRef.current);
         }
       } catch {}
       const queryParams: any = {
@@ -78,12 +79,12 @@ export function buildGetRows(TasksCache: any, refs: any) {
         rows = rows.filter(spotVisibilityFilterRef.current);
       }
       const total = spotVisibilityFilterRef?.current ? rows.length : (result?.rowCount || 0);
-      try { if (localStorage.getItem('wh-debug-filters') === 'true') console.log('[WT getRows] result rows=', rows.length, 'total=', total); } catch {}
+      try { if (localStorage.getItem('wh-debug-filters') === 'true') Logger.info('workspaces', '[WT getRows] result rows=', rows.length, 'total=', total); } catch {}
       rowCache.current.set(cacheKey, { rows, rowCount: total });
       try { setEmptyOverlayVisible?.(total === 0); } catch {}
       params.successCallback(rows, total);
     } catch (error) {
-      console.error('Error querying local tasks cache:', error);
+      Logger.error('workspaces', 'Error querying local tasks cache:', error);
       try { setEmptyOverlayVisible?.(false); } catch {}
       params.failCallback();
     }

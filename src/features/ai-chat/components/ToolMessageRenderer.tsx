@@ -4,6 +4,7 @@ import JsonSyntaxHighlighter from "./JsonSyntaxHighlighter";
 import { useTheme } from "@/providers/ThemeProvider";
 import { LoadingWidget } from "./LoadingWidget";
 
+import { Logger } from '@/utils/logger';
 const MAX_RENDER_CHARS = 20000;
 
 function extractFirstImageUrlFromText(text: string): string | null {
@@ -144,7 +145,7 @@ function ToolMessageRenderer({
             }
           }
         } catch (e) {
-          console.error("Error extracting tool_call_id from result message:", e);
+          Logger.error('assistant', "Error extracting tool_call_id from result message:", e);
         }
 
         if (extractedToolCallId) {
@@ -192,7 +193,7 @@ function ToolMessageRenderer({
               toolName: genericToolName,
               formattedToolName: genericToolName
             }
-            console.warn("Could not find corresponding tool_call for result:", message);
+            Logger.warn('assistant', "Could not find corresponding tool_call for result:", message);
           }
         }
 
@@ -221,7 +222,7 @@ function ToolMessageRenderer({
           setParsedToolResultContent(parsedContent);
           setHasError(!!(parsedContent as any)?.error); 
         } catch (error) {
-          console.error("Error parsing tool result content:", error);
+          Logger.error('assistant', "Error parsing tool result content:", error);
           const result = message.content;
           if (typeof result === 'object' && result !== null && extractedToolCallId) {
             if (!('tool_call_id' in result)) {
@@ -259,7 +260,7 @@ function ToolMessageRenderer({
       stringified = JSON.stringify(content, null, 2);
       count = stringified.length;
     } catch (e) {
-      console.error("Error stringifying content for size check:", e);
+      Logger.error('assistant', "Error stringifying content for size check:", e);
       stringified = String(content);
       count = stringified.length;
       originalContent = stringified;
@@ -316,7 +317,7 @@ function ToolMessageRenderer({
         setTimeout(() => setCopiedResult(false), 2000);
       }
     } catch (err) {
-      console.error('Failed to copy text: ', err);
+      Logger.error('assistant', 'Failed to copy text: ', err);
     }
   };
 

@@ -2,6 +2,7 @@ import { createAsyncThunk, createSlice, PayloadAction, Slice } from "@reduxjs/to
 import type { AsyncThunk, SliceCaseReducers, SliceSelectors } from "@reduxjs/toolkit";
 import { GenericCache } from "./indexedDB/GenericCache";
 
+import { Logger } from '@/utils/logger';
 // Generic event emitter for all tables (replaces TaskEvents for generic slices)
 export class GenericEvents {
   private static listeners: Map<string, ((data: any) => void)[]> = new Map();
@@ -259,7 +260,7 @@ let inflightLoad: Promise<T[]> | null = null;
                     await cacheInstance.remove(id);
                 } catch (error: any) {
                     // Ignore errors if item doesn't exist in IndexedDB
-                    console.warn(`${name}/removeAsync: Failed to remove from IndexedDB (may already be deleted)`, error);
+                    Logger.warn('redux', `${name}/removeAsync: Failed to remove from IndexedDB (may already be deleted)`, error);
                 }
 
                 // Always refresh Redux from IndexedDB to ensure sync

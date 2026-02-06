@@ -5,6 +5,7 @@ import { ColDef, GridReadyEvent } from 'ag-grid-community';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { RowGroupingModule, TreeDataModule, SetFilterModule, LicenseManager } from 'ag-grid-enterprise';
 
+import { Logger } from '@/utils/logger';
 export const AG_GRID_LICENSE = import.meta.env.VITE_AG_GRID_LICENSE_KEY as string | undefined;
 
 // Register AG Grid modules (community + enterprise needed for grouping/tree/set filter)
@@ -14,7 +15,7 @@ ModuleRegistry.registerModules([AllCommunityModule, RowGroupingModule, TreeDataM
 if (AG_GRID_LICENSE) {
   LicenseManager.setLicenseKey(AG_GRID_LICENSE);
 } else {
-  console.warn('AG Grid Enterprise license key (VITE_AG_GRID_LICENSE_KEY) is missing.');
+  Logger.warn('settings', 'AG Grid Enterprise license key (VITE_AG_GRID_LICENSE_KEY) is missing.');
 }
 
 export interface SettingsGridProps<T = any> {

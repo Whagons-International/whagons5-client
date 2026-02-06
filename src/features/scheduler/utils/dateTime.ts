@@ -1,3 +1,4 @@
+import { Logger } from '@/utils/logger';
 const DEFAULT_TIME = "00:00:00";
 
 export function parseLocalDateTime(dateStr: string): Date {
@@ -89,7 +90,7 @@ export function combineLocalDateAndTime(dateStr: string, timeStr: string): Date 
 
   // Validate parsed values are valid numbers
   if (isNaN(year) || isNaN(month) || isNaN(day)) {
-    console.warn('[dateTime] Invalid date string:', dateStr);
+    Logger.warn('scheduler', '[dateTime] Invalid date string:', dateStr);
     return new Date(NaN); // Return invalid date to signal error
   }
 

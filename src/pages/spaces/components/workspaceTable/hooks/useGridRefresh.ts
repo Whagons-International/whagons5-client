@@ -6,6 +6,7 @@ import { useCallback } from 'react';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { refreshClientSideGrid } from '../grid/dataSource';
 
+import { Logger } from '@/utils/logger';
 export function useGridRefresh(opts: {
   modulesLoaded: boolean;
   gridRef: React.RefObject<any>;
@@ -72,7 +73,7 @@ export function useGridRefresh(opts: {
         setClientRows(rows);
         gridRef.current.api.refreshClientSideRowModel?.('everything');
       } catch (e) {
-        console.warn('refreshGrid (client-side) failed', e);
+        Logger.warn('workspaces', 'refreshGrid (client-side) failed', e);
       }
     } else {
       rowCache.current.clear();

@@ -15,6 +15,7 @@ import { DB } from '@/store/indexedDB/DB';
 import { getEnvVariables } from '@/lib/getEnvVariables';
 
 
+import { Logger } from '@/utils/logger';
 // Google Sign-In
 export const signInWithGoogle = async (): Promise<UserCredential> => {
   const provider = new GoogleAuthProvider();
@@ -23,7 +24,7 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
     const result = await signInWithPopup(auth, provider);
     return result;
   } catch (error) {
-    console.error('Google Sign-In Error:', error);
+    Logger.error('auth', 'Google Sign-In Error:', error);
     throw error;
   }
 };
@@ -81,7 +82,7 @@ export const linkGoogleProvider = async (credential: any) => {
     const user = auth.currentUser;
     if (user) {
       await linkWithCredential(user, credential);
-      console.log('Google provider linked successfully');
+      Logger.info('auth', 'Google provider linked successfully');
     } else {
       throw new Error('No user is currently signed in');
     }
@@ -107,9 +108,9 @@ export const logout = async (): Promise<void> => {
       //delete subdomain from local storage
       localStorage.removeItem('whagons-subdomain');
       
-      console.log('User logged out');
+      Logger.info('auth', 'User logged out');
     } catch (error) {
-      console.error('Logout Error:', error);
+      Logger.error('auth', 'Logout Error:', error);
       throw error;
     }
   };

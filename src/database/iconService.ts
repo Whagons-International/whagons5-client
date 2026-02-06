@@ -2,6 +2,7 @@ import { iconCacheManager } from './iconCacheDB';
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { IconDefinition } from '@fortawesome/fontawesome-common-types';
 
+import { Logger } from '@/utils/logger';
 // Simple inline default icon definition (building icon)
 const defaultIcon = {
   prefix: 'far',
@@ -65,7 +66,7 @@ class IconService {
     try {
       await iconCacheManager.clearOutdatedIcons();
     } catch (error) {
-      console.error('Error clearing outdated icons:', error);
+      Logger.error('icons', 'Error clearing outdated icons:', error);
     }
   }
 
@@ -96,7 +97,7 @@ class IconService {
       this.loadedIcons.set(iconName, icon);
       return icon;
     } catch (error) {
-      console.error(`Error loading icon ${iconName}:`, error);
+      Logger.error('icons', `Error loading icon ${iconName}:`, error);
       return this.defaultIcon;
     } finally {
       this.loadingPromises.delete(iconName);
@@ -121,7 +122,7 @@ class IconService {
 
       return this.defaultIcon;
     } catch (error) {
-      console.error(`Error loading icon ${iconName} from cache:`, error);
+      Logger.error('icons', `Error loading icon ${iconName} from cache:`, error);
       return this.defaultIcon;
     }
   }
@@ -175,10 +176,10 @@ class IconService {
       }
 
       // Icon not found in any package
-      console.warn(`✗ Icon ${iconName} (${faIconName}) not found in any FontAwesome package`);
+      Logger.warn('icons', `✗ Icon ${iconName} (${faIconName}) not found in any FontAwesome package`);
       return null;
     } catch (error) {
-      console.error(`Error loading icon ${iconName} from Font Awesome:`, error);
+      Logger.error('icons', `Error loading icon ${iconName} from Font Awesome:`, error);
       return null;
     }
   }
@@ -238,7 +239,7 @@ class IconService {
 
       return result;
     } catch (error) {
-      console.error('Error loading multiple icons:', error);
+      Logger.error('icons', 'Error loading multiple icons:', error);
       return {};
     }
   }
@@ -282,7 +283,7 @@ class IconService {
           keywordsMetadata = await keywordsResponse.json();
         }
       } catch (error) {
-        console.warn('Could not load icon keywords metadata:', error);
+        Logger.warn('icons', 'Could not load icon keywords metadata:', error);
       }
 
       // Get all icon names from metadata
@@ -298,7 +299,7 @@ class IconService {
           metadata = await response.json();
           this.faMetadata = metadata;
         } else {
-          console.warn('Could not load icon metadata, falling back to curated list');
+          Logger.warn('icons', 'Could not load icon metadata, falling back to curated list');
           return this.getCuratedIconList();
         }
       }
@@ -313,7 +314,7 @@ class IconService {
         }
       });
 
-      console.log(`Found ${allIconNames.length} icons in Font Awesome metadata`);
+      Logger.info('icons', `Found ${allIconNames.length} icons in Font Awesome metadata`);
 
       // Build icon list with metadata (but don't load icon definitions yet - lazy load on demand)
       const iconList: IconItem[] = allIconNames.map(iconName => {
@@ -330,7 +331,7 @@ class IconService {
       // Sort by name
       return iconList.sort((a, b) => a.name.localeCompare(b.name));
     } catch (error) {
-      console.error('Error loading all icons from metadata:', error);
+      Logger.error('icons', 'Error loading all icons from metadata:', error);
       // Fallback to curated list on error
       return this.getCuratedIconList();
     }
@@ -368,7 +369,7 @@ class IconService {
         }
       } catch (error) {
         // Skip icons that can't be loaded
-        console.warn(`Could not load curated icon ${iconName}:`, error);
+        Logger.warn('icons', `Could not load curated icon ${iconName}:`, error);
       }
     }
 
@@ -390,12 +391,12 @@ class IconService {
       
       if (response.ok) {
         this.faMetadata = await response.json();
-        // console.log('FontAwesome metadata loaded successfully');
+        // Logger.info('icons', 'FontAwesome metadata loaded successfully');
       } else {
-        console.warn('Could not load FontAwesome metadata, falling back to generated keywords');
+        Logger.warn('icons', 'Could not load FontAwesome metadata, falling back to generated keywords');
       }
     } catch (error) {
-      console.warn('Error loading FontAwesome metadata:', error);
+      Logger.warn('icons', 'Error loading FontAwesome metadata:', error);
     }
   }
 
@@ -580,7 +581,7 @@ class IconService {
     try {
       await this.loadIcons(commonIcons);
     } catch (error) {
-      console.error('Error preloading common icons:', error);
+      Logger.error('icons', 'Error preloading common icons:', error);
     }
   }
 
@@ -594,7 +595,7 @@ class IconService {
       this.allIconsCache = null;
       this.allIconsPromise = null;
     } catch (error) {
-      console.error('Error clearing icon cache:', error);
+      Logger.error('icons', 'Error clearing icon cache:', error);
     }
   }
 
@@ -605,7 +606,7 @@ class IconService {
     try {
       return await iconCacheManager.getStorageInfo();
     } catch (error) {
-      console.error('Error getting cache stats:', error);
+      Logger.error('icons', 'Error getting cache stats:', error);
       return { totalIcons: 0, cacheSize: 0 };
     }
   }

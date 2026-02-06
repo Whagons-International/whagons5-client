@@ -118,6 +118,7 @@
     "tailwindcss": "^4.0.12",
     "tailwindcss-animate": "^1.0.7",
     "vite": "^6.3.2",
+    "yaml": "^2.8.2",
     "zod": "^3.25.76"
   },
   "devDependencies": {

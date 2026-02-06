@@ -17,6 +17,7 @@ import type { TtsPlaybackControls } from "./useTtsPlayback";
 import { VOICE_WS_IDLE_CLOSE_MS } from "./useTtsPlayback";
 import { getEnvVariables } from "@/lib/getEnvVariables";
 
+import { Logger } from '@/utils/logger';
 const { VITE_API_URL, VITE_CHAT_URL, VITE_DEVELOPMENT, VITE_CLIENT_ID } = getEnvVariables();
 const CHAT_HOST = VITE_CHAT_URL || VITE_API_URL || window.location.origin;
 const IS_DEV = (import.meta as any).env?.DEV === true || VITE_DEVELOPMENT === "true";
@@ -113,7 +114,7 @@ export function useWebSocketChat(deps: UseWebSocketChatDeps): UseWebSocketChatRe
       try {
         wsEventHandlerRef.current?.(data);
       } catch (e) {
-        console.error("[WS] handler error:", e);
+        Logger.error('assistant', "[WS] handler error:", e);
       }
     };
   }
@@ -186,7 +187,7 @@ export function useWebSocketChat(deps: UseWebSocketChatDeps): UseWebSocketChatRe
     }
 
     if (parts.length === 0) {
-      console.error("No valid content to send.");
+      Logger.error('assistant', "No valid content to send.");
       setGettingResponse(false);
       return;
     }
@@ -194,7 +195,7 @@ export function useWebSocketChat(deps: UseWebSocketChatDeps): UseWebSocketChatRe
     const handleWebSocketEvent = (data: any) => {
       // ── Execution traces (UI-only, not stored in chat history) ──
       if (data.type === "execution_trace") {
-        console.log('[AssistantWidget] Received trace:', data.status, data.label);
+        Logger.info('assistant', '[AssistantWidget] Received trace:', data.status, data.label);
         handleTrace(data);
         return;
       }
@@ -224,7 +225,7 @@ export function useWebSocketChat(deps: UseWebSocketChatDeps): UseWebSocketChatRe
         if (audioB64) {
           tts.lastTtsChunkAtRef.current = Date.now();
           // eslint-disable-next-line no-console
-          console.debug("[TTS] audio chunk received:", audioB64.length);
+          Logger.debug('assistant', "[TTS] audio chunk received:", audioB64.length);
           if (!tts.ttsPlayerRef.current) tts.ttsPlayerRef.current = new StreamingTtsPlayer();
 
           voiceTiming.markFirstTtsChunk();
@@ -293,7 +294,7 @@ export function useWebSocketChat(deps: UseWebSocketChatDeps): UseWebSocketChatRe
         return;
       }
       if (data.type === "tts_error") {
-        console.error("[TTS] error:", data.error || data.message);
+        Logger.error('assistant', "[TTS] error:", data.error || data.message);
         return;
       }
 
@@ -305,7 +306,7 @@ export function useWebSocketChat(deps: UseWebSocketChatDeps): UseWebSocketChatRe
           tts.expectingTtsRef.current = true;
           if (IS_DEV) {
             // eslint-disable-next-line no-console
-            console.debug("[TTS] context started:", ctxId);
+            Logger.debug('assistant', "[TTS] context started:", ctxId);
           }
         }
         return;
@@ -315,7 +316,7 @@ export function useWebSocketChat(deps: UseWebSocketChatDeps): UseWebSocketChatRe
       if (data.type === "done" || data.type === "stopped" || data.type === "error") {
         setGettingResponse(false);
         if (data.type === "error") {
-          console.error("WebSocket error:", data.error || data.message);
+          Logger.error('assistant', "WebSocket error:", data.error || data.message);
         }
         if (tts.keepWsOpenForVoiceRef.current) {
           tts.scheduleWsIdleClose(VOICE_WS_IDLE_CLOSE_MS);
@@ -528,7 +529,7 @@ export function useWebSocketChat(deps: UseWebSocketChatDeps): UseWebSocketChatRe
           token = await auth.currentUser.getIdToken();
         }
       } catch (error) {
-        console.warn('[WS] Failed to get Firebase token:', error);
+        Logger.warn('assistant', '[WS] Failed to get Firebase token:', error);
       }
 
       unsubscribeWSRef.current = wsManager.subscribe(conversationId, stableWsHandlerRef.current!, selectedModel, token);
@@ -570,7 +571,7 @@ export function useWebSocketChat(deps: UseWebSocketChatDeps): UseWebSocketChatRe
       if (!connected) {
         const wsState = wsManager.getState(conversationId);
         const wsDebug = (wsManager as any)?.getDebugInfo?.(conversationId);
-        console.error('[WS] Connection failed.', { wsState, wsDebug, CHAT_HOST });
+        Logger.error('assistant', '[WS] Connection failed.', { wsState, wsDebug, CHAT_HOST });
         const urlHint =
           wsDebug?.url ? ` url=${wsDebug.url}` : ` chatHost=${String(CHAT_HOST || "")}`;
         const closeHint =
@@ -610,7 +611,7 @@ export function useWebSocketChat(deps: UseWebSocketChatDeps): UseWebSocketChatRe
       }
 
     } catch (error) {
-      console.error("Error sending message:", error);
+      Logger.error('assistant', "Error sending message:", error);
       setGettingResponse(false);
 
       setMessages(prev => {
@@ -645,9 +646,9 @@ export function useWebSocketChat(deps: UseWebSocketChatDeps): UseWebSocketChatRe
         unsubscribeWSRef.current = null;
       }
       wsManager.close(conversationId);
-      console.log('[WS] Stopped chat by closing WebSocket connection');
+      Logger.info('assistant', '[WS] Stopped chat by closing WebSocket connection');
     } catch (e) {
-      console.error("Failed to stop chat:", e);
+      Logger.error('assistant', "Failed to stop chat:", e);
     }
   }, [conversationId, setGettingResponse, abortControllerRef, tts]);
 

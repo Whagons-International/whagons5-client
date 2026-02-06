@@ -18,6 +18,7 @@ import CreationTab from "./CreationTab";
 import { motion } from "motion/react";
 import { WORKSPACE_SETTINGS_TAB_ANIMATION, getWorkspaceSettingsTabInitialX } from "@/config/tabAnimation";
 
+import { Logger } from '@/utils/logger';
 // Simplified module loading
 const loadRequiredModules = async () => {
   const {
@@ -183,7 +184,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
       .then(() => {
         setModulesLoaded(true);
       })
-      .catch(console.error);
+      .catch((err) => Logger.error('settings', 'Failed to load AG Grid modules:', err));
   }, []);
 
   // Sync activeTab with URL on initial load
@@ -258,7 +259,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
 
         setWorkspaceOverview(mockOverview);
       } catch (error) {
-        console.error('Failed to fetch workspace overview:', error);
+        Logger.error('settings', 'Failed to fetch workspace overview:', error);
       } finally {
         setLoading(false);
       }
@@ -308,7 +309,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
 
         setWorkspaceFilters(mockFilters);
       } catch (error) {
-        console.error('Failed to fetch workspace filters:', error);
+        Logger.error('settings', 'Failed to fetch workspace filters:', error);
       } finally {
         setFiltersLoading(false);
       }
@@ -477,7 +478,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
     } catch (error: any) {
       // Error is already handled by API interceptor (shows toast for 403)
       // But we log it here for debugging
-      console.error('Failed to update workspace:', error);
+      Logger.error('settings', 'Failed to update workspace:', error);
       // The optimistic update will be rolled back automatically by the thunk
     }
   }, [currentWorkspace, dispatch]);
@@ -654,7 +655,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
                     window.dispatchEvent(new CustomEvent('wh:tabOrderReset', { detail: { workspaceId: workspaceId || 'all' } }));
                     window.location.reload();
                   } catch (error) {
-                    console.error('Failed to reset tab order:', error);
+                    Logger.error('settings', 'Failed to reset tab order:', error);
                   }
                 }}
               >

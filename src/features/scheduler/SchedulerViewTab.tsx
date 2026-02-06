@@ -27,6 +27,7 @@ import { TaskEvents } from "@/store/eventEmiters/taskEvents";
 import { getTasksFromIndexedDB, updateTaskLocally, applyTaskUserPivotChanges } from "@/store/reducers/tasksSlice";
 import { genericActions } from "@/store/genericSlices";
 
+import { Logger } from '@/utils/logger';
 export default function SchedulerViewTab({ workspaceId }: { workspaceId: string | undefined }) {
   const dispatch = useDispatch<AppDispatch>();
 
@@ -497,7 +498,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
         }
         setTimeout(() => pendingOptimisticUpdatesRef.current.delete(event.taskId), 2000);
       } catch (error) {
-        console.error("Failed to update task:", error);
+        Logger.error('scheduler', "Failed to update task:", error);
         pendingOptimisticUpdatesRef.current.delete(event.taskId);
         // Revert optimistic update
         if (task) {
@@ -548,7 +549,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
         await api.patch(`/tasks/${event.taskId}`, updates);
         setTimeout(() => pendingOptimisticUpdatesRef.current.delete(event.taskId), 2000);
       } catch (error) {
-        console.error("Failed to resize task:", error);
+        Logger.error('scheduler', "Failed to resize task:", error);
         pendingOptimisticUpdatesRef.current.delete(event.taskId);
         if (task) {
           await TasksCache.updateTask(event.taskId.toString(), task);

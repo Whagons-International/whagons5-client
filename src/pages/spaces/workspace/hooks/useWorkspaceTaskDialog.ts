@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 
+import { Logger } from '@/utils/logger';
 export function useWorkspaceTaskDialog() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -35,7 +36,7 @@ export function useWorkspaceTaskDialog() {
           navigate(newUrl, { replace: true });
         }
       } catch (error) {
-        console.error('Failed to open task from URL:', error);
+        Logger.error('workspaces', 'Failed to open task from URL:', error);
       }
     })();
   }, [taskIdFromUrl, location.pathname, location.search, navigate]);
@@ -51,11 +52,11 @@ export function useWorkspaceTaskDialog() {
           setSelectedTask(fullTask);
         } else {
           // Fallback to provided task if cache doesn't have it
-          console.warn('[useWorkspaceTaskDialog] Task not found in cache, using provided task data:', task.id);
+          Logger.warn('workspaces', '[useWorkspaceTaskDialog] Task not found in cache, using provided task data:', task.id);
           setSelectedTask(task);
         }
       } catch (error) {
-        console.error('[useWorkspaceTaskDialog] Failed to fetch task from cache:', error);
+        Logger.error('workspaces', '[useWorkspaceTaskDialog] Failed to fetch task from cache:', error);
         // Fallback to provided task on error
         setSelectedTask(task);
       }

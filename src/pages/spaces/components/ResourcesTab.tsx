@@ -13,6 +13,7 @@ import {
 } from "@/api/workspaceResourcesApi";
 import { FileTree, type FileTreeItem, type FileTreeFile, type FileTreeFolder } from "@/components/ui/file-tree";
 
+import { Logger } from '@/utils/logger';
 export default function ResourcesTab({ workspaceId }: { workspaceId: string | undefined }) {
   const { t } = useLanguage();
   const dispatch = useDispatch<any>();
@@ -42,7 +43,7 @@ export default function ResourcesTab({ workspaceId }: { workspaceId: string | un
         await uploadWorkspaceResource(workspaceId, file);
       } catch (error: any) {
         setError(`${t('workspace.collab.resources.failedToUpload', 'Failed to upload')} ${file.name}: ${error?.response?.data?.message || error.message}`);
-        console.error("Upload failed:", error);
+        Logger.error('ui', "Upload failed:", error);
       }
     }
     // The upload API creates the resource in the DB, which triggers a real-time notification
@@ -85,7 +86,7 @@ export default function ResourcesTab({ workspaceId }: { workspaceId: string | un
       setError(null);
     } catch (error: any) {
       setError(error?.response?.data?.message || t('workspace.collab.resources.failedToDelete', 'Failed to delete resource'));
-      console.error("Failed to delete resource:", error);
+      Logger.error('ui', "Failed to delete resource:", error);
     }
   };
 

@@ -9,6 +9,7 @@
 
 import type { FrontendToolResult, SendMessageCallback, NavigateCallback } from './frontend_tools';
 
+import { Logger } from '@/utils/logger';
 // Re-use the same color/icon/type resolution helpers from createKpi
 // (imported inline to keep this file self-contained and avoid circular deps)
 
@@ -219,7 +220,7 @@ export function handleUpdateKpi(
   const input = normalizeRawInput(rawInput);
 
   if (!input.id || isNaN(input.id)) {
-    console.error('[Update_Kpi] Missing required field: id');
+    Logger.error('assistant', '[Update_Kpi] Missing required field: id');
     if (sendMessage) sendMessage('Error updating KPI card: "id" is required.');
     return true;
   }
@@ -230,24 +231,24 @@ export function handleUpdateKpi(
   const existingCard = kpiCards.find((c: any) => c.id === input.id);
 
   if (!existingCard) {
-    console.error(`[Update_Kpi] KPI card #${input.id} not found`);
+    Logger.error('assistant', `[Update_Kpi] KPI card #${input.id} not found`);
     if (sendMessage) sendMessage(`Error: KPI card #${input.id} not found.`);
     return true;
   }
 
   const updates = buildUpdatePayload(input, existingCard);
-  console.log('[Update_Kpi] Updating KPI card:', { id: input.id, updates });
+  Logger.info('assistant', '[Update_Kpi] Updating KPI card:', { id: input.id, updates });
 
   store
     .dispatch(genericActions.kpiCards.updateAsync({ id: input.id, updates }) as any)
     .unwrap()
     .then(() => {
-      console.log('[Update_Kpi] KPI card updated successfully');
+      Logger.info('assistant', '[Update_Kpi] KPI card updated successfully');
       if (navigate) navigate('/settings/kpi-cards/manage');
       if (sendMessage) sendMessage(`KPI card #${input.id} updated successfully.`);
     })
     .catch((error: any) => {
-      console.error('[Update_Kpi] Failed to update KPI card:', error);
+      Logger.error('assistant', '[Update_Kpi] Failed to update KPI card:', error);
       if (sendMessage) {
         const errMsg = error?.message || error?.response?.data?.message || 'Unknown error';
         sendMessage(`Failed to update KPI card: ${errMsg}`);
@@ -302,12 +303,12 @@ export async function handleUpdateKpiPrompt(
 
   const updates = buildUpdatePayload(input, existingCard);
 
-  console.log('[Update_Kpi] Raw input from agent:', JSON.stringify(rawInput));
-  console.log('[Update_Kpi] Resolved updates:', JSON.stringify(updates));
+  Logger.info('assistant', '[Update_Kpi] Raw input from agent:', JSON.stringify(rawInput));
+  Logger.info('assistant', '[Update_Kpi] Resolved updates:', JSON.stringify(updates));
 
   try {
     const updated = await store.dispatch(genericActions.kpiCards.updateAsync({ id: input.id, updates }) as any).unwrap();
-    console.log('[Update_Kpi] KPI card updated successfully via prompt pathway:', updated);
+    Logger.info('assistant', '[Update_Kpi] KPI card updated successfully via prompt pathway:', updated);
 
     if (navigate) navigate('/settings/kpi-cards/manage');
 
@@ -331,7 +332,7 @@ export async function handleUpdateKpiPrompt(
     });
   } catch (error: any) {
     const errMsg = error?.message || error?.response?.data?.message || 'Unknown error';
-    console.error('[Update_Kpi] Failed:', errMsg);
+    Logger.error('assistant', '[Update_Kpi] Failed:', errMsg);
     send({
       type: 'frontend_tool_response',
       tool: data?.tool,

@@ -9,6 +9,7 @@ import { auth } from '@/firebase/firebaseConfig';
 import { signOut } from 'firebase/auth';
 import { useLanguage } from '@/providers/LanguageProvider';
 
+import { Logger } from '@/utils/logger';
 const InvitationSignUp: React.FC = () => {
   const { t } = useLanguage();
   const { token } = useParams<{ token: string }>();
@@ -34,12 +35,12 @@ const InvitationSignUp: React.FC = () => {
       const tenantPrefix = parts[0];
       // Only set tenant subdomain on invitation screen
       setSubdomain(tenantPrefix);
-      console.log('Invitation screen: Extracted tenant from URL:', tenantPrefix);
+      Logger.info('auth', 'Invitation screen: Extracted tenant from URL:', tenantPrefix);
       return tenantPrefix;
     }
     
     // If no valid tenant found, don't set anything (will use default/empty subdomain)
-    console.warn('No valid tenant subdomain found in URL:', hostname);
+    Logger.warn('auth', 'No valid tenant subdomain found in URL:', hostname);
     return null;
   };
 
@@ -57,11 +58,11 @@ const InvitationSignUp: React.FC = () => {
       try {
         const currentUser = auth.currentUser;
         if (currentUser) {
-          console.log('Clearing existing Firebase session for invitation signup');
+          Logger.info('auth', 'Clearing existing Firebase session for invitation signup');
           await signOut(auth);
         }
       } catch (err) {
-        console.warn('Failed to sign out existing session:', err);
+        Logger.warn('auth', 'Failed to sign out existing session:', err);
         // Continue anyway - not critical
       }
 
@@ -118,13 +119,13 @@ const InvitationSignUp: React.FC = () => {
         return false;
       }
 
-      console.log('Invitation signup: Using tenant subdomain:', tenantPrefix);
+      Logger.info('auth', 'Invitation signup: Using tenant subdomain:', tenantPrefix);
 
       const response = await actionsApi.post(`/invitations/signup/${token}`, {
         token: idToken
       });
 
-      console.log('Invitation signup response:', {
+      Logger.info('auth', 'Invitation signup response:', {
         status: response.status,
         data: response.data,
         hasToken: !!response.data?.data?.token,
@@ -132,17 +133,17 @@ const InvitationSignUp: React.FC = () => {
       });
 
       if (response.status === 200 && response.data?.data?.token) {
-        console.log('Successfully signed up via invitation, updating auth token');
+        Logger.info('auth', 'Successfully signed up via invitation, updating auth token');
         updateAuthToken(response.data.data.token);
         
         // Use the user data from the signup response directly
         // This avoids the AuthProvider skip logic that blocks /me requests on invitation pages
         const userData = response.data.data.user;
-        console.log('User data from signup response:', userData);
+        Logger.info('auth', 'User data from signup response:', userData);
         
         // Force immediate redirect - don't wait for AuthProvider
         // The user data is already in the response, so we can navigate immediately
-        console.log('Navigating to home page immediately...');
+        Logger.info('auth', 'Navigating to home page immediately...');
         
         // Use window.location to force a full page reload and clear the invitation page context
         // This ensures PublicRoute doesn't block us and AuthProvider can fetch user data properly
@@ -150,13 +151,13 @@ const InvitationSignUp: React.FC = () => {
         
         return true;
       } else {
-        console.error('Invalid response structure:', response);
+        Logger.error('auth', 'Invalid response structure:', response);
         setError('Signup failed. Invalid response from server.');
         return false;
       }
     } catch (err: any) {
-      console.error('Invitation signup error:', err);
-      console.error('Error response:', err?.response);
+      Logger.error('auth', 'Invitation signup error:', err);
+      Logger.error('auth', 'Error response:', err?.response);
       const errorMessage = err?.response?.data?.message || err?.message || 'Signup failed. Please try again.';
       setError(errorMessage);
       setLoading(false);
@@ -179,7 +180,7 @@ const InvitationSignUp: React.FC = () => {
       }
       // If success, invitationSignup already handles navigation
     } catch (error: any) {
-      console.error('Google signup error:', error);
+      Logger.error('auth', 'Google signup error:', error);
       // Only show error if Firebase login itself failed
       if (error?.code?.startsWith('auth/')) {
         setError('Google signup failed: ' + (error.message || 'Please try again.'));

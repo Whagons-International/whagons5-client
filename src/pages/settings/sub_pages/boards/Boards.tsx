@@ -30,6 +30,7 @@ import {
 import { SettingsLayout } from '@/pages/settings/components';
 import { faUsers } from '@fortawesome/free-solid-svg-icons';
 
+import { Logger } from '@/utils/logger';
 const PINNED_BOARDS_STORAGE_KEY = 'pinnedBoards';
 const PINNED_BOARDS_ORDER_STORAGE_KEY = 'pinnedBoardsOrder';
 
@@ -48,7 +49,7 @@ const setPinnedBoards = (boardIds: number[]) => {
     // Dispatch custom event to notify sidebar
     window.dispatchEvent(new Event('pinnedBoardsChanged'));
   } catch (error) {
-    console.error('Error saving pinned boards:', error);
+    Logger.error('boards', 'Error saving pinned boards:', error);
   }
 };
 
@@ -67,7 +68,7 @@ const setPinnedBoardsOrder = (boardIds: number[]) => {
     // Dispatch custom event to notify sidebar
     window.dispatchEvent(new Event('pinnedBoardsChanged'));
   } catch (error) {
-    console.error('Error saving pinned boards order:', error);
+    Logger.error('boards', 'Error saving pinned boards order:', error);
   }
 };
 
@@ -137,13 +138,13 @@ function Boards() {
 
     setIsSubmitting(true);
     try {
-      console.log('[Boards] Creating board with data:', formData);
+      Logger.info('boards', '[Boards] Creating board with data:', formData);
       const result = await dispatch(genericActions.boards.addAsync(formData) as any);
-      console.log('[Boards] Board created, result:', result);
+      Logger.info('boards', '[Boards] Board created, result:', result);
       setIsCreateDialogOpen(false);
       setFormData({ name: '', description: '', visibility: 'private' });
     } catch (error) {
-      console.error('Failed to create board:', error);
+      Logger.error('boards', 'Failed to create board:', error);
     } finally {
       setIsSubmitting(false);
     }

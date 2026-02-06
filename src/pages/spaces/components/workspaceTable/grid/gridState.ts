@@ -9,6 +9,7 @@ import { GRID_CONSTANTS } from './gridConfig';
 import { refreshClientSideGrid } from './dataSource';
 import type React from 'react';
 
+import { Logger } from '@/utils/logger';
 export interface GridStateOptions {
   workspaceId: string;
   searchText?: string;
@@ -111,7 +112,7 @@ export const useGridModeDecision = (workspaceId: string, searchText: string) => 
           totalFiltered,
         };
       } catch (e) {
-        console.warn('decideMode failed', e);
+        Logger.warn('workspaces', 'decideMode failed', e);
         return {
           useClientSide: false,
           totalFiltered: 0,
@@ -186,7 +187,7 @@ export const useWorkspaceTableMode = (params: WorkspaceTableModeParams) => {
             // ignore
           }
         } catch (e) {
-          console.warn('Failed to load client-side rows for grouping', e);
+          Logger.warn('workspaces', 'Failed to load client-side rows for grouping', e);
           setClientRows([]);
         }
         return;

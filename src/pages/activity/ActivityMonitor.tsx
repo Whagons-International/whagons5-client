@@ -22,6 +22,7 @@ import MetroMap from './visualizations/MetroMap';
 import MusicVisualizer from './visualizations/MusicVisualizer';
 import CardWallPhysics from './visualizations/CardWallPhysics';
 
+import { Logger } from '@/utils/logger';
 // Types for activity data
 export interface ActivityEvent {
   id: string;
@@ -93,7 +94,7 @@ export default function ActivityMonitor() {
   // Convert RTL publication message to ActivityEvent
   const convertPublicationToActivity = useCallback((data: RTLMessage): ActivityEvent | null => {
     if (data.type !== 'database' || !data.table || !data.operation) {
-      console.debug('ActivityMonitor: Skipping non-database message', data.type);
+      Logger.debug('activity', 'ActivityMonitor: Skipping non-database message', data.type);
       return null;
     }
 
@@ -215,19 +216,19 @@ export default function ActivityMonitor() {
     }
 
     if (!activityType) {
-      console.debug('ActivityMonitor: No activity type determined', { table, operation });
+      Logger.debug('activity', 'ActivityMonitor: No activity type determined', { table, operation });
       return null;
     }
 
     // Use current user as fallback if no userId found
     if (!userId && user?.id) {
       userId = typeof user.id === 'number' ? user.id : Number(user.id);
-      console.debug('ActivityMonitor: Using current user as fallback', userId);
+      Logger.debug('activity', 'ActivityMonitor: Using current user as fallback', userId);
     }
 
     // If still no userId, we can't create an activity
     if (!userId) {
-      console.debug('ActivityMonitor: No userId found, skipping activity', { table, operation, newData });
+      Logger.debug('activity', 'ActivityMonitor: No userId found, skipping activity', { table, operation, newData });
       return null;
     }
 
@@ -257,7 +258,7 @@ export default function ActivityMonitor() {
       relatedUserId,
     };
 
-    console.debug('ActivityMonitor: Created activity', activity);
+    Logger.debug('activity', 'ActivityMonitor: Created activity', activity);
     return activity;
   }, [users, user, priorities]);
 
@@ -272,19 +273,19 @@ export default function ActivityMonitor() {
 
     // Handle publication messages
     const handlePublication = (data: RTLMessage) => {
-      console.debug('ActivityMonitor: Received publication', data);
+      Logger.debug('activity', 'ActivityMonitor: Received publication', data);
       const activity = convertPublicationToActivity(data);
       if (activity) {
-        console.debug('ActivityMonitor: Adding activity', activity);
+        Logger.debug('activity', 'ActivityMonitor: Adding activity', activity);
         setActivities(prev => [activity, ...prev].slice(0, 100)); // Keep last 100
       } else {
-        console.debug('ActivityMonitor: No activity created from publication', data);
+        Logger.debug('activity', 'ActivityMonitor: No activity created from publication', data);
       }
     };
 
     // Handle connection status
     const handleConnectionStatus = (status: any) => {
-      console.log('ActivityMonitor: Connection status:', status);
+      Logger.info('activity', 'ActivityMonitor: Connection status:', status);
       if (status.status === 'connected' || status.status === 'authenticated') {
         setIsConnected(true);
       } else if (status.status === 'disconnected' || status.status === 'failed') {
@@ -297,7 +298,7 @@ export default function ActivityMonitor() {
 
     // Connect to RTE
     rtl.connectAndHold().catch((error) => {
-      console.error('Failed to connect to RTE:', error);
+      Logger.error('activity', 'Failed to connect to RTE:', error);
       setIsConnected(false);
     });
 
@@ -319,7 +320,7 @@ export default function ActivityMonitor() {
 
   // Debug: log taskLogs changes
   useEffect(() => {
-    console.log('ActivityMonitor: taskLogs updated, count:', taskLogs.length);
+    Logger.info('activity', 'ActivityMonitor: taskLogs updated, count:', taskLogs.length);
   }, [taskLogs]);
 
   // Convert task logs to activities for initial display

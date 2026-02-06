@@ -1,6 +1,7 @@
 import type { Task, Status } from '@/store/types';
 import ExcelJS from 'exceljs';
 
+import { Logger } from '@/utils/logger';
 export async function exportToExcel(
   tasks: Task[],
   statuses: Status[],
@@ -64,7 +65,7 @@ export async function exportToPNG(element: HTMLElement, filename: string) {
     link.href = canvas.toDataURL('image/png');
     link.click();
   } catch (error) {
-    console.error('Failed to export to PNG:', error);
+    Logger.error('ui', 'Failed to export to PNG:', error);
     throw error;
   }
 }
@@ -89,7 +90,7 @@ export async function exportToPDF(element: HTMLElement, filename: string) {
     pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
     pdf.save(filename);
   } catch (error) {
-    console.error('Failed to export to PDF:', error);
+    Logger.error('ui', 'Failed to export to PDF:', error);
     throw error;
   }
 }

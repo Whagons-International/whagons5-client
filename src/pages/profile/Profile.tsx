@@ -31,6 +31,7 @@ import {
 } from '@/store/reducers/notificationPreferencesSlice';
 import { isFCMReady, isTokenRegistered } from '@/firebase/fcmHelper';
 
+import { Logger } from '@/utils/logger';
 // Helper functions to get translated arrays
 const getMonths = (t: (key: string, fallback?: string) => string) => [
     { value: 1, label: t('profile.months.january', 'January') },
@@ -341,7 +342,7 @@ function Profile() {
                     setPreviewImage(null);
                 }
             } catch (error) {
-                console.error('Error initializing form:', error);
+                Logger.error('profile', 'Error initializing form:', error);
                 setError(t('profile.failedToLoad', 'Failed to load profile data'));
             }
         }
@@ -488,15 +489,15 @@ function Profile() {
             const response = await actionsApi.patch('/users/me', payload);
             
             if (response.status === 200) {
-                console.log('Profile: Saving profile with url_picture:', editForm.url_picture);
+                Logger.info('profile', 'Profile: Saving profile with url_picture:', editForm.url_picture);
                 
                 // Clear avatar cache BEFORE refreshing to ensure fresh image loads
                 const { AvatarCache } = await import('@/store/indexedDB/AvatarCache');
                 const firebaseUser = (window as any).firebase?.auth?.currentUser;
                 if (firebaseUser?.uid && displayUserData?.id) {
-                    console.log('Profile: Clearing cache for', [firebaseUser.uid, displayUserData.google_uuid, displayUserData.id]);
+                    Logger.info('profile', 'Profile: Clearing cache for', [firebaseUser.uid, displayUserData.google_uuid, displayUserData.id]);
                     await AvatarCache.deleteByAny([firebaseUser.uid, displayUserData.google_uuid, displayUserData.id]);
-                    console.log('Profile: Cache cleared');
+                    Logger.info('profile', 'Profile: Cache cleared');
                 }
                 
                 // Notify other components (like header) that profile was updated WITH THE NEW URL
@@ -507,7 +508,7 @@ function Profile() {
                         url_picture: editForm.url_picture 
                     }
                 }));
-                console.log('Profile: Dispatched profileUpdated event with url_picture:', editForm.url_picture);
+                Logger.info('profile', 'Profile: Dispatched profileUpdated event with url_picture:', editForm.url_picture);
                 
                 // Close dialog immediately to prevent blank screen during refetch
                 setIsEditing(false);
@@ -515,16 +516,16 @@ function Profile() {
                 // Refresh user data in the background (non-blocking)
                 // This prevents the blank screen flash since dialog is already closed
                 refetchUser().then(() => {
-                    console.log('Profile: User data refetched');
+                    Logger.info('profile', 'Profile: User data refetched');
                 }).catch((err) => {
-                    console.error('Error refetching user:', err);
+                    Logger.error('profile', 'Error refetching user:', err);
                 });
                 
                 // Also set localStorage for cross-tab communication
                 localStorage.setItem('profile_updated', Date.now().toString());
             }
         } catch (err: any) {
-            console.error('Error updating profile:', err);
+            Logger.error('profile', 'Error updating profile:', err);
             // Extract error message from API response if available
             const errorMessage = err?.response?.data?.message || 
                                 err?.response?.data?.errors?.zodiac_sign?.[0] ||

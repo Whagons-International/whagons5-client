@@ -4,6 +4,7 @@ import { useLanguage } from '@/providers/LanguageProvider';
 
 import type { TaskDialogProps } from './taskDialog/types';
 
+import { Logger } from '@/utils/logger';
 const TaskDialogContent = lazy(() => import('./taskDialog/TaskDialogContent'));
 
 declare global {
@@ -57,7 +58,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId, task
 
       if (perfEnabled) {
         // eslint-disable-next-line no-console
-        console.log('[PERF] TaskDialog: open requested', {
+        Logger.info('tasks', '[PERF] TaskDialog: open requested', {
           clickTime: clickTimeRef.current,
           hasParentClickMark: typeof candidate === 'number',
         });
@@ -89,10 +90,10 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId, task
 
     const raf1 = requestAnimationFrame(() => {
       // eslint-disable-next-line no-console
-      console.log(`[PERF] TaskDialog: click→rAF1 ${(performance.now() - clickTime).toFixed(2)}ms`);
+      Logger.info('tasks', `[PERF] TaskDialog: click→rAF1 ${(performance.now() - clickTime).toFixed(2)}ms`);
       requestAnimationFrame(() => {
         // eslint-disable-next-line no-console
-        console.log(`[PERF] TaskDialog: click→rAF2 ${(performance.now() - clickTime).toFixed(2)}ms`);
+        Logger.info('tasks', `[PERF] TaskDialog: click→rAF2 ${(performance.now() - clickTime).toFixed(2)}ms`);
       });
     });
 
@@ -100,7 +101,7 @@ export default function TaskDialog({ open, onOpenChange, mode, workspaceId, task
     if (el) {
       const onAnimStart = () => {
         // eslint-disable-next-line no-console
-        console.log(`[PERF] TaskDialog: click→animationstart ${(performance.now() - clickTime).toFixed(2)}ms`);
+        Logger.info('tasks', `[PERF] TaskDialog: click→animationstart ${(performance.now() - clickTime).toFixed(2)}ms`);
       };
       el.addEventListener('animationstart', onAnimStart, { once: true });
       removeAnimStart = () => el.removeEventListener('animationstart', onAnimStart);

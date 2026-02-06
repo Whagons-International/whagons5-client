@@ -1,3 +1,4 @@
+import { Logger } from '@/utils/logger';
 export type FontStyle = 'system' | 'inter' | 'roboto' | 'montserrat' | 'georgia' | 'playfair' | 'poppins' | 'raleway' | 'tahoma' | 'patrickHand' | 'architectsDaughter' | 'dmSans' | 'nunito';
 
 const FONT_STYLE_SETTING_KEY = 'wh-font-style';
@@ -30,7 +31,7 @@ export function getFontStyle(): FontStyle {
       return stored as FontStyle;
     }
   } catch (error) {
-    console.warn('[FontStyle] Error reading localStorage:', error);
+    Logger.warn('ui', '[FontStyle] Error reading localStorage:', error);
   }
   return 'system'; // Default
 }
@@ -52,7 +53,7 @@ export function setFontStyle(style: FontStyle) {
       loadGoogleFont(style);
     }
   } catch (error) {
-    console.warn('[FontStyle] Error saving to localStorage:', error);
+    Logger.warn('ui', '[FontStyle] Error saving to localStorage:', error);
   }
 }
 

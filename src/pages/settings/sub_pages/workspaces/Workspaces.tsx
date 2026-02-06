@@ -25,6 +25,7 @@ import { useLanguage } from "@/providers/LanguageProvider";
 import { useAuth } from "@/providers/AuthProvider";
 import { actionsApi } from "@/api/whagonsActionsApi";
 
+import { Logger } from '@/utils/logger';
 // Custom cell renderer for workspace name with color indicator
 const WorkspaceNameCellRenderer = (props: ICellRendererParams) => {
   const workspace = props.data as Workspace;
@@ -77,7 +78,7 @@ function Workspaces() {
   
   // Toggle workspace visibility with optimistic updates
   const handleToggleWorkspaceVisibility = useCallback(async (workspaceId: number, e?: React.MouseEvent) => {
-    console.log('Toggle visibility clicked for workspace:', workspaceId);
+    Logger.info('workspaces', 'Toggle visibility clicked for workspace:', workspaceId);
     
     // Prevent any default behavior or event propagation
     if (e) {
@@ -87,12 +88,12 @@ function Workspaces() {
     
     // Prevent multiple simultaneous toggles for the same workspace
     if (isTogglingRef.current.has(workspaceId)) {
-      console.log('Already toggling, ignoring');
+      Logger.info('workspaces', 'Already toggling, ignoring');
       return;
     }
     
     if (!user) {
-      console.warn('Cannot toggle workspace visibility: user not loaded');
+      Logger.warn('workspaces', 'Cannot toggle workspace visibility: user not loaded');
       return;
     }
     
@@ -104,7 +105,7 @@ function Workspaces() {
       const currentHidden = new Set(effectiveHiddenIds);
       const wasHidden = currentHidden.has(workspaceId);
       
-      console.log('Current state - isHidden:', wasHidden, 'effectiveHiddenIds:', Array.from(effectiveHiddenIds));
+      Logger.info('workspaces', 'Current state - isHidden:', wasHidden, 'effectiveHiddenIds:', Array.from(effectiveHiddenIds));
       
       if (wasHidden) {
         currentHidden.delete(workspaceId);
@@ -114,14 +115,14 @@ function Workspaces() {
       
       const newHiddenSet = new Set(currentHidden);
       
-      console.log('New state - hiddenWorkspaces:', Array.from(newHiddenSet));
+      Logger.info('workspaces', 'New state - hiddenWorkspaces:', Array.from(newHiddenSet));
       
       // Store the expected state for later comparison
       lastUpdateRef.current = newHiddenSet;
       
       // Update optimistic state immediately
       setOptimisticHiddenIds(newHiddenSet);
-      console.log('Optimistic state updated');
+      Logger.info('workspaces', 'Optimistic state updated');
       
       const newSettings = {
         ...(((user as any).settings || {}) as any),
@@ -129,53 +130,53 @@ function Workspaces() {
       };
       
       // Update server
-      console.log('Sending API request with settings:', newSettings);
+      Logger.info('workspaces', 'Sending API request with settings:', newSettings);
       const response = await actionsApi.patch('/users/me', { settings: newSettings });
-      console.log('API request successful', response.data);
+      Logger.info('workspaces', 'API request successful', response.data);
       
       // Verify the response contains the updated settings
       const updatedUser = response?.data?.data || response?.data;
-      console.log('API response user data:', updatedUser);
-      console.log('API response settings:', updatedUser?.settings);
+      Logger.info('workspaces', 'API response user data:', updatedUser);
+      Logger.info('workspaces', 'API response settings:', updatedUser?.settings);
       
       if ((updatedUser as any)?.settings?.hiddenWorkspaces) {
         const serverHiddenSet = new Set((((updatedUser as any).settings?.hiddenWorkspaces) || []) as number[]);
-        console.log('Server returned hiddenWorkspaces:', Array.from(serverHiddenSet));
+        Logger.info('workspaces', 'Server returned hiddenWorkspaces:', Array.from(serverHiddenSet));
         
         // Verify it matches what we sent
         if (serverHiddenSet.size === newHiddenSet.size && 
             Array.from(serverHiddenSet).every(id => newHiddenSet.has(id))) {
-          console.log('✅ Server response matches our update');
+          Logger.info('workspaces', '✅ Server response matches our update');
         } else {
-          console.warn('⚠️ Server response does not match our update!', {
+          Logger.warn('workspaces', '⚠️ Server response does not match our update!', {
             sent: Array.from(newHiddenSet),
             received: Array.from(serverHiddenSet)
           });
         }
       } else {
-        console.warn('⚠️ API response does not include hiddenWorkspaces in settings');
-        console.log('Full response:', JSON.stringify(response?.data, null, 2));
+        Logger.warn('workspaces', '⚠️ API response does not include hiddenWorkspaces in settings');
+        Logger.info('workspaces', 'Full response:', JSON.stringify(response?.data, null, 2));
       }
       
       // Update user state directly from API response without full refetch
       // This avoids the blank screen flash
       if (updatedUser) {
         updateUser(updatedUser);
-        console.log('User state updated directly from API response (no refresh)');
+        Logger.info('workspaces', 'User state updated directly from API response (no refresh)');
       } else {
         // Fallback: if response doesn't have user data, do a silent background refetch
         setTimeout(async () => {
           try {
             await refetchUser();
-            console.log('User state updated from background refetch');
+            Logger.info('workspaces', 'User state updated from background refetch');
           } catch (refetchError) {
-            console.warn('Failed to refetch user, but API update succeeded:', refetchError);
+            Logger.warn('workspaces', 'Failed to refetch user, but API update succeeded:', refetchError);
           }
         }, 1000); // Delay to avoid immediate refresh
       }
     } catch (error: any) {
-      console.error('Failed to update workspace visibility:', error);
-      console.error('Error details:', {
+      Logger.error('workspaces', 'Failed to update workspace visibility:', error);
+      Logger.error('workspaces', 'Error details:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status
@@ -187,7 +188,7 @@ function Workspaces() {
       
       // Show error without causing page refresh
       const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
-      console.error('Error message:', errorMessage);
+      Logger.error('workspaces', 'Error message:', errorMessage);
       // Use a non-blocking error notification instead of alert
       // alert() can sometimes cause issues, so we'll just log it for now
       // You can replace this with a toast notification if available
@@ -211,11 +212,11 @@ function Workspaces() {
           Array.from(expectedSet).every(id => serverHiddenSet.has(id));
       
       if (setsMatch) {
-        console.log('Server state matches optimistic state, clearing optimistic state');
+        Logger.info('workspaces', 'Server state matches optimistic state, clearing optimistic state');
         setOptimisticHiddenIds(null);
         lastUpdateRef.current = null;
       } else {
-        console.log('Server state does not match optimistic state yet', {
+        Logger.info('workspaces', 'Server state does not match optimistic state yet', {
           optimistic: Array.from(optimisticHiddenIds),
           expected: Array.from(expectedSet),
           server: Array.from(serverHiddenSet)
@@ -362,7 +363,7 @@ function Workspaces() {
   const calculateStatistics = useCallback(async () => {
     // Prevent concurrent calculations
     if (isCalculatingRef.current) {
-      console.log('Statistics calculation already in progress, skipping...');
+      Logger.info('workspaces', 'Statistics calculation already in progress, skipping...');
       return;
     }
     
@@ -372,7 +373,7 @@ function Workspaces() {
     const categoriesArray = Array.isArray(categories) ? categories : [];
     const teamsArray = Array.isArray(teams) ? teams : [];
     
-    console.log('Starting statistics calculation...', {
+    Logger.info('workspaces', 'Starting statistics calculation...', {
       workspacesCount: workspacesArray.length,
       tasksCount: tasksArray.length,
       categoriesCount: categoriesArray.length,
@@ -463,10 +464,10 @@ function Workspaces() {
         tasksOverTime
       };
       
-      console.log('Statistics calculated successfully:', statsData);
+      Logger.info('workspaces', 'Statistics calculated successfully:', statsData);
       setStatistics(statsData);
     } catch (error) {
-      console.error('Error calculating statistics:', error);
+      Logger.error('workspaces', 'Error calculating statistics:', error);
       setStatsLoading(false);
       isCalculatingRef.current = false;
     } finally {
@@ -476,7 +477,7 @@ function Workspaces() {
   }, [workspaces, tasks, categories, teams]);
 
   useEffect(() => {
-    console.log('Tab change detected:', { activeTab, loading, isCalculating: isCalculatingRef.current });
+    Logger.info('workspaces', 'Tab change detected:', { activeTab, loading, isCalculating: isCalculatingRef.current });
     
     // Reset statistics when switching away from statistics tab
     if (activeTab !== 'statistics') {
@@ -487,13 +488,13 @@ function Workspaces() {
     // Calculate statistics when switching to statistics tab
     // Only calculate if not already loading and data is available
     if (activeTab === 'statistics' && !isCalculatingRef.current && !loading) {
-      console.log('Triggering statistics calculation...');
+      Logger.info('workspaces', 'Triggering statistics calculation...');
       setStatistics(null); // Clear old stats first
       calculateStatistics();
     } else if (activeTab === 'statistics' && loading) {
-      console.log('Waiting for data to load before calculating statistics...');
+      Logger.info('workspaces', 'Waiting for data to load before calculating statistics...');
     } else if (activeTab === 'statistics' && isCalculatingRef.current) {
-      console.log('Statistics calculation already in progress...');
+      Logger.info('workspaces', 'Statistics calculation already in progress...');
     }
   }, [activeTab, calculateStatistics, loading]);
 
@@ -561,7 +562,7 @@ function Workspaces() {
                 e.preventDefault();
                 e.stopPropagation();
                 (e.nativeEvent as any)?.stopImmediatePropagation?.();
-                console.log('Button clicked for workspace:', workspaceId);
+                Logger.info('workspaces', 'Button clicked for workspace:', workspaceId);
                 handleToggleWorkspaceVisibility(workspaceId, e);
               }}
               disabled={!user}

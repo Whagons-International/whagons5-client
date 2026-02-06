@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from "react";
+import { useRef, useCallback, useEffect, useMemo } from "react";
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, GridReadyEvent } from 'ag-grid-community';
 
@@ -16,6 +16,13 @@ if (AG_GRID_LICENSE) {
 } else {
   console.warn('AG Grid Enterprise license key (VITE_AG_GRID_LICENSE_KEY) is missing.');
 }
+
+// Default column definition - defined outside component to prevent recreating on each render
+const DEFAULT_COL_DEF: ColDef = {
+  sortable: true,
+  filter: true,
+  resizable: true
+};
 
 export interface SettingsGridProps<T = any> {
   rowData: T[];
@@ -49,11 +56,7 @@ export function SettingsGrid<T = any>({
   height,
   className,
   noRowsMessage = "No data found",
-  defaultColDef = {
-    sortable: true,
-    filter: true,
-    resizable: true
-  },
+  defaultColDef = DEFAULT_COL_DEF,
   rowSelection,
   onSelectionChanged,
   onRowClicked,
@@ -88,6 +91,62 @@ export function SettingsGrid<T = any>({
     return () => window.removeEventListener('resize', handleWindowResize);
   }, []);
 
+  // Memoize defaultColDef to prevent AG Grid from re-rendering on every parent render
+  const mergedDefaultColDef = useMemo(() => ({
+    ...defaultColDef,
+    resizable: true
+  }), [defaultColDef]);
+
+  // Memoize getRowStyle to prevent infinite re-renders
+  const getRowStyle = useMemo(() => {
+    if (!zebraRows) return undefined;
+    return (params: any) => {
+      const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+      if (params.node.rowIndex % 2 === 0) {
+        return { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' };
+      }
+      return undefined as any;
+    };
+  }, [zebraRows]);
+
+  // Memoize noRowsOverlayComponent to prevent infinite re-renders
+  const NoRowsOverlay = useMemo(() => {
+    return () => (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-muted-foreground">{noRowsMessage}</p>
+      </div>
+    );
+  }, [noRowsMessage]);
+
+  // Memoize event handlers
+  const handleSelectionChanged = useCallback(() => {
+    if (gridRef.current?.api && onSelectionChanged) {
+      const selected = gridRef.current.api.getSelectedRows() as T[];
+      onSelectionChanged(selected);
+    }
+  }, [onSelectionChanged]);
+
+  const handleRowClicked = useCallback((event: any) => {
+    // Allow inner interactive elements to opt out of row click handling
+    // (e.g. buttons inside cells that should not trigger edit/open).
+    const target = event?.event?.target as HTMLElement | null | undefined;
+    if (target?.closest?.('[data-grid-stop-row-click="true"]')) {
+      return;
+    }
+    if (onRowClicked && event?.data) {
+      onRowClicked(event.data as T);
+    } else if (onRowDoubleClicked && event?.data) {
+      // If onRowDoubleClicked is provided but onRowClicked is not, trigger edit on single click
+      onRowDoubleClicked(event.data as T);
+    }
+  }, [onRowClicked, onRowDoubleClicked]);
+
+  const handleRowDoubleClicked = useCallback((event: any) => {
+    if (onRowDoubleClicked && event?.data) {
+      onRowDoubleClicked(event.data as T);
+    }
+  }, [onRowDoubleClicked]);
+
   return (
     <div
       className={`ag-theme-quartz wh-settings-grid wh-modern-grid wh-density-comfortable w-full ${className ?? ""}`}
@@ -103,53 +162,18 @@ export function SettingsGrid<T = any>({
         animateRows={true}
         rowHeight={rowHeight ?? 50}
         headerHeight={44}
-        defaultColDef={{
-          ...defaultColDef,
-          resizable: true
-        }}
+        defaultColDef={mergedDefaultColDef}
         onCellValueChanged={onCellValueChanged}
         onRowDragEnd={onRowDragEnd}
         getRowId={getRowId}
         autoGroupColumnDef={autoGroupColumnDef}
         {...(gridOptions || {})}
         quickFilterText={quickFilterText}
-        getRowStyle={zebraRows ? (params: any) => {
-          const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
-          if (params.node.rowIndex % 2 === 0) {
-            return { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' };
-          }
-          return undefined as any;
-        } : undefined}
-        onSelectionChanged={() => {
-          if (gridRef.current?.api && onSelectionChanged) {
-            const selected = gridRef.current.api.getSelectedRows() as T[];
-            onSelectionChanged(selected);
-          }
-        }}
-        onRowClicked={(event: any) => {
-          // Allow inner interactive elements to opt out of row click handling
-          // (e.g. buttons inside cells that should not trigger edit/open).
-          const target = event?.event?.target as HTMLElement | null | undefined;
-          if (target?.closest?.('[data-grid-stop-row-click="true"]')) {
-            return;
-          }
-          if (onRowClicked && event?.data) {
-            onRowClicked(event.data as T);
-          } else if (onRowDoubleClicked && event?.data) {
-            // If onRowDoubleClicked is provided but onRowClicked is not, trigger edit on single click
-            onRowDoubleClicked(event.data as T);
-          }
-        }}
-        onRowDoubleClicked={(event: any) => {
-          if (onRowDoubleClicked && event?.data) {
-            onRowDoubleClicked(event.data as T);
-          }
-        }}
-        noRowsOverlayComponent={() => (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-muted-foreground">{noRowsMessage}</p>
-          </div>
-        )}
+        getRowStyle={getRowStyle}
+        onSelectionChanged={handleSelectionChanged}
+        onRowClicked={handleRowClicked}
+        onRowDoubleClicked={handleRowDoubleClicked}
+        noRowsOverlayComponent={NoRowsOverlay}
       />
     </div>
   );

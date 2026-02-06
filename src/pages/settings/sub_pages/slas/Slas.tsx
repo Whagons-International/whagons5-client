@@ -144,7 +144,7 @@ function Slas() {
     handleDelete: handleDeleteAlert,
     handleCloseDeleteDialog: closeDeleteAlertDialog
   } = useSettingsState<SlaAlertRow>({
-    entityName: "slaAlerts",
+    entityName: "sla_alerts",
     searchFields: ["type", "notify_to"] as (keyof SlaAlertRow)[]
   });
 
@@ -174,7 +174,7 @@ function Slas() {
     handleDelete: handleDeletePolicy,
     handleCloseDeleteDialog: closeDeletePolicyDialog
   } = useSettingsState<SlaPolicyRow>({
-    entityName: "slaPolicies",
+    entityName: "sla_policies",
     searchFields: ["name", "trigger_type"] as (keyof SlaPolicyRow)[]
   });
 

@@ -65,7 +65,6 @@ export function useSettingsState<T extends { id: number; [key: string]: any }>({
   
   // Local state
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredItems, setFilteredItems] = useState<T[]>(items || []);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   
@@ -78,15 +77,15 @@ export function useSettingsState<T extends { id: number; [key: string]: any }>({
   const [editingItem, setEditingItem] = useState<T | null>(null);
   const [deletingItem, setDeletingItem] = useState<T | null>(null);
   
-  // Search functionality
-  const handleSearch = useCallback((query: string) => {
-    const lowerCaseQuery = query.toLowerCase();
+  // Compute filtered items directly with useMemo instead of useEffect + setState
+  // This avoids the infinite loop caused by handleSearch being recreated when items changes
+  const filteredItems = useMemo(() => {
+    const lowerCaseQuery = searchQuery.toLowerCase();
     if (!lowerCaseQuery) {
-      setFilteredItems(items);
-      return;
+      return items;
     }
     
-    const filtered = items.filter((item) => {
+    return items.filter((item) => {
       // Search in specified fields
       if (searchFields.length > 0) {
         return searchFields.some(field => {
@@ -100,21 +99,12 @@ export function useSettingsState<T extends { id: number; [key: string]: any }>({
         return value && typeof value === 'string' && value.toLowerCase().includes(lowerCaseQuery);
       });
     });
-    
-    setFilteredItems(filtered);
-  }, [items, searchFields]);
+  }, [items, searchQuery, searchFields]);
   
-  // Update filtered items when items change
-  useEffect(() => {
-    handleSearch(searchQuery);
-  }, [items, searchQuery, handleSearch]);
-  
-  // Ensure filteredItems is always synced with items
-  useEffect(() => {
-    if (!searchQuery) {
-      setFilteredItems(items || []);
-    }
-  }, [items, searchQuery]);
+  // Keep handleSearch for external use (e.g., search input onChange)
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+  }, []);
   
   // Get the collection for CRUD operations
   const collection = useMemo(() => getCollection(entityName), [entityName]);

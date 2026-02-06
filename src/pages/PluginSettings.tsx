@@ -4,15 +4,17 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { getPluginsConfig, togglePluginEnabled, togglePluginPinned, subscribeToPluginsConfig, type PluginConfig } from '@/components/AppSidebar';
-import { Pin, PinOff, Save } from 'lucide-react';
+import { Pin, PinOff, Save, Plus, Trash2 } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faStar } from '@fortawesome/free-solid-svg-icons';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/store/store';
-import { genericActions } from '@/store/genericSlices';
+import { genericActions, genericInternalActions } from '@/store/genericSlices';
 import { actionsApi } from '@/api/whagonsActionsApi';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { SelectField } from '@/pages/settings/components';
+import type { Status, CleaningStatus } from '@/store/types';
 import toast from 'react-hot-toast';
 
 interface PluginDetails {
@@ -29,6 +31,13 @@ function PluginSettings() {
 	const [selectedSpotTypeIds, setSelectedSpotTypeIds] = useState<string[]>([]);
 	const [savedSpotTypeIds, setSavedSpotTypeIds] = useState<string[]>([]);
 	const [saving, setSaving] = useState(false);
+	// Change to array of objects: [{status_id: number, cleaning_status_id: number}, ...]
+	const [statusToCleaningStatusMap, setStatusToCleaningStatusMap] = useState<Array<{status_id: number, cleaning_status_id: number}>>([]);
+	const [savedStatusToCleaningStatusMap, setSavedStatusToCleaningStatusMap] = useState<Array<{status_id: number, cleaning_status_id: number}>>([]);
+	const [savingStatusMapping, setSavingStatusMapping] = useState(false);
+	const [isAddingMapping, setIsAddingMapping] = useState(false);
+	const [newMappingStatusId, setNewMappingStatusId] = useState<string>('');
+	const [newMappingCleaningStatusId, setNewMappingCleaningStatusId] = useState<string>('');
 	
 	// Default to 'settings' tab
 	const activeTab = searchParams.get('tab') || 'settings';
@@ -42,7 +51,17 @@ function PluginSettings() {
 			return [];
 		}
 	});
-	const backendPlugin = pluginId ? plugins.find((p: any) => p.slug === pluginId || String(p.id) === String(pluginId)) : undefined;
+	const backendPlugin = pluginId ? plugins.find((p: any) => {
+		// First try to match by slug, then by id
+		if (p.slug === pluginId) return true;
+		if (String(p.id) === String(pluginId)) return true;
+		return false;
+	}) : undefined;
+	
+	// Ensure we have a valid slug for API calls
+	// If pluginId is numeric, it's likely an ID, so use the plugin's slug
+	// Otherwise, use pluginId as slug (it should be 'cleaning', 'broadcasts', etc.)
+	const effectivePluginSlug = backendPlugin?.slug || (isNaN(Number(pluginId)) ? pluginId : 'cleaning') || 'cleaning';
 
 	// Get spotTypes from Redux
 	const spotTypes = useSelector((state: RootState) => {
@@ -54,23 +73,64 @@ function PluginSettings() {
 		}
 	});
 
+	// Get statuses and cleaningStatuses from Redux
+	const statuses = useSelector((state: RootState) => {
+		try {
+			return (state as any).statuses?.value || [];
+		} catch (error) {
+			console.error('Error accessing statuses from Redux:', error);
+			return [];
+		}
+	}) as Status[];
+
+	const cleaningStatuses = useSelector((state: RootState) => {
+		try {
+			// Access the cleaningStatuses slice from the state
+			const slice = (state as any).cleaningStatuses;
+			if (!slice) {
+				console.warn('cleaningStatuses slice not found in Redux state');
+				return [];
+			}
+			const value = Array.isArray(slice.value) ? slice.value : [];
+			return value;
+		} catch (error) {
+			console.error('Error accessing cleaningStatuses from Redux:', error);
+			return [];
+		}
+	}) as CleaningStatus[];
+
 	useEffect(() => {
 		const unsubscribe = subscribeToPluginsConfig(setPluginsConfigState);
 		return unsubscribe;
 	}, []);
 
-	// Load spotTypes on mount
+	// Load spotTypes, statuses and cleaningStatuses on mount
 	useEffect(() => {
 		if (pluginId === 'cleaning') {
 			try {
-				if (genericActions?.spotTypes?.getFromIndexedDB) {
-					dispatch(genericActions.spotTypes.getFromIndexedDB() as any);
+				// Load spotTypes
+				if (genericInternalActions?.spotTypes?.getFromIndexedDB) {
+					dispatch(genericInternalActions.spotTypes.getFromIndexedDB() as any);
 				}
-				if (genericActions?.spotTypes?.fetchFromAPI) {
-					dispatch(genericActions.spotTypes.fetchFromAPI() as any);
+				if (genericInternalActions?.spotTypes?.fetchFromAPI) {
+					dispatch(genericInternalActions.spotTypes.fetchFromAPI() as any);
+				}
+				// Load statuses
+				if (genericInternalActions?.statuses?.getFromIndexedDB) {
+					dispatch(genericInternalActions.statuses.getFromIndexedDB() as any);
+				}
+				if (genericInternalActions?.statuses?.fetchFromAPI) {
+					dispatch(genericInternalActions.statuses.fetchFromAPI() as any);
+				}
+				// Load cleaningStatuses
+				if (genericInternalActions?.cleaningStatuses?.getFromIndexedDB) {
+					dispatch(genericInternalActions.cleaningStatuses.getFromIndexedDB() as any);
+				}
+				if (genericInternalActions?.cleaningStatuses?.fetchFromAPI) {
+					dispatch(genericInternalActions.cleaningStatuses.fetchFromAPI() as any);
 				}
 			} catch (error) {
-				console.error('Error loading spot types:', error);
+				console.error('Error loading data:', error);
 			}
 		}
 	}, [pluginId, dispatch]);
@@ -97,13 +157,39 @@ function PluginSettings() {
 				const spotTypeIdsString = spotTypeIds.map((id: number) => String(id));
 				setSelectedSpotTypeIds(spotTypeIdsString);
 				setSavedSpotTypeIds(spotTypeIdsString);
+
+				// Parse status to cleaning status mapping - now expects array of objects
+				const statusMapping = (settings as any).status_to_cleaning_status || [];
+				
+				// Handle migration from old format (object) to new format (array of objects)
+				let mappingsArray: Array<{status_id: number, cleaning_status_id: number}> = [];
+				
+				if (Array.isArray(statusMapping)) {
+					// New format: array of objects
+					mappingsArray = statusMapping.map((item: any) => ({
+						status_id: typeof item.status_id === 'string' ? parseInt(item.status_id, 10) : item.status_id,
+						cleaning_status_id: typeof item.cleaning_status_id === 'string' ? parseInt(item.cleaning_status_id, 10) : item.cleaning_status_id
+					})).filter((item: any) => !isNaN(item.status_id) && !isNaN(item.cleaning_status_id));
+				} else if (statusMapping && typeof statusMapping === 'object' && !Array.isArray(statusMapping)) {
+					// Old format: object like {"2": 2, "4": 3} - migrate to new format
+					mappingsArray = Object.entries(statusMapping).map(([statusId, cleaningStatusId]) => ({
+						status_id: parseInt(String(statusId), 10),
+						cleaning_status_id: typeof cleaningStatusId === 'string' ? parseInt(cleaningStatusId, 10) : cleaningStatusId
+					})).filter(item => !isNaN(item.status_id) && !isNaN(item.cleaning_status_id));
+				}
+				
+				setStatusToCleaningStatusMap(mappingsArray);
+				setSavedStatusToCleaningStatusMap(mappingsArray);
 			} catch (error) {
 				console.error('Error parsing plugin settings:', error);
 				setSelectedSpotTypeIds([]);
+				setStatusToCleaningStatusMap([]);
+				setSavedStatusToCleaningStatusMap([]);
 			}
 		} else if (pluginId === 'cleaning' && !backendPlugin) {
 			// Reset if plugin not found
 			setSelectedSpotTypeIds([]);
+			setStatusToCleaningStatusMap([]);
 		}
 	}, [backendPlugin, pluginId]);
 
@@ -147,22 +233,25 @@ function PluginSettings() {
 			};
 
 			// Use slug instead of id, and send settings as object (backend will handle it)
-			const pluginSlug = backendPlugin.slug || pluginId;
-			await actionsApi.patch(`/plugins/${pluginSlug}`, {
+			// Ensure we use the slug, not the ID
+			const pluginSlug = effectivePluginSlug;
+			const response = await actionsApi.patch(`/plugins/${pluginSlug}/settings`, {
 				settings: updatedSettings
 			});
 
-			// Update Redux store
-			dispatch(genericActions.plugins.updateAsync({
-				id: backendPlugin.id,
-				updates: { settings: updatedSettings }
-			}));
+			// Update Redux store with the response data
+			// Use updateItem directly instead of updateAsync to avoid extra API call
+			const savedPlugin = response?.data?.data;
+			if (savedPlugin) {
+				dispatch(genericActions.plugins.updateItem(savedPlugin));
+			}
 
 			setSavedSpotTypeIds([...selectedSpotTypeIds]);
 			toast.success(t('plugins.cleaning.spotTypesSaved', 'Spot types saved successfully'));
-		} catch (error) {
+		} catch (error: any) {
 			console.error('Error saving spot types:', error);
-			toast.error(t('plugins.cleaning.spotTypesError', 'Failed to save spot types'));
+			const errorMessage = error?.response?.data?.message || error?.message || t('plugins.cleaning.spotTypesError', 'Failed to save spot types');
+			toast.error(errorMessage);
 			// Revert to saved selection
 			setSelectedSpotTypeIds([...savedSpotTypeIds]);
 		} finally {
@@ -170,8 +259,129 @@ function PluginSettings() {
 		}
 	};
 
+	// Handle saving status to cleaning status mapping
+	const handleSaveStatusMapping = async () => {
+		if (!backendPlugin) {
+			console.error('Backend plugin not found');
+			toast.error(t('plugins.cleaning.statusMappingError', 'Failed to save status mapping'));
+			return;
+		}
+
+		setSavingStatusMapping(true);
+		
+		try {
+			// Convert to array of objects format
+			// Ensure statusToCleaningStatusMap is always an array
+			const currentMapping = Array.isArray(statusToCleaningStatusMap) ? statusToCleaningStatusMap : [];
+			const statusMappingArray = currentMapping.map(item => ({
+				status_id: typeof item.status_id === 'string' ? parseInt(item.status_id, 10) : item.status_id,
+				cleaning_status_id: typeof item.cleaning_status_id === 'string' ? parseInt(item.cleaning_status_id, 10) : item.cleaning_status_id
+			})).filter(item => !isNaN(item.status_id) && !isNaN(item.cleaning_status_id));
+
+			let currentSettings: any = {};
+			
+			if (backendPlugin.settings) {
+				if (typeof backendPlugin.settings === 'string') {
+					try {
+						currentSettings = JSON.parse(backendPlugin.settings);
+					} catch (e) {
+						console.error('Error parsing settings JSON:', e);
+						currentSettings = {};
+					}
+				} else if (typeof backendPlugin.settings === 'object') {
+					currentSettings = { ...backendPlugin.settings };
+				}
+			}
+			
+			// Set status_to_cleaning_status as array of objects
+			const updatedSettings = {
+				...currentSettings,
+				status_to_cleaning_status: statusMappingArray
+			};
+
+			// Use slug instead of id, and send settings as object (backend will handle it)
+			// Ensure we use the slug, not the ID
+			const pluginSlug = effectivePluginSlug;
+			
+			// Create payload with array of objects format
+			const payloadSettings = {
+				...updatedSettings,
+				status_to_cleaning_status: statusMappingArray
+			};
+			
+			const response = await actionsApi.patch(`/plugins/${pluginSlug}/settings`, {
+				settings: payloadSettings
+			});
+
+			// Update Redux store with the response data
+			// Use updateItem directly instead of updateAsync to avoid extra API call
+			const savedPlugin = response?.data?.data;
+			if (savedPlugin) {
+				dispatch(genericActions.plugins.updateItem(savedPlugin));
+			}
+
+			// Parse the saved settings to update local state
+			const savedSettings = savedPlugin?.settings || updatedSettings;
+			const savedStatusMapping = savedSettings?.status_to_cleaning_status || [];
+			const savedMappingsArray = Array.isArray(savedStatusMapping) 
+				? savedStatusMapping.map((item: any) => ({
+					status_id: typeof item.status_id === 'string' ? parseInt(item.status_id, 10) : item.status_id,
+					cleaning_status_id: typeof item.cleaning_status_id === 'string' ? parseInt(item.cleaning_status_id, 10) : item.cleaning_status_id
+				})).filter((item: any) => !isNaN(item.status_id) && !isNaN(item.cleaning_status_id))
+				: [];
+			
+			// Update saved mapping state
+			setStatusToCleaningStatusMap(savedMappingsArray);
+			setSavedStatusToCleaningStatusMap(savedMappingsArray);
+
+			toast.success(t('plugins.cleaning.statusMappingSaved', 'Status mapping saved successfully'));
+		} catch (error: any) {
+			console.error('Error saving status mapping:', error);
+			const errorMessage = error?.response?.data?.message || error?.message || t('plugins.cleaning.statusMappingError', 'Failed to save status mapping');
+			toast.error(errorMessage);
+			// Revert to saved mapping
+			setStatusToCleaningStatusMap([...savedStatusToCleaningStatusMap]);
+		} finally {
+			setSavingStatusMapping(false);
+		}
+	};
+
+	// Handle adding new mapping
+	const handleAddMapping = () => {
+		if (newMappingStatusId && newMappingCleaningStatusId) {
+			const newMapping = {
+				status_id: parseInt(newMappingStatusId, 10),
+				cleaning_status_id: parseInt(newMappingCleaningStatusId, 10)
+			};
+			setStatusToCleaningStatusMap(prev => {
+				const current = Array.isArray(prev) ? prev : [];
+				return [...current, newMapping];
+			});
+			setNewMappingStatusId('');
+			setNewMappingCleaningStatusId('');
+			setIsAddingMapping(false);
+		}
+	};
+
+	// Handle removing mapping
+	const handleRemoveMapping = (statusId: number) => {
+		setStatusToCleaningStatusMap(prev => {
+			const current = Array.isArray(prev) ? prev : [];
+			return current.filter(mapping => mapping.status_id !== statusId);
+		});
+	};
+
+	// Get available statuses (not already mapped)
+	// Ensure statusToCleaningStatusMap is always an array
+	const statusMappingArray = Array.isArray(statusToCleaningStatusMap) ? statusToCleaningStatusMap : [];
+	const availableStatuses = statuses.filter(status => 
+		!statusMappingArray.some(mapping => mapping.status_id === status.id)
+	);
+
 	// Check if there are unsaved changes
 	const hasUnsavedChanges = JSON.stringify(selectedSpotTypeIds.sort()) !== JSON.stringify(savedSpotTypeIds.sort());
+	const savedMappingArray = Array.isArray(savedStatusToCleaningStatusMap) ? savedStatusToCleaningStatusMap : [];
+	const hasUnsavedStatusMappingChanges = JSON.stringify(statusMappingArray.sort((a, b) => a.status_id - b.status_id)) !== JSON.stringify(savedMappingArray.sort((a, b) => a.status_id - b.status_id));
 
 	// Plugin details for summary tab
 	const getPluginDetails = (pluginId: string): PluginDetails => {
@@ -518,6 +728,175 @@ function PluginSettings() {
 									}
 								</Button>
 							</div>
+						</CardContent>
+					</Card>
+				)}
+
+				{/* Status to Cleaning Status Mapping for Cleaning Plugin */}
+				{pluginId === 'cleaning' && Array.isArray(statuses) && (
+					<Card>
+						<CardHeader>
+							<CardTitle className="flex items-center justify-between">
+								<span>{t('plugins.cleaning.statusMapping', 'Task Status to Cleaning Status Mapping')}</span>
+								{hasUnsavedStatusMappingChanges && (
+									<span className="text-xs text-amber-500 font-normal">
+										{t('plugins.cleaning.unsavedChanges', 'Unsaved changes')}
+									</span>
+								)}
+							</CardTitle>
+							<CardDescription>
+								{t('plugins.cleaning.statusMappingDescription', 'Configure which cleaning status to assign to spots when a task changes to a specific status. For example: "En Progreso" → "Cleaning", "Finalizado" → "Limpia"')}
+							</CardDescription>
+						</CardHeader>
+						<CardContent className="space-y-4">
+							{!Array.isArray(cleaningStatuses) || cleaningStatuses.length === 0 ? (
+								<div className="text-center py-8 text-muted-foreground">
+									<p>{t('plugins.cleaning.loadingCleaningStatuses', 'Loading cleaning statuses...')}</p>
+									<p className="text-xs mt-2">
+										{cleaningStatuses.length === 0 
+											? t('plugins.cleaning.noCleaningStatusesFound', 'No cleaning statuses found. Please create cleaning statuses first.')
+											: ''
+										}
+									</p>
+								</div>
+							) : (
+								<>
+									{/* Existing mappings */}
+									<div className="space-y-3">
+										{statusToCleaningStatusMap.length === 0 ? (
+											<div className="text-center py-6 text-muted-foreground text-sm">
+												{t('plugins.cleaning.noMappingsConfigured', 'No mappings configured. Click "Add Mapping" to create one.')}
+											</div>
+										) : (
+											(Array.isArray(statusToCleaningStatusMap) ? statusToCleaningStatusMap : []).map((mapping) => {
+												const status = statuses.find(s => s.id === mapping.status_id);
+												const cleaningStatus = cleaningStatuses.find(cs => cs.id === mapping.cleaning_status_id);
+												
+												if (!status || !cleaningStatus) {
+													return null;
+												}
+
+												return (
+													<div key={`${mapping.status_id}-${mapping.cleaning_status_id}`} className="flex items-center gap-4 p-3 border rounded-lg bg-muted/30">
+														<div className="flex-1">
+															<div className="flex items-center gap-2">
+																{status.color && (
+																	<div className="w-3 h-3 rounded-full" style={{ backgroundColor: status.color }} />
+																)}
+																<span className="font-medium">{status.name}</span>
+															</div>
+															<p className="text-xs text-muted-foreground mt-1">
+																{t('plugins.cleaning.whenTaskStatus', 'When task status is')} "{status.name}"
+															</p>
+														</div>
+														<div className="flex items-center gap-3 flex-1">
+															<span className="text-muted-foreground">→</span>
+															<div className="flex items-center gap-2 flex-1">
+																{cleaningStatus.color && (
+																	<div className="w-3 h-3 rounded-full" style={{ backgroundColor: cleaningStatus.color }} />
+																)}
+																<span className="font-medium">{cleaningStatus.name}</span>
+															</div>
+															<Button
+																variant="ghost"
+																size="icon"
+																onClick={() => handleRemoveMapping(mapping.status_id)}
+																className="h-8 w-8 text-destructive hover:text-destructive"
+																title={t('plugins.cleaning.removeMapping', 'Remove mapping')}
+															>
+																<Trash2 className="h-4 w-4" />
+															</Button>
+														</div>
+													</div>
+												);
+											})
+										)}
+									</div>
+
+									{/* Add new mapping form */}
+									{isAddingMapping ? (
+										<div className="p-4 border-2 border-dashed rounded-lg space-y-4">
+											<div className="grid grid-cols-2 gap-4">
+												<div>
+													<SelectField
+														id="new-status"
+														label={t('plugins.cleaning.selectTaskStatus', 'Task Status')}
+														value={newMappingStatusId}
+														onChange={(v) => setNewMappingStatusId(v)}
+														options={availableStatuses.map(s => ({
+															value: String(s.id),
+															label: s.name,
+															color: s.color
+														}))}
+														placeholder={t('plugins.cleaning.selectTaskStatusPlaceholder', 'Select task status...')}
+													/>
+												</div>
+												<div>
+													<SelectField
+														id="new-cleaning-status"
+														label={t('plugins.cleaning.selectCleaningStatusLabel', 'Cleaning Status')}
+														value={newMappingCleaningStatusId}
+														onChange={(v) => setNewMappingCleaningStatusId(v)}
+														options={cleaningStatuses.map(cs => ({
+															value: String(cs.id),
+															label: cs.name,
+															color: cs.color
+														}))}
+														placeholder={t('plugins.cleaning.selectCleaningStatus', 'Select cleaning status...')}
+													/>
+												</div>
+											</div>
+											<div className="flex justify-end gap-2">
+												<Button
+													variant="outline"
+													onClick={() => {
+														setIsAddingMapping(false);
+														setNewMappingStatusId('');
+														setNewMappingCleaningStatusId('');
+													}}
+												>
+													{t('plugins.cleaning.cancel', 'Cancel')}
+												</Button>
+												<Button
+													onClick={handleAddMapping}
+													disabled={!newMappingStatusId || !newMappingCleaningStatusId}
+													className="gap-2"
+												>
+													<Plus className="h-4 w-4" />
+													{t('plugins.cleaning.addMapping', 'Add Mapping')}
+												</Button>
+											</div>
+										</div>
+									) : (
+										<Button
+											variant="outline"
+											onClick={() => setIsAddingMapping(true)}
+											disabled={availableStatuses.length === 0 || cleaningStatuses.length === 0}
+											className="w-full gap-2"
+										>
+											<Plus className="h-4 w-4" />
+											{t('plugins.cleaning.addNewMapping', 'Add New Mapping')}
+										</Button>
+									)}
+
+									<p className="text-xs text-muted-foreground">
+										{t('plugins.cleaning.statusMappingHint', 'When a task changes to a status, the associated spot will automatically update its cleaning status.')}
+									</p>
+									<div className="flex justify-end pt-2">
+										<Button
+											onClick={handleSaveStatusMapping}
+											disabled={savingStatusMapping || !hasUnsavedStatusMappingChanges || !backendPlugin}
+											className="gap-2"
+										>
+											<Save className="h-4 w-4" />
+											{savingStatusMapping 
+												? t('plugins.cleaning.saving', 'Saving...')
+												: t('plugins.cleaning.save', 'Save')
+											}
+										</Button>
+									</div>
+								</>
+							)}
 						</CardContent>
 					</Card>
 				)}

@@ -1,6 +1,6 @@
 import { auth } from "@/firebase/firebaseConfig";
 import { Task } from "../types";
-import { DB } from "./DB";
+import { DB, buildTaskQuery, hasSQLSupport } from "../database";
 import { api } from "@/store/api/internalApi";
 import { TaskEvents } from "@/store/eventEmiters/taskEvents";
 
@@ -232,6 +232,68 @@ export class TasksCache {
         try {
             if (!DB.inited) await DB.init();
             
+            // Use SQL query path if DuckDB is available (much faster for complex filters)
+            if (hasSQLSupport && DB.query) {
+                return this.queryTasksSQL(params);
+            }
+
+            // Fallback to JavaScript filtering for IndexedDB
+            return this.queryTasksJS(params);
+        } catch (error) {
+            console.error("queryTasks", error);
+            throw error;
+        }
+    }
+
+    /**
+     * SQL-based task query using DuckDB.
+     * Much more efficient for complex filtering and pagination.
+     */
+    private static async queryTasksSQL(params: any = {}) {
+        const { sql, countSql } = buildTaskQuery(params);
+        
+        if (localStorage.getItem('wh-debug-duckdb') === 'true') {
+            console.log('[TasksCache] SQL Query:', sql);
+            console.log('[TasksCache] Count Query:', countSql);
+        }
+
+        const [rows, countResult] = await Promise.all([
+            DB.query!(sql),
+            DB.query!(countSql),
+        ]);
+
+        const totalCount = countResult?.[0]?.count ?? rows?.length ?? 0;
+
+        // Handle pagination response format
+        if (params.per_page && params.page) {
+            // API-style pagination
+            const perPage = parseInt(params.per_page) || 15;
+            const page = parseInt(params.page) || 1;
+            const startIndex = (page - 1) * perPage;
+            
+            return {
+                data: rows || [],
+                current_page: page,
+                per_page: perPage,
+                total: totalCount,
+                last_page: Math.ceil(totalCount / perPage),
+                from: startIndex + 1,
+                to: Math.min(startIndex + perPage, totalCount)
+            };
+        } else {
+            // AG Grid-style or simple response
+            return {
+                rows: rows || [],
+                rowCount: totalCount
+            };
+        }
+    }
+
+    /**
+     * JavaScript-based task query (original implementation).
+     * Used as fallback when DuckDB is not available.
+     */
+    private static async queryTasksJS(params: any = {}) {
             const sharedWithMe = !!params.shared_with_me;
 
             // Get tasks from appropriate store (tasks vs shared_tasks)
@@ -475,10 +537,6 @@ export class TasksCache {
                     rowCount: tasks.length
                 };
             }
-        } catch (error) {
-            console.error("queryTasks", error);
-            throw error;
-        }
     }
 
     /**

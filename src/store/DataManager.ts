@@ -2,7 +2,7 @@ import { AppDispatch } from './store';
 import { genericInternalActions } from './genericSlices';
 import { getTasksFromIndexedDB } from './reducers/tasksSlice';
 import { fetchRoles } from './reducers/rolesSlice';
-import { DB } from './indexedDB/DB';
+import { DB } from './database';
 import { getCacheForTable, syncReduxForTable } from './indexedDB/CacheRegistry';
 import { auth } from '@/firebase/firebaseConfig';
 import { api as apiClient } from './api/internalApi';

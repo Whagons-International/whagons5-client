@@ -16,7 +16,7 @@ import { fetchNotificationPreferences } from '../store/reducers/notificationPref
 
 // Custom caches with advanced features
 import { RealTimeListener, setGlobalRtl } from '@/store/realTimeListener/RTL';
-import { DB } from '@/store/indexedDB/DB';
+import { DB } from '@/store/database';
 import { DataManager } from '@/store/DataManager';
 import { requestNotificationPermission, setupForegroundMessageHandler, unregisterToken } from '@/firebase/fcmHelper';
 

@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Clock, Calendar } from "lucide-react";
-import { DB } from "@/store/indexedDB/DB";
+import { DB } from "@/store/database";
 import { TasksCache } from "@/store/indexedDB/TasksCache";
 import { cn } from "@/lib/utils";
 

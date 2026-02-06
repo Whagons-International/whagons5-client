@@ -1,5 +1,5 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import { DB } from "../indexedDB/DB";
+import { DB } from "../database";
 import { genericInternalActions } from "../genericSlices";
 
 /**

@@ -11,7 +11,7 @@ import {
   sendEmailVerification
 } from 'firebase/auth';
 import { clearAuth } from '../../api/whagonsApi';
-import { DB } from '@/store/indexedDB/DB';
+import { DB } from '@/store/database';
 import { getEnvVariables } from '@/lib/getEnvVariables';
 
 

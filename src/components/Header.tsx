@@ -47,7 +47,7 @@ import { useLanguage } from "@/providers/LanguageProvider";
 import { ActiveFilterChips } from "@/components/ActiveFilterChips";
 import { genericActions, genericInternalActions } from "@/store/genericSlices";
 import { cleanupExpiredNotifications, markAllViewedNotifications } from "@/store/reducers/notificationThunks";
-import { DB } from "@/store/indexedDB/DB";
+import { DB } from "@/store/database";
 
 
 // Avatars are now cached globally in IndexedDB via AvatarCache

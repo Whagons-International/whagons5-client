@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, Paperclip, Smile } from "lucide-react";
-import { useDispatch, useSelector } from "react-redux";
-import { genericActions } from "@/store/genericSlices";
 import { useAuth } from "@/providers/AuthProvider";
 import { useLanguage } from "@/providers/LanguageProvider";
 import dayjs from "dayjs";
@@ -13,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 import { uploadWorkspaceResource, getWorkspaceResourceUrl } from "@/api/workspaceResourcesApi";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { useTable, collections } from "@/store/dexie";
 import {
   faFile,
   faFilePdf,
@@ -95,13 +94,12 @@ export default function ChatTab({ workspaceId }: { workspaceId: string | undefin
   const { t } = useLanguage();
   const [input, setInput] = useState("");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
-  const dispatch = useDispatch<any>();
   const endRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const { user } = useAuth();
-  const users = useSelector((state: RootState) => (state.users as any).value);
-  const workspaceChat = useSelector((state: RootState) => (state.workspaceChat as any).value);
+  const users = useTable('users');
+  const workspaceChat = useTable('workspace_chat');
 
   // Filter messages by workspace_id and sort by created_at
   const messages = workspaceId && !isNaN(Number(workspaceId))
@@ -140,7 +138,7 @@ export default function ChatTab({ workspaceId }: { workspaceId: string | undefin
         user_id: Number(user.id)
       };
 
-      await dispatch(genericActions.workspaceChat.addAsync(chatMessage)).unwrap();
+      await collections.workspace_chat.add(chatMessage);
     } catch (error: any) {
       console.error("Failed to send message:", error);
       setInput(messageText);
@@ -174,7 +172,7 @@ export default function ChatTab({ workspaceId }: { workspaceId: string | undefin
         message: `[${file.name}](${fileUrl})`,
         user_id: Number(user.id)
       };
-      await dispatch(genericActions.workspaceChat.addAsync(chatMessage)).unwrap();
+      await collections.workspace_chat.add(chatMessage);
     } catch (error: any) {
       console.error("Failed to upload attachment:", error);
       alert(`Error: ${error?.response?.data?.message || error?.message || 'Failed to upload attachment.'}`);

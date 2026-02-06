@@ -11,7 +11,7 @@ import {
   sendEmailVerification
 } from 'firebase/auth';
 import { clearAuth } from '../../api/whagonsApi';
-import { DB } from '@/store/database';
+import { clearAllData } from '@/store/dexie';
 import { getEnvVariables } from '@/lib/getEnvVariables';
 
 
@@ -96,10 +96,11 @@ export const logout = async (): Promise<void> => {
       // Clear auth tokens from both memory and storage before signing out
       clearAuth();
       
-      // Best-effort: fully delete the current user's IndexedDB before signing out
-      const uid = auth.currentUser?.uid;
-      if (uid) {
-        await DB.deleteDatabase(uid);
+      // Best-effort: clear Dexie data before signing out
+      try {
+        await clearAllData();
+      } catch (e) {
+        console.warn('Failed to clear Dexie on logout:', e);
       }
 
       await signOut(auth);

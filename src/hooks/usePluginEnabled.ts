@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
-import { useSelector } from 'react-redux';
-import { RootState } from '@/store/store';
+import { useTable } from '@/store/dexie';
 
 interface Plugin {
   id: number;
@@ -15,12 +14,12 @@ interface Plugin {
  * @returns Object with isEnabled boolean and plugin data
  */
 export function usePluginEnabled(pluginSlug: string) {
-  const { value: plugins, loading } = useSelector(
-    (state: RootState) => state.plugins
-  ) as { value: Plugin[]; loading: boolean };
+  const plugins = useTable<Plugin>('plugins');
+  const loading = plugins === undefined;
 
   const result = useMemo(() => {
-    const plugin = plugins.find(p => p.slug === pluginSlug);
+    const pluginList = plugins || [];
+    const plugin = pluginList.find(p => p.slug === pluginSlug);
     return {
       isEnabled: plugin?.is_enabled ?? false,
       plugin,

@@ -1,6 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
@@ -19,7 +18,6 @@ import {
   faCheckCircle,
   faUser
 } from "@fortawesome/free-solid-svg-icons";
-import { RootState, AppDispatch } from "@/store/store";
 import { Team, Category, Task, Role, UserTeam } from "@/store/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,8 +38,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
 import ReactECharts from "echarts-for-react";
 import dayjs from "dayjs";
 import { useLanguage } from "@/providers/LanguageProvider";
-import { genericActions } from "@/store/genericSlices";
 import { Plus, Trash } from "lucide-react";
+import { useTable, collections } from "@/store/dexie";
 
 // Custom cell renderer: show color avatar, name, and description stacked
 const TeamNameCellRenderer = (props: ICellRendererParams) => {
@@ -71,15 +69,14 @@ function Teams() {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const tt = (key: string, fallback: string) => t(`settings.teams.${key}`, fallback);
-  const dispatch = useDispatch<AppDispatch>();
   const noneOptionLabel = tt('fields.none', 'None');
   const unassignedOptionLabel = tt('fields.unassigned', 'Unassigned');
-  // Redux state for related data
-  const { value: categories } = useSelector((state: RootState) => state.categories);
-  const { value: tasks } = useSelector((state: RootState) => state.tasks);
-  const { value: users } = useSelector((state: RootState) => (state as any).users || { value: [] });
-  const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
-  const { value: roles } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
+  // Dexie state for related data
+  const categories = useTable('categories') ?? [];
+  const tasks = useTable('tasks') ?? [];
+  const users = useTable('users') ?? [];
+  const userTeams = useTable('user_teams') as UserTeam[] ?? [];
+  const roles = useTable('roles') as Role[] ?? [];
   
   // Use shared state management
   const {
@@ -266,29 +263,24 @@ function Teams() {
     const toRemove = existing.filter((ex) => !current.some((c) => c.id === ex.id));
 
     for (const add of toAdd) {
-      await dispatch((genericActions as any).userTeams.addAsync({
+      await collections.userTeams.add({
         user_id: add.userIdNum,
         team_id: teamId,
         role_id: add.roleIdNum
-      })).unwrap();
+      });
     }
 
     for (const upd of toUpdate) {
-      await dispatch((genericActions as any).userTeams.updateAsync({
-        id: upd.id,
-        updates: {
-          user_id: upd.userIdNum,
-          team_id: teamId,
-          role_id: upd.roleIdNum
-        }
-      })).unwrap();
+      await collections.userTeams.update(upd.id!, {
+        user_id: upd.userIdNum,
+        team_id: teamId,
+        role_id: upd.roleIdNum
+      });
     }
 
     for (const del of toRemove) {
-      await dispatch((genericActions as any).userTeams.removeAsync(del.id)).unwrap();
+      await collections.userTeams.delete(del.id);
     }
-
-    dispatch((genericActions as any).userTeams.getFromIndexedDB?.());
   };
 
   // Open edit with immediate form population to avoid flicker

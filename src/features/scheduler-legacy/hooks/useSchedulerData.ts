@@ -1,6 +1,4 @@
 import { useMemo } from "react";
-import { useSelector } from "react-redux";
-import type { RootState } from "@/store/store";
 import type { SchedulerResource, SchedulerEvent } from "../types/scheduler";
 import { parseLocalDateTime } from "../utils/dateTime";
 

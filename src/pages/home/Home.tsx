@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSelector } from "react-redux";
-import { RootState } from "@/store/store";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -10,6 +8,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import WhagonsTitle from '@/assets/WhagonsTitle';
 import RotatingBackground from "@/components/marketing/RotatingBackground";
 import { HERO_BACKGROUND_IMAGES } from "@/assets/marketing/heroBackgrounds";
+import { useTable } from "@/store/dexie";
 
 function Home() {
   const navigate = useNavigate();
@@ -145,20 +144,12 @@ function Home() {
     };
   }, [showWelcome]);
 
-  // Safely destructure with default values
-  const workspacesState = useSelector((s: RootState) => s.workspaces);
-  const teamsState = useSelector((s: RootState) => s.teams);
-  const categoriesState = useSelector((s: RootState) => s.categories);
-  const templatesState = useSelector((s: RootState) => s.templates);
-  const tasksState = useSelector((s: RootState) => s.tasks);
-
-  const { value: workspaces = [] } = workspacesState || {};
-  const { value: teams = [] } = teamsState || {};
-  const { value: categories = [] } = categoriesState || {};
-  const { value: templates = [] } = templatesState || {};
-  const { value: tasks = [] } = tasksState || {};
-
-  // Data is hydrated globally in AuthProvider; no fetching here
+  // Data from Dexie (live queries - auto-update on changes)
+  const workspaces = useTable('workspaces') ?? [];
+  const teams = useTable('teams') ?? [];
+  const categories = useTable('categories') ?? [];
+  const templates = useTable('templates') ?? [];
+  const tasks = useTable('tasks') ?? [];
 
   const topWorkspaces = useMemo(() => workspaces.slice(0, 6), [workspaces]);
 

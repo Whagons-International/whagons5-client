@@ -1,10 +1,8 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
-import { useSelector } from "react-redux";
 import { useLocation } from "react-router-dom";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDiagramProject, faPlus, faChartBar, faSpinner, faExclamationTriangle, faCheckCircle, faClock, faUsers, faLayerGroup, faTrash, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
-import { RootState } from "@/store/store";
 import { Workspace, Task, Category } from "@/store/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +22,7 @@ import dayjs from 'dayjs';
 import { useLanguage } from "@/providers/LanguageProvider";
 import { useAuth } from "@/providers/AuthProvider";
 import { actionsApi } from "@/api/whagonsActionsApi";
+import { useTable } from "@/store/dexie";
 
 // Custom cell renderer for workspace name with color indicator
 const WorkspaceNameCellRenderer = (props: ICellRendererParams) => {
@@ -56,10 +55,10 @@ function Workspaces() {
   const { user, refetchUser, updateUser } = useAuth();
   const location = useLocation();
   
-  // Redux state for related data
-  const { value: categories } = useSelector((state: RootState) => state.categories);
-  const { value: tasks } = useSelector((state: RootState) => state.tasks);
-  const { value: teams } = useSelector((state: RootState) => state.teams);
+  // Dexie state for related data
+  const categories = useTable('categories');
+  const tasks = useTable('tasks');
+  const teams = useTable('teams');
   
   // Get hidden workspace IDs from user settings
   const hiddenWorkspaceIds = useMemo(() => {

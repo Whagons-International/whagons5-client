@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -21,11 +20,10 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { genericActions } from '@/store/genericSlices';
 import { BroadcastFormData } from '@/types/broadcast';
-import { RootState } from '@/store/store';
 import { MultiSelect } from '@/components/ui/multi-select';
 import toast from 'react-hot-toast';
+import { useTable, collections } from '@/store/dexie';
 
 interface CreateBroadcastDialogProps {
   open: boolean;
@@ -34,12 +32,11 @@ interface CreateBroadcastDialogProps {
 
 function CreateBroadcastDialog({ open, onOpenChange }: CreateBroadcastDialogProps) {
   const { t } = useLanguage();
-  const dispatch = useDispatch();
 
-  // Redux state
-  const { value: users } = useSelector((state: RootState) => (state as any).users || { value: [] });
-  const { value: teams } = useSelector((state: RootState) => (state as any).teams || { value: [] });
-  const { value: roles } = useSelector((state: RootState) => state.roles) as { value: any[]; loading: boolean };
+  // Dexie state
+  const users = useTable('users');
+  const teams = useTable('teams');
+  const roles = useTable('roles');
 
   // Form state
   const [formData, setFormData] = useState<BroadcastFormData>({
@@ -102,7 +99,7 @@ function CreateBroadcastDialog({ open, onOpenChange }: CreateBroadcastDialogProp
 
     setIsSubmitting(true);
     try {
-      await dispatch(genericActions.broadcasts.addAsync(formData) as any);
+      await collections.broadcasts.add(formData);
       toast.success(t('broadcasts.create.success', 'Broadcast created successfully'));
       onOpenChange(false);
       resetForm();

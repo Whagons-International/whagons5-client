@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { useSelector } from 'react-redux';
-import type { RootState } from '@/store/store';
+import { useLiveQuery } from '@/store/dexie';
+import { collections } from '@/store/dexie';
 import type { 
     DialogLayout, 
     DialogFieldConfig, 
@@ -86,10 +86,10 @@ const DATE_FIELD_IDS = ['start_date', 'due_date', 'recurrence'];
  * @returns DialogLayoutResult with layout data and helpers
  */
 export function useDialogLayout({ categoryId, isFromScheduler = false }: UseDialogLayoutOptions): DialogLayoutResult {
-    // Get categories from Redux
-    const categories = useSelector((state: RootState) => state.categories.value);
-    const categoryCustomFieldsAll = useSelector((state: RootState) => state.categoryCustomFields.value);
-    const customFields = useSelector((state: RootState) => state.customFields.value);
+    // Get data from Dexie with useLiveQuery
+    const categories = useLiveQuery(() => collections.categories.getAll()) || [];
+    const categoryCustomFieldsAll = useLiveQuery(() => collections.categoryCustomFields.getAll()) || [];
+    const customFields = useLiveQuery(() => collections.customFields.getAll()) || [];
     
     // Get the current category
     const category = useMemo(() => {

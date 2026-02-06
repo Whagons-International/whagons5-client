@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '@/store/store';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +17,7 @@ import {
 import toast from 'react-hot-toast';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { actionsApi } from '@/api/whagonsActionsApi';
-import { genericActions, genericInternalActions, genericCaches } from '@/store/genericSlices';
+import { useLiveQuery, db, collections } from '@/store/dexie';
 
 interface Plugin {
 	id: number;
@@ -37,25 +35,23 @@ interface Plugin {
 
 export default function PluginManagement() {
 	const { t } = useLanguage();
-	const dispatch = useDispatch();
-	const plugins = useSelector((state: RootState) => (state as any).plugins?.value || []) as Plugin[];
-	const loading = useSelector((state: RootState) => (state as any).plugins?.loading || false);
+	const plugins = useLiveQuery(() => db.table<Plugin>('plugins').toArray(), []) || [];
+	const [loading, setLoading] = useState(false);
 	const [toggling, setToggling] = useState<Record<string, boolean>>({});
-
-	// Fetch plugins on mount
-	useEffect(() => {
-		fetchPlugins();
-	}, []);
 
 	const fetchPlugins = async () => {
 		try {
-			// First try to get from IndexedDB (fast)
-			dispatch(genericInternalActions.plugins.getFromIndexedDB());
-			// Then fetch from API to ensure we have latest data
-			dispatch(genericInternalActions.plugins.fetchFromAPI());
+			setLoading(true);
+			// Fetch from API and update Dexie
+			const response = await actionsApi.get('/plugins');
+			const data = response.data?.data || response.data || [];
+			await db.table('plugins').clear();
+			await db.table('plugins').bulkPut(data);
 		} catch (error) {
 			console.error('Error fetching plugins:', error);
 			toast.error('Failed to fetch plugins');
+		} finally {
+			setLoading(false);
 		}
 	};
 
@@ -69,11 +65,8 @@ export default function PluginManagement() {
 			// Extract plugin data from response (handle API response envelope)
 			const updatedPlugin = response.data?.data || response.data || response;
 			
-			// Update cache with the response data
-			await genericCaches.plugins.update(updatedPlugin.id, updatedPlugin);
-			
-			// Update Redux state directly with the response data
-			dispatch(genericInternalActions.plugins.updateItem(updatedPlugin));
+			// Update Dexie - useLiveQuery will automatically update UI
+			await db.table('plugins').put(updatedPlugin);
 			
 			toast.success(
 				`${plugin.name} has been ${!plugin.is_enabled ? 'enabled' : 'disabled'}`

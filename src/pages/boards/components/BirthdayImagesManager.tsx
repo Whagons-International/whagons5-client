@@ -1,9 +1,7 @@
 import { useState } from 'react';
-import { useDispatch } from 'react-redux';
 import { Plus, Trash2, Image, Loader2, Cake } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { genericActions } from '@/store/genericSlices';
 import { uploadFile, UploadedFile } from '@/api/assetApi';
 import {
   Dialog,
@@ -13,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { collections } from '@/store/dexie';
 
 interface BirthdayImage {
   id: string | number;
@@ -47,7 +46,6 @@ export function BirthdayImagesManager({
   onImagesChange,
 }: BirthdayImagesManagerProps) {
   const { t } = useLanguage();
-  const dispatch = useDispatch();
   
   const [isUploading, setIsUploading] = useState(false);
   const [previewImage, setPreviewImage] = useState<BirthdayImage | null>(null);
@@ -82,12 +80,12 @@ export function BirthdayImagesManager({
       const uploadResult: UploadedFile = await uploadFile(file);
       
       // Create birthday image record
-      await dispatch(genericActions.boardBirthdayImages.addAsync({
+      await collections.board_birthday_images.add({
         board_id: boardId,
         file_path: uploadResult.url || uploadResult.imgproxy_url || '',
         file_name: file.name,
         uploaded_by: currentUserId,
-      }) as any);
+      });
 
       onImagesChange?.();
     } catch (error) {
@@ -107,7 +105,7 @@ export function BirthdayImagesManager({
 
     setDeletingId(imageId);
     try {
-      await dispatch(genericActions.boardBirthdayImages.removeAsync(imageId) as any);
+      await collections.board_birthday_images.delete(imageId);
       onImagesChange?.();
     } catch (error) {
       console.error('Failed to delete birthday image:', error);

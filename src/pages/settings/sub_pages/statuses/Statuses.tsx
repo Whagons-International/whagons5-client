@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { useDispatch, useSelector } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faPlus,
@@ -17,8 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SettingsGrid } from "@/pages/settings/components/SettingsGrid";
 import type { ColDef } from "ag-grid-community";
-import { RootState, AppDispatch } from "@/store/store";
-import { genericActions } from "@/store/genericSlices";
+import { collections, useLiveQuery } from "@/store/dexie";
 import { SettingsDialog } from "@/pages/settings/components/SettingsDialog";
 import { TextField, CheckboxField, SelectField } from "@/pages/settings/components/FormFields";
 import { IconPicker } from "@/pages/settings/components/IconPicker";
@@ -46,13 +44,11 @@ const ACTION_ACCENTS: Record<string, string> = {
 function Statuses() {
   const { t } = useLanguage();
   const ts = (key: string, fallback: string) => t(`settings.statuses.${key}`, fallback);
-  
-  const dispatch = useDispatch<AppDispatch>();
 
-  // Selectors
-  const statuses = useSelector((s: RootState) => s.statuses.value) as any[];
-  const statusTransitions = useSelector((s: RootState) => s.statusTransitions.value) as any[];
-  const statusTransitionGroups = useSelector((s: RootState) => s.statusTransitionGroups.value) as any[];
+  // Dexie queries with useLiveQuery
+  const statuses = useLiveQuery(() => collections.statuses.getAll()) || [];
+  const statusTransitions = useLiveQuery(() => collections.statusTransitions.getAll()) || [];
+  const statusTransitionGroups = useLiveQuery(() => collections.statusTransitionGroups.getAll()) || [];
   
   // Local UI state
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
@@ -102,7 +98,7 @@ function Statuses() {
     );
 
     transitionsToRemove.forEach((transition: any) => {
-      dispatch(genericActions.statusTransitions.removeAsync(transition.id));
+      collections.statusTransitions.delete(transition.id);
     });
 
     setActiveStatuses(prev => {
@@ -235,14 +231,18 @@ function Statuses() {
         const onToggle = async () => {
           if (!id) return;
           const next = !checked;
-          // If setting this as initial, unset any other initial
-          if (next) {
-            const currentInitial = (statuses || []).find((s: any) => s.initial && s.id !== id);
-            if (currentInitial) {
-              dispatch(genericActions.statuses.updateAsync({ id: currentInitial.id, updates: { initial: false } }));
+          try {
+            // If setting this as initial, unset any other initial
+            if (next) {
+              const currentInitial = (statuses || []).find((s: any) => s.initial && s.id !== id);
+              if (currentInitial) {
+                await collections.statuses.update(currentInitial.id, { initial: false });
+              }
             }
+            await collections.statuses.update(id, { initial: next });
+          } catch (error) {
+            console.error('Failed to update status:', error);
           }
-          dispatch(genericActions.statuses.updateAsync({ id, updates: { initial: next } }));
         };
         return (
           <Checkbox
@@ -253,7 +253,7 @@ function Statuses() {
         );
       }
     }
-  ], [dispatch, statuses, ts]);
+  ], [statuses, ts]);
 
   // Derived map for fast lookup of transitions in selected group
   const transitionsByKey = useMemo(() => {
@@ -293,31 +293,31 @@ function Statuses() {
       // Find the transition row id to remove
       const row = statusTransitions.find((t: any) => Number(t.status_transition_group_id) === Number(selectedGroupId) && Number(t.from_status) === Number(fromId) && Number(t.to_status) === Number(toId));
       if (row) {
-        dispatch(genericActions.statusTransitions.removeAsync(row.id));
+        await collections.statusTransitions.delete(row.id);
       }
     } else {
-      dispatch(genericActions.statusTransitions.addAsync({
+      await collections.statusTransitions.add({
         status_transition_group_id: selectedGroupId,
         from_status: fromId,
         to_status: toId
-      }));
+      });
     }
   };
 
-  const handleCreateGroup = (name: string) => {
+  const handleCreateGroup = async (name: string) => {
     if (!name.trim()) return;
-    dispatch(genericActions.statusTransitionGroups.addAsync({ name: name.trim(), description: '', is_default: false, is_active: true } as any));
+    await collections.statusTransitionGroups.add({ name: name.trim(), description: '', is_default: false, is_active: true });
   };
 
-  const handleRenameGroup = (name: string) => {
+  const handleRenameGroup = async (name: string) => {
     if (!selectedGroupId) return;
     if (!name.trim()) return;
-    dispatch(genericActions.statusTransitionGroups.updateAsync({ id: selectedGroupId, updates: { name: name.trim() } }));
+    await collections.statusTransitionGroups.update(selectedGroupId, { name: name.trim() });
   };
 
-  const handleDeleteGroup = () => {
+  const handleDeleteGroup = async () => {
     if (!selectedGroupId) return;
-    dispatch(genericActions.statusTransitionGroups.removeAsync(selectedGroupId));
+    await collections.statusTransitionGroups.delete(selectedGroupId);
     setSelectedGroupId(null);
   };
 
@@ -946,7 +946,7 @@ function Statuses() {
               if (formInitial) {
                 const currentInitial = statuses.find((s: any) => s.initial === true);
                 if (currentInitial) {
-                  await dispatch(genericActions.statuses.updateAsync({ id: currentInitial.id, updates: { initial: false } }));
+                  await collections.statuses.update(currentInitial.id, { initial: false });
                 }
               }
 
@@ -961,12 +961,10 @@ function Statuses() {
                 initial: !!formInitial,
                 celebration_enabled: !!formCelebrationEnabled
               };
-              const result: any = await dispatch(genericActions.statuses.addAsync(payload));
-              if (result?.meta?.requestStatus === 'rejected') {
-                setFormError(result?.payload || result?.error?.message || 'Failed to create');
-                return;
-              }
+              await collections.statuses.add(payload);
               setCreateOpen(false);
+            } catch (error: any) {
+              setFormError(error?.message || 'Failed to create');
             } finally {
               setIsCreating(false);
             }
@@ -1001,7 +999,7 @@ function Statuses() {
               if (formInitial) {
                 const othersInitial = statuses.find((s: any) => s.initial === true && s.id !== selectedStatus.id);
                 if (othersInitial) {
-                  await dispatch(genericActions.statuses.updateAsync({ id: othersInitial.id, updates: { initial: false } }));
+                  await collections.statuses.update(othersInitial.id, { initial: false });
                 }
               }
 
@@ -1016,12 +1014,10 @@ function Statuses() {
                 initial: !!formInitial,
                 celebration_enabled: !!formCelebrationEnabled
               };
-              const result: any = await dispatch(genericActions.statuses.updateAsync({ id: selectedStatus.id, updates }));
-              if (result?.meta?.requestStatus === 'rejected') {
-                setFormError(result?.payload || result?.error?.message || 'Failed to update');
-                return;
-              }
+              await collections.statuses.update(selectedStatus.id, updates);
               setEditOpen(false);
+            } catch (error: any) {
+              setFormError(error?.message || 'Failed to update');
             } finally {
               setIsUpdating(false);
             }
@@ -1073,9 +1069,11 @@ function Statuses() {
           if (selectedStatus.system) { setFormError(ts("dialogs.delete.systemError", "Los estados del sistema no se pueden eliminar")); return; }
           try {
             setIsDeleting(true);
-            await dispatch(genericActions.statuses.removeAsync(selectedStatus.id));
+            await collections.statuses.delete(selectedStatus.id);
             setDeleteOpen(false);
             setSelectedStatus(null);
+          } catch (error: any) {
+            setFormError(error?.message || 'Failed to delete');
           } finally {
             setIsDeleting(false);
           }

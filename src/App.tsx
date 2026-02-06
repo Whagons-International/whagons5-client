@@ -171,7 +171,7 @@ const ServiceWorkerListener = () => {
         }
       }
 
-      // Handle new notifications - refresh from IndexedDB and show toast
+      // Handle new notifications - show toast (Dexie reactivity handles refresh)
       if (event.data.type === 'NEW_NOTIFICATION') {
         const notification = event.data.notification;
         
@@ -184,11 +184,7 @@ const ServiceWorkerListener = () => {
           duration: 6000,
         });
         
-        // Dynamically import to avoid circular dependencies
-        const { store } = await import('./store/store');
-        const { genericInternalActions } = await import('./store/genericSlices');
-        
-        await store.dispatch(genericInternalActions.notifications.getFromIndexedDB({ force: true }) as any);
+        // Dexie's useLiveQuery will automatically update UI when RTL writes new notification
       }
     };
 

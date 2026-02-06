@@ -1,11 +1,10 @@
 import { useMemo } from 'react';
-import { useSelector } from 'react-redux';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RootState } from '@/store/store';
 import { Board } from '@/store/types';
+import { useTable } from '@/store/dexie';
 
 interface BoardMessageConfigFormProps {
   config: Record<string, any>;
@@ -13,7 +12,7 @@ interface BoardMessageConfigFormProps {
 }
 
 export function BoardMessageConfigForm({ config, onChange }: BoardMessageConfigFormProps) {
-  const boards = useSelector((state: RootState) => (state as any).boards?.value ?? []) as Board[];
+  const boards = useTable('boards') as Board[];
   const sortedBoards = useMemo(() => {
     return (boards || [])
       .filter((board) => !board?.deleted_at)

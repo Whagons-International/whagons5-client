@@ -1,5 +1,4 @@
 import { useMemo, useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import type { ColDef } from "ag-grid-community";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faStopwatch, faPlus, faCircleQuestion, faTrash } from "@fortawesome/free-solid-svg-icons";
@@ -11,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import whagonsLogo from "@/assets/whagons.svg";
 import blockShuffleImg from "@/assets/block-3-shuffle.svg";
+import { useTable } from "@/store/dexie";
 import {
   SettingsLayout,
   SettingsGrid,
@@ -21,8 +21,6 @@ import {
   CheckboxField,
   TextField
 } from "../../components";
-import { AppDispatch, RootState } from "@/store/store";
-import { genericActions } from "@/store/genericSlices";
 
 type SlaRow = {
   id: number;
@@ -84,7 +82,6 @@ function NameWithDescriptionRenderer(params: any) {
 }
 
 function Slas() {
-  const dispatch = useDispatch<AppDispatch>();
   const [activeTab, setActiveTab] = useState<'slas' | 'alerts' | 'policies'>('slas');
   const [selectedSlaId, setSelectedSlaId] = useState<number | ''>('');
   const [isHelpOpen, setIsHelpOpen] = useState(false);
@@ -181,8 +178,8 @@ function Slas() {
     searchFields: ["name", "trigger_type"] as (keyof SlaPolicyRow)[]
   });
 
-  const { value: statuses = [] } = useSelector((s: RootState) => (s as any).statuses || { value: [] });
-  const { value: categories = [] } = useSelector((s: RootState) => (s as any).categories || { value: [] });
+  const statuses = useTable('statuses') ?? [];
+  const categories = useTable('categories') ?? [];
 
   // Sync trigger type state with dialog open/editing
   useEffect(() => {

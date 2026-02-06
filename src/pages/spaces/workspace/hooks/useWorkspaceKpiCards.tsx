@@ -1,7 +1,4 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useSelector } from 'react-redux';
-import type { RootState } from '@/store';
-import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { BarChart3, Activity, TrendingUp } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -29,7 +26,7 @@ import {
   IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
 import { WorkspaceStats } from './useWorkspaceStats';
-import { TaskEvents } from '@/store/eventEmiters/taskEvents';
+import { useTable, queryTasks } from '@/store/dexie';
 
 // Icon mapping from string value to FontAwesome icon
 const FA_ICON_MAP: Record<string, IconDefinition> = {
@@ -137,10 +134,10 @@ export function useWorkspaceKpiCards(params: {
   const { workspaceIdNum, currentUserId, doneStatusId, workingStatusIds, stats } = params;
   const { t } = useLanguage();
 
-  const allKpiCardsFromRedux = useSelector((s: RootState) => ((s as any).kpiCards?.value ?? []) as KpiCardEntity[]);
+  const allKpiCardsFromDexie = useTable<KpiCardEntity>('kpi_cards');
 
   const scopedKpiCardsFromStore = useMemo(() => {
-    return (allKpiCardsFromRedux || [])
+    return (allKpiCardsFromDexie || [])
       .map((c) => {
         // Normalize query_config / display_config from JSON strings to objects
         let qc = c.query_config;
@@ -162,7 +159,7 @@ export function useWorkspaceKpiCards(params: {
         return c.user_id == null || Number(c.user_id) === currentUserId;
       })
       .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
-  }, [allKpiCardsFromRedux, workspaceIdNum, currentUserId]);
+  }, [allKpiCardsFromDexie, workspaceIdNum, currentUserId]);
 
   const [headerKpiCards, setHeaderKpiCards] = useState<KpiCardEntity[]>([]);
 
@@ -297,18 +294,12 @@ export function useWorkspaceKpiCards(params: {
   const [customComputed, setCustomComputed] = useState<Map<number, Omit<WorkspaceHeaderCard, 'id'>>>(new Map());
   const [tasksRefreshKey, setTasksRefreshKey] = useState(0);
 
+  // Refresh stats periodically since we don't have Redux events
   useEffect(() => {
-    const bump = () => setTasksRefreshKey((prev) => prev + 1);
-    const unsubscribers = [
-      TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, bump),
-      TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, bump),
-      TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, bump),
-      TaskEvents.on(TaskEvents.EVENTS.TASKS_BULK_UPDATE, bump),
-      TaskEvents.on(TaskEvents.EVENTS.CACHE_INVALIDATE, bump),
-    ];
-    return () => {
-      unsubscribers.forEach((u) => { u(); });
-    };
+    const interval = setInterval(() => {
+      setTasksRefreshKey((prev) => prev + 1);
+    }, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -342,8 +333,6 @@ export function useWorkspaceKpiCards(params: {
 
     const compute = async () => {
       try {
-        if (!TasksCache.initialized) await TasksCache.init();
-
         const next = new Map<number, Omit<WorkspaceHeaderCard, 'id'>>();
         for (const card of cardsToProcess) {
           if (!card || card.is_enabled === false) continue;
@@ -355,7 +344,7 @@ export function useWorkspaceKpiCards(params: {
 
           if (card.type === 'task_count') {
             const q = buildTaskQuery(card.query_config?.filters);
-            const r = await TasksCache.queryTasks({ ...q, startRow: 0, endRow: 0 });
+            const r = await queryTasks({ ...q, startRow: 0, endRow: 0 });
             const count = Number((r as any)?.rowCount ?? 0);
             const filters = card.query_config?.filters ?? {};
             const filterModel: any = {};
@@ -392,8 +381,8 @@ export function useWorkspaceKpiCards(params: {
             const numQ = buildTaskQuery(card.query_config?.numerator_filters);
             const denQ = buildTaskQuery(card.query_config?.denominator_filters);
             const [numR, denR] = await Promise.all([
-              TasksCache.queryTasks({ ...numQ, startRow: 0, endRow: 0 }),
-              TasksCache.queryTasks({ ...denQ, startRow: 0, endRow: 0 }),
+              queryTasks({ ...numQ, startRow: 0, endRow: 0 }),
+              queryTasks({ ...denQ, startRow: 0, endRow: 0 }),
             ]);
             const numerator = Number((numR as any)?.rowCount ?? 0);
             const denominator = Number((denR as any)?.rowCount ?? 0);
@@ -423,7 +412,7 @@ export function useWorkspaceKpiCards(params: {
             const start = new Date(midnight);
             start.setDate(start.getDate() - (days - 1));
             const q = buildTaskQuery(card.query_config?.filters);
-            const trendResp = await TasksCache.queryTasks({ ...q, updated_after: start.toISOString() });
+            const trendResp = await queryTasks({ ...q, updated_after: start.toISOString() });
             const rows: any[] = (trendResp as any)?.rows ?? [];
             const series = Array.from({ length: days }, (_, idx) => {
               const dayStart = new Date(start);
@@ -461,7 +450,7 @@ export function useWorkspaceKpiCards(params: {
             });
           } else if (card.type === 'custom_query') {
             const q = buildTaskQuery(card.query_config);
-            const r = await TasksCache.queryTasks({ ...q, startRow: 0, endRow: 0 });
+            const r = await queryTasks({ ...q, startRow: 0, endRow: 0 });
             const count = Number((r as any)?.rowCount ?? 0);
             const filters = card.query_config?.filters ?? card.query_config ?? {};
             const filterModel: any = {};
@@ -523,44 +512,38 @@ export function useWorkspaceKpiCards(params: {
   }, [headerKpiCards]);
 
   const headerCardsForRender = useMemo(() => {
-    const defaults: WorkspaceHeaderCard[] = [];
-    const customs: WorkspaceHeaderCard[] = [];
-    
-    // Collect default cards (either from DB or fallbacks)
-    if (hasDefaultCardsInLoaded) {
-      // Use default cards from database, sorted by position
-      const defaultCardsFromDb = headerKpiCards
-        .filter((c) => c?.query_config?.is_default)
-        .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
-      
-      for (const card of defaultCardsFromDb) {
-        const computed = defaultComputed.get(card.id);
-        if (!computed) continue;
-        defaults.push({ id: card.id, ...computed });
-      }
-    } else {
-      // Use fallback default cards if none in database
-      defaults.push(
+    // If no default cards exist in the DB yet, show fallback defaults first
+    // followed by any custom cards in position order.
+    if (!hasDefaultCardsInLoaded) {
+      const fallbacks: WorkspaceHeaderCard[] = [
         { id: -1, ...getDefaultCardData('total') },
         { id: -2, ...getDefaultCardData('inProgress') },
         { id: -3, ...getDefaultCardData('completedToday') },
-        { id: -4, ...getDefaultCardData('trend') }
-      );
+        { id: -4, ...getDefaultCardData('trend') },
+      ];
+      const customs: WorkspaceHeaderCard[] = [];
+      for (const card of headerKpiCards) {
+        if (card?.query_config?.is_default) continue;
+        const computed = customComputed.get(card.id);
+        if (!computed) continue;
+        customs.push({ id: card.id, ...computed });
+      }
+      return [...fallbacks, ...customs];
     }
-    
-    // Collect custom cards, sorted by position
-    const customCardsFromDb = headerKpiCards
-      .filter((c) => c && !c.query_config?.is_default)
-      .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
-    
-    for (const card of customCardsFromDb) {
-      const computed = customComputed.get(card.id);
-      if (!computed) continue;
-      customs.push({ id: card.id, ...computed });
+
+    // Cards are already sorted by position from the upstream memo.
+    // Iterate in that order so default and custom cards can be freely interleaved.
+    const result: WorkspaceHeaderCard[] = [];
+    for (const card of headerKpiCards) {
+      if (card?.query_config?.is_default) {
+        const computed = defaultComputed.get(card.id);
+        if (computed) result.push({ id: card.id, ...computed });
+      } else {
+        const computed = customComputed.get(card.id);
+        if (computed) result.push({ id: card.id, ...computed });
+      }
     }
-    
-    // Return defaults first, then customs
-    return [...defaults, ...customs];
+    return result;
   }, [headerKpiCards, defaultComputed, customComputed, hasDefaultCardsInLoaded, doneStatusId, workingStatusIds, stats.total, stats.inProgress, stats.completedToday, stats.trend, statsArePending, completedLast7Days, trendDelta, t]);
 
   const headerCards = headerCardsForRender;

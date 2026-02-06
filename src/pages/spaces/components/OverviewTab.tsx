@@ -7,10 +7,8 @@ import { iconService } from '@/database/iconService';
 
 import { Users, Building, Tag, Check, X, ChevronDown, Trash2 } from "lucide-react";
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { AppDispatch, RootState } from "@/store";
-import { genericActions } from '@/store/genericSlices';
+import { collections, useLiveQuery } from '@/store/dexie';
 import {
   Dialog,
   DialogContent,
@@ -87,11 +85,10 @@ function OverviewTab({
   onTeamClick,
   onUpdateWorkspace 
 }: OverviewTabProps) {
-  const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   
-  // Get teams from Redux store
-  const { value: allTeams } = useSelector((state: RootState) => (state as any).teams as { value: any[] });
+  // Dexie query with useLiveQuery
+  const allTeams = useLiveQuery(() => collections.teams.getAll()) || [];
   
   // Get teams for this workspace based on workspace.teams array
   const workspaceTeamDetails = useMemo(() => {
@@ -422,7 +419,7 @@ function OverviewTab({
     
     setIsDeleting(true);
     try {
-      await dispatch(genericActions.workspaces.removeAsync(workspaceId)).unwrap();
+      await collections.workspaces.delete(workspaceId);
       setShowDeleteDialog(false);
       // Navigate to home or workspace list after successful deletion
       navigate('/tasks'); // or wherever you want to redirect after deletion

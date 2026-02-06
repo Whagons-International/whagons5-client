@@ -1,12 +1,8 @@
-import { useDispatch } from 'react-redux';
-import { AppDispatch } from '@/store/store';
-import { updateTaskAsync } from '@/store/reducers/tasksSlice';
-import { genericActions } from '@/store/genericSlices';
+import { collections } from '@/store/dexie';
 import { isCustomFieldValueFilled, serializeCustomFieldPayload } from '../utils/customFieldSerialization';
 
 export function useCustomFieldSync(params: any) {
   const { categoryFields, customFieldValues, taskCustomFieldValues } = params;
-  const dispatch = useDispatch<AppDispatch>();
 
   const syncTaskCustomFields = async (taskId: number) => {
     if (!taskId || categoryFields.length === 0) return;
@@ -28,7 +24,7 @@ export function useCustomFieldSync(params: any) {
 
     for (const [fieldId, row] of existingByField.entries()) {
       if (!validFieldIds.has(fieldId)) {
-        await dispatch(genericActions.taskCustomFieldValues.removeAsync(row?.id ?? fieldId)).unwrap();
+        await collections.taskCustomFieldValues.delete(row?.id ?? fieldId);
         didChange = true;
       }
     }
@@ -43,7 +39,7 @@ export function useCustomFieldSync(params: any) {
 
       if (!hasValue) {
         if (existing) {
-          await dispatch(genericActions.taskCustomFieldValues.removeAsync(existing?.id ?? fieldId)).unwrap();
+          await collections.taskCustomFieldValues.delete(existing?.id ?? fieldId);
           didChange = true;
         }
         continue;
@@ -59,17 +55,17 @@ export function useCustomFieldSync(params: any) {
       };
 
       if (existing) {
-        await dispatch(genericActions.taskCustomFieldValues.updateAsync({ id: existing?.id, updates: body } as any)).unwrap();
+        await collections.taskCustomFieldValues.update(existing?.id, body);
         didChange = true;
       } else {
-        await dispatch(genericActions.taskCustomFieldValues.addAsync(body as any)).unwrap();
+        await collections.taskCustomFieldValues.add(body as any);
         didChange = true;
       }
     }
 
     if (didChange) {
       try {
-        await dispatch(updateTaskAsync({ id: taskId, updates: {} } as any)).unwrap();
+        await collections.tasks.update(taskId, {});
       } catch (err) {
         console.warn('Failed to refresh task after custom field sync', err);
       }

@@ -1,10 +1,9 @@
 import { useMemo } from 'react';
-import { useSelector } from 'react-redux';
-import { RootState } from '@/store/store';
 import { Status } from '@/store/types';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useTable } from '@/store/dexie';
 
 interface StatusConfigFormProps {
   config: Record<string, any>;
@@ -13,10 +12,10 @@ interface StatusConfigFormProps {
 }
 
 export function StatusConfigForm({ config, onChange, approvalId }: StatusConfigFormProps) {
-  const allStatuses = useSelector((s: RootState) => s.statuses?.value ?? []) as Status[];
-  const categories = useSelector((s: RootState) => (s as any).categories?.value ?? []) as Array<{ id: number; approval_id?: number | null; status_transition_group_id?: number | null }>;
-  const templates = useSelector((s: RootState) => (s as any).templates?.value ?? []) as Array<{ id: number; approval_id?: number | null; category_id?: number | null }>;
-  const statusTransitions = useSelector((s: RootState) => (s as any).statusTransitions?.value ?? []) as Array<{ status_transition_group_id: number; from_status: number; to_status: number }>;
+  const allStatuses = (useTable('statuses') ?? []) as Status[];
+  const categories = (useTable('categories') ?? []) as Array<{ id: number; approval_id?: number | null; status_transition_group_id?: number | null }>;
+  const templates = (useTable('templates') ?? []) as Array<{ id: number; approval_id?: number | null; category_id?: number | null }>;
+  const statusTransitions = (useTable('status_transitions') ?? []) as Array<{ status_transition_group_id: number; from_status: number; to_status: number }>;
 
   // Filter statuses based on categories/templates that use this approval
   const filteredStatuses = useMemo(() => {

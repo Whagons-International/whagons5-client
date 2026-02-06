@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
 import { Plus, Bell, Send, CheckCircle2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,23 +6,17 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuthUser } from '@/providers/AuthProvider';
-import { RootState } from '@/store/store';
-import { genericActions } from '@/store/genericSlices';
 import { Broadcast } from '@/types/broadcast';
 import CreateBroadcastDialog from './CreateBroadcastDialog';
 import BroadcastDetailView from './BroadcastDetailView';
+import { useTable } from '@/store/dexie';
 
 function BroadcastsPage() {
   const { t } = useLanguage();
-  const dispatch = useDispatch();
 
-  // Redux state
-  const { value: broadcasts, loading } = useSelector(
-    (state: RootState) => (state as any).broadcasts || { value: [], loading: false }
-  );
-  const { value: acknowledgments } = useSelector(
-    (state: RootState) => (state as any).broadcastAcknowledgments || { value: [] }
-  );
+  // Dexie state
+  const broadcasts = useTable('broadcasts') as Broadcast[];
+  const acknowledgments = useTable('broadcast_acknowledgments') as any[];
   const currentUser = useAuthUser();
 
   // Local state
@@ -145,11 +138,7 @@ function BroadcastsPage() {
         </TabsList>
 
         <TabsContent value={activeTab} className="space-y-4 mt-6">
-          {loading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              {t('common.loading', 'Loading...')}
-            </div>
-          ) : filteredBroadcasts.length === 0 ? (
+          {filteredBroadcasts.length === 0 ? (
             <Card className="p-8">
               <div className="text-center text-muted-foreground">
                 <Bell className="h-12 w-12 mx-auto mb-3 opacity-50" />

@@ -1,21 +1,20 @@
 import { useEffect, useRef } from 'react';
-import { useSelector } from 'react-redux';
-import type { RootState } from '@/store';
-import { TaskEvents } from '@/store/eventEmiters/taskEvents';
 import { Task } from '@/store/types';
 import toast from 'react-hot-toast';
+import { useTable, useLiveQuery, db } from '@/store/dexie';
+import { useAuth } from '@/providers/AuthProvider';
 
 /**
  * Hook to detect when tasks are finished and show toast notifications
- * Listens to TASK_UPDATED events and checks if status changed to FINISHED/DONE
+ * Listens to Dexie liveQuery changes and checks if status changed to FINISHED/DONE
  */
 export function useTaskCompletionToast() {
-  const statuses = useSelector((s: RootState) => (s as any).statuses.value as any[]);
-  const users = useSelector((s: RootState) => (s as any).users.value as any[]);
-  const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
-  const tasks = useSelector((s: RootState) => (s as any).tasks.value as Task[]);
-  const currentUser = useSelector((s: RootState) => (s as any).auth?.user);
-  const currentUserId = Number((currentUser as any)?.id);
+  const statuses = useTable('statuses');
+  const users = useTable('users');
+  const spots = useTable('spots');
+  const tasks = useTable<Task>('tasks');
+  const { user: currentUser } = useAuth();
+  const currentUserId = Number(currentUser?.id);
 
   // Track previous task states to detect status changes
   const previousTasksRef = useRef<Map<number, { status_id: number }>>(new Map());
@@ -38,9 +37,10 @@ export function useTaskCompletionToast() {
     }
   }, [tasks]);
 
+  // Build finished status IDs set
+  const finishedStatusIds = useRef(new Set<number>());
   useEffect(() => {
-    // Find the finished/done status IDs
-    const finishedStatusIds = new Set<number>();
+    const ids = new Set<number>();
     (statuses || []).forEach((status: any) => {
       const action = String(status.action || '').toUpperCase();
       const nameLower = String(status.name || '').toLowerCase();
@@ -52,32 +52,27 @@ export function useTaskCompletionToast() {
         nameLower.includes('finished');
       
       if (isFinishedStatus && status.id) {
-        finishedStatusIds.add(Number(status.id));
+        ids.add(Number(status.id));
       }
     });
+    finishedStatusIds.current = ids;
+  }, [statuses]);
 
-    // Listen for task updates
-    const unsubscribe = TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, (task: Task) => {
+  // Watch for task changes via useLiveQuery - check for status transitions
+  useEffect(() => {
+    if (!tasks || tasks.length === 0) return;
+    
+    // Check each task for status transitions
+    tasks.forEach((task: Task) => {
       if (!task || !task.id) return;
 
       const currentStatusId = Number(task.status_id);
-      
-      // Get previous status from ref or Redux state
-      let previousStatusId: number | null = null;
       const previousTaskFromRef = previousTasksRef.current.get(task.id);
-      if (previousTaskFromRef) {
-        previousStatusId = previousTaskFromRef.status_id;
-      } else {
-        // Fallback: check Redux state for previous status
-        const previousTaskFromRedux = tasks.find((t: Task) => t.id === task.id);
-        if (previousTaskFromRedux) {
-          previousStatusId = Number(previousTaskFromRedux.status_id);
-        }
-      }
+      const previousStatusId = previousTaskFromRef?.status_id ?? null;
 
       // Check if task just became finished (transitioned from non-finished to finished)
-      const wasFinishedBefore = previousStatusId !== null ? finishedStatusIds.has(previousStatusId) : false;
-      const isFinishedNow = finishedStatusIds.has(currentStatusId);
+      const wasFinishedBefore = previousStatusId !== null ? finishedStatusIds.current.has(previousStatusId) : false;
+      const isFinishedNow = finishedStatusIds.current.has(currentStatusId);
 
       if (
         previousStatusId !== null &&
@@ -87,7 +82,6 @@ export function useTaskCompletionToast() {
         !recentToastsRef.current.has(task.id) // Avoid duplicate toasts
       ) {
         // Get user name who finished the task
-        // Try to get from task's user_ids (responsible users) first
         let userName = 'Someone';
         if (task.user_ids && task.user_ids.length > 0) {
           const responsibleUser = users.find((u: any) => 
@@ -98,8 +92,6 @@ export function useTaskCompletionToast() {
           }
         }
         
-        // If no responsible user found, try to use current user if they're the one who updated
-        // (This is a best guess for local updates)
         if (userName === 'Someone' && currentUserId) {
           const currentUserData = users.find((u: any) => Number(u.id) === currentUserId);
           if (currentUserData?.name) {
@@ -107,7 +99,7 @@ export function useTaskCompletionToast() {
           }
         }
 
-        // Get location (spot) name if task has one
+        // Get location (spot) name
         let locationText = '';
         if (task.spot_id) {
           const spot = spots.find((s: any) => Number(s.id) === Number(task.spot_id));
@@ -116,13 +108,13 @@ export function useTaskCompletionToast() {
           }
         }
 
-        // Show simple toast notification
+        // Show toast notification
         toast.success(`${userName} finished task "${task.name}"${locationText}`, {
           duration: 5000,
           position: 'bottom-right',
         });
 
-        // Mark this task as recently toasted (prevent duplicates for 10 seconds)
+        // Prevent duplicates
         recentToastsRef.current.add(task.id);
         setTimeout(() => {
           recentToastsRef.current.delete(task.id);
@@ -134,9 +126,5 @@ export function useTaskCompletionToast() {
         status_id: currentStatusId,
       });
     });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [statuses, users, spots, currentUserId, tasks]);
+  }, [tasks, users, spots, currentUserId]);
 }

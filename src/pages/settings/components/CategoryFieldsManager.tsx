@@ -1,14 +1,12 @@
-import React, { useState, useMemo, useCallback } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import React, { useState, useMemo } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faSpinner, faTrash, faGripVertical } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { RootState, AppDispatch } from "@/store/store";
-import { genericActions, genericCaches, genericEventNames, genericEvents } from '@/store/genericSlices';
 import { Category } from "@/store/types";
 import { useLanguage } from "@/providers/LanguageProvider";
+import { useTable, collections } from "@/store/dexie";
 
 type CategoryFieldAssignment = { 
   id: number; 
@@ -37,11 +35,10 @@ export interface CategoryFieldsManagerProps {
 }
 
 export function CategoryFieldsManager({ open, onOpenChange, category, variant = 'dialog' }: CategoryFieldsManagerProps) {
-  const dispatch = useDispatch<AppDispatch>();
   const { t } = useLanguage();
   const tc = (key: string, fallback: string) => t(`settings.categories.fieldsManager.${key}`, fallback);
-  const { value: customFields } = useSelector((state: RootState) => state.customFields) as { value: CustomField[] };
-  const { value: categoryCustomFields } = useSelector((state: RootState) => state.categoryCustomFields) as { value: CategoryFieldAssignment[] };
+  const customFields = useTable<CustomField>('custom_fields') ?? [];
+  const categoryCustomFields = useTable<CategoryFieldAssignment>('category_custom_fields') ?? [];
   
   const [assignSubmitting, setAssignSubmitting] = useState(false);
   const [newFieldId, setNewFieldId] = useState<string>("");
@@ -59,7 +56,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category, variant = 
   const currentAssignments = useMemo(() => {
     if (!category) return [] as CategoryFieldAssignment[];
     const cid = Number(category.id);
-    const source = localAssignments.length ? localAssignments : (categoryCustomFields as CategoryFieldAssignment[]);
+    const source = localAssignments.length ? localAssignments : categoryCustomFields;
     return source
       .filter(a => getCategoryId(a) === cid)
       .sort((a, b) => ((a as any).order ?? 0) - ((b as any).order ?? 0));
@@ -67,7 +64,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category, variant = 
 
   const assignedFieldIds = useMemo(() => new Set(currentAssignments.map(a => getFieldId(a))), [currentAssignments]);
   const availableFields = useMemo(() => {
-    return (customFields as CustomField[]).filter(f => !assignedFieldIds.has(Number(f.id)));
+    return customFields.filter(f => !assignedFieldIds.has(Number(f.id)));
   }, [customFields, assignedFieldIds]);
 
   // Data is hydrated on login; this dialog should not trigger ad-hoc IndexedDB/API loading.
@@ -105,14 +102,14 @@ export function CategoryFieldsManager({ open, onOpenChange, category, variant = 
       };
       setLocalAssignments(prev => [...prev, optimistic]);
 
-      const saved = await dispatch(genericActions.categoryCustomFields.addAsync({
+      const saved = await collections.categoryCustomFields.add({
         field_id: parseInt(newFieldId, 10),
         custom_field_id: parseInt(newFieldId, 10),
         category_id: Number(category.id),
         is_required: false,
         order: nextOrder,
         default_value: null,
-      } as any)).unwrap();
+      });
       if (dbg) console.log('[CFM] addAssignment saved', saved);
       setNewFieldId("");
       // Replace optimistic row with server row to prevent flash-removal
@@ -136,7 +133,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category, variant = 
   const removeAssignment = async (assignment: CategoryFieldAssignment) => {
     setAssignSubmitting(true);
     try {
-      await dispatch(genericActions.categoryCustomFields.removeAsync(assignment.id)).unwrap();
+      await collections.categoryCustomFields.delete(assignment.id);
       setLocalAssignments(prev => prev.filter((r: any) => r?.id !== assignment.id));
     } catch (e) {
       console.error('Error removing assignment', e);
@@ -147,7 +144,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category, variant = 
 
   const updateAssignment = async (assignmentId: number, updates: Partial<CategoryFieldAssignment>) => {
     try {
-      await dispatch(genericActions.categoryCustomFields.updateAsync({ id: assignmentId, updates } as any)).unwrap();
+      await collections.categoryCustomFields.update(assignmentId, updates);
       setLocalAssignments(prev => prev.map((r: any) => (r?.id === assignmentId ? { ...r, ...(updates as any) } : r)));
     } catch (e) {
       console.error('Error updating assignment', e);
@@ -351,7 +348,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category, variant = 
               </div>
               <div className="divide-y">
                 {currentAssignments.map((a, idx) => {
-                  const f = (customFields as CustomField[]).find(cf => Number(cf.id) === getFieldId(a));
+                    const f = customFields.find(cf => Number(cf.id) === getFieldId(a));
                   return (
                     <div
                       key={a.id}
@@ -408,7 +405,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category, variant = 
               <DialogDescription>
                 {(() => {
                   const fid = deleteTarget ? getFieldId(deleteTarget) : null;
-                  const f = (customFields as CustomField[]).find((cf) => Number(cf.id) === Number(fid));
+                  const f = customFields.find((cf) => Number(cf.id) === Number(fid));
                   const name = f?.name || (fid != null ? tc('deleteDialog.fieldNumber', 'Field #{id}').replace('{id}', String(fid)) : tc('deleteDialog.thisField', 'this field'));
                   return tc('deleteDialog.confirm', 'Are you sure you want to remove "{name}" from {category}? This does not delete the custom field itself.')
                     .replace('{name}', name)
@@ -451,7 +448,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category, variant = 
             <DialogDescription>
               {(() => {
                 const fid = deleteTarget ? getFieldId(deleteTarget) : null;
-                const f = (customFields as CustomField[]).find((cf) => Number(cf.id) === Number(fid));
+                const f = customFields.find((cf) => Number(cf.id) === Number(fid));
                 const name = f?.name || (fid != null ? tc('deleteDialog.fieldNumber', 'Field #{id}').replace('{id}', String(fid)) : tc('deleteDialog.thisField', 'this field'));
                 return tc('deleteDialog.confirm', 'Are you sure you want to remove "{name}" from {category}? This does not delete the custom field itself.')
                   .replace('{name}', name)

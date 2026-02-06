@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTable } from '@/store/dexie';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,8 +39,6 @@ import {
   faClipboardCheck,
   IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
-import { useSelector } from 'react-redux';
-import { RootState } from '@/store/store';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -111,10 +110,10 @@ const getIconByValue = (value: string): IconDefinition => {
 };
 
 export default function KpiCardBuilder({ isOpen, onClose, onSave, onDelete, editingCard }: KpiCardBuilderProps) {
-  const { t } = useLanguage();
-  const workspaces = useSelector((state: RootState) => (state as any).workspaces?.value ?? []);
-  const statuses = useSelector((state: RootState) => state.statuses?.value ?? []);
-  const priorities = useSelector((state: RootState) => state.priorities?.value ?? []);
+  const { t, language } = useLanguage();
+  const workspaces = useTable('workspaces') ?? [];
+  const statuses = useTable('statuses') ?? [];
+  const priorities = useTable('priorities') ?? [];
   
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<Partial<KpiCard>>({
@@ -522,7 +521,7 @@ export default function KpiCardBuilder({ isOpen, onClose, onSave, onDelete, edit
             }
           </DialogTitle>
           <DialogDescription>
-            {t('kpiCards.builder.description', 'Step {step} of 3', { step })}
+            {language === 'es' ? `Paso ${step} de 3` : `Step ${step} of 3`}
           </DialogDescription>
         </DialogHeader>
 

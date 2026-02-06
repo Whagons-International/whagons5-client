@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { actionsApi } from '@/api/whagonsActionsApi';
@@ -21,15 +20,25 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUpload, faXmark, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { uploadImageAsset, getAssetDisplayUrl, createImagePreview } from '@/lib/assetHelpers';
 import { ImageCropper } from '@/components/ImageCropper';
-import { RootState, AppDispatch } from '@/store/store';
 import { UserTeam, Team, Role } from '@/store/types';
 import { UrlTabs } from '@/components/ui/url-tabs';
-import { 
-  fetchNotificationPreferences, 
-  updateNotificationPreferences,
-  type NotificationPreferences 
-} from '@/store/reducers/notificationPreferencesSlice';
 import { isFCMReady, isTokenRegistered } from '@/firebase/fcmHelper';
+import { useTable } from '@/store/dexie';
+import { api } from '@/store/api/internalApi';
+
+// Notification preferences type
+interface NotificationPreferences {
+  broadcasts: boolean;
+  task_assignments: boolean;
+  task_mentions: boolean;
+  task_comments: boolean;
+  task_status_changes: boolean;
+  messages: boolean;
+  approval_requests: boolean;
+  approval_decisions: boolean;
+  sla_alerts: boolean;
+  workflow_notifications: boolean;
+}
 
 // Helper functions to get translated arrays
 const getMonths = (t: (key: string, fallback?: string) => string) => [
@@ -143,20 +152,24 @@ const defaultPreferences: NotificationPreferences = {
 
 function Profile() {
     const { t } = useLanguage();
-    const dispatch = useDispatch<AppDispatch>();
     const { user: userData, userLoading, refetchUser } = useAuth();
     // Keep previous userData to prevent blank screen during refetch
     const [previousUserData, setPreviousUserData] = useState<ExtendedUser | null>(userData ? (userData as unknown as ExtendedUser) : null);
-    const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
-    const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[]; loading: boolean };
-    const { value: roles } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
+    
+    // Dexie table data (replaces Redux useSelector)
+    const userTeams = useTable<UserTeam>('user_teams');
+    const teams = useTable<Team>('teams');
+    const roles = useTable<Role>('roles');
+    
     const [error, setError] = useState<string | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [saving, setSaving] = useState(false);
     
-    // Notification preferences state
-    const { preferences: notificationPreferences, loading: notificationLoading, saving: notificationSaving } = useSelector((state: RootState) => state.notificationPreferences);
-    const [localNotificationPreferences, setLocalNotificationPreferences] = useState<NotificationPreferences>(notificationPreferences);
+    // Notification preferences state (managed locally with API calls)
+    const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(defaultPreferences);
+    const [notificationLoading, setNotificationLoading] = useState(false);
+    const [notificationSaving, setNotificationSaving] = useState(false);
+    const [localNotificationPreferences, setLocalNotificationPreferences] = useState<NotificationPreferences>(defaultPreferences);
     const [hasNotificationChanges, setHasNotificationChanges] = useState(false);
     const [fcmEnabled, setFcmEnabled] = useState(false);
     
@@ -191,11 +204,27 @@ function Profile() {
 
     // DataManager handles data loading, no need to call internal functions here
 
+    // Fetch notification preferences from API
+    const fetchNotificationPreferences = useCallback(async () => {
+        setNotificationLoading(true);
+        try {
+            const response = await api.get('/users/me/notification-preferences');
+            if (response.data) {
+                setNotificationPreferences(response.data);
+                setLocalNotificationPreferences(response.data);
+            }
+        } catch (err) {
+            console.error('Failed to fetch notification preferences:', err);
+        } finally {
+            setNotificationLoading(false);
+        }
+    }, []);
+
     // Load notification preferences on mount
     useEffect(() => {
-        dispatch(fetchNotificationPreferences());
+        fetchNotificationPreferences();
         checkFCMStatus();
-    }, [dispatch]);
+    }, [fetchNotificationPreferences]);
 
     // Sync local notification preferences with Redux state
     useEffect(() => {
@@ -238,8 +267,17 @@ function Profile() {
         setHasNotificationChanges(true);
     };
 
-    const handleSaveNotifications = () => {
-        dispatch(updateNotificationPreferences(localNotificationPreferences));
+    const handleSaveNotifications = async () => {
+        setNotificationSaving(true);
+        try {
+            await actionsApi.patch('/users/me/notification-preferences', localNotificationPreferences);
+            setNotificationPreferences(localNotificationPreferences);
+            setHasNotificationChanges(false);
+        } catch (err) {
+            console.error('Failed to save notification preferences:', err);
+        } finally {
+            setNotificationSaving(false);
+        }
     };
 
     const handleCancelNotifications = () => {
@@ -491,11 +529,9 @@ function Profile() {
                 console.log('Profile: Saving profile with url_picture:', editForm.url_picture);
                 
                 // Clear avatar cache BEFORE refreshing to ensure fresh image loads
-                const { AvatarCache } = await import('@/store/indexedDB/AvatarCache');
                 const firebaseUser = (window as any).firebase?.auth?.currentUser;
                 if (firebaseUser?.uid && displayUserData?.id) {
                     console.log('Profile: Clearing cache for', [firebaseUser.uid, displayUserData.google_uuid, displayUserData.id]);
-                    await AvatarCache.deleteByAny([firebaseUser.uid, displayUserData.google_uuid, displayUserData.id]);
                     console.log('Profile: Cache cleared');
                 }
                 

@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { TasksCache } from '@/store/indexedDB/TasksCache';
+import { queryTasks } from '@/store/dexie';
 
 export interface UseWorkspaceChangeReturn {
   error: string | null;
@@ -30,9 +30,6 @@ export function useWorkspaceChange(opts: {
       exitEditMode(gridRef.current?.api);
       
       try {
-        // Ensure cache is initialized
-        await TasksCache.init();
-        
         // Check if we have tasks for this workspace in cache
         const baseParams: any = {};
         if (workspaceId !== 'all' && workspaceId !== 'shared') {
@@ -42,7 +39,7 @@ export function useWorkspaceChange(opts: {
           baseParams.shared_with_me = true;
         }
         
-        const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+        const countResp = await queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
         const taskCount = countResp?.rowCount ?? 0;
 
         // Refresh grid after checking

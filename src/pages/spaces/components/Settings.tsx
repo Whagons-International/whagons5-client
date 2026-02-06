@@ -6,10 +6,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { useDispatch, useSelector } from "react-redux";
 import { useLocation } from "react-router-dom";
-import { AppDispatch, RootState } from "@/store";
-import { genericActions } from '@/store/genericSlices';
+import { collections, useLiveQuery } from "@/store/dexie";
 import { useAuth } from "@/providers/AuthProvider";
 import { useLanguage } from "@/providers/LanguageProvider";
 import OverviewTab from "./OverviewTab";
@@ -134,19 +132,14 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
     }
   };
 
-  const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
   const { user, refetchUser } = useAuth();
-  // Using async actions for workspace operations
 
-  // Get current workspace from Redux store (slice only; no fetching)
-  const { value: workspaces } = useSelector((state: RootState) => (state as any).workspaces as { value: any[] });
-  
-
-  // Get categories and custom fields from Redux store
-  const { value: categories } = useSelector((state: RootState) => (state as any).categories as { value: any[] });
-  const { value: customFields } = useSelector((state: RootState) => (state as any).customFields as { value: any[] });
-  const { value: categoryCustomFields } = useSelector((state: RootState) => (state as any).categoryCustomFields as { value: any[] });
+  // Dexie queries with useLiveQuery
+  const workspaces = useLiveQuery(() => collections.workspaces.getAll()) || [];
+  const categories = useLiveQuery(() => collections.categories.getAll()) || [];
+  const customFields = useLiveQuery(() => collections.customFields.getAll()) || [];
+  const categoryCustomFields = useLiveQuery(() => collections.categoryCustomFields.getAll()) || [];
 
   // Find workspace by ID from prop or fallback to first workspace
   const currentWorkspace = useMemo(() => {
@@ -470,17 +463,14 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
     };
 
     try {
-      await dispatch(genericActions.workspaces.updateAsync({
-        id: currentWorkspace.id,
-        updates: updatedWorkspace
-      })).unwrap();
+      await collections.workspaces.update(currentWorkspace.id, updatedWorkspace);
     } catch (error: any) {
       // Error is already handled by API interceptor (shows toast for 403)
       // But we log it here for debugging
       console.error('Failed to update workspace:', error);
       // The optimistic update will be rolled back automatically by the thunk
     }
-  }, [currentWorkspace, dispatch]);
+  }, [currentWorkspace]);
 
   // Define tabs for URL persistence
   const settingsTabs = [

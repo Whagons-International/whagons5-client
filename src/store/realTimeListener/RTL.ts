@@ -1,9 +1,8 @@
 import { getTokenForUser } from "@/api/whagonsApi";
 import { auth } from "@/firebase/firebaseConfig";
 import { getEnvVariables } from "@/lib/getEnvVariables";
-// Removed direct TasksCache usage; routed through CacheRegistry
-import { getCacheForTable } from "@/store/indexedDB/CacheRegistry";
-import { syncReduxForTable } from "@/store/indexedDB/CacheRegistry";
+// Note: Cache handling is now done via setupRTLDexieHandler() in @/store/dexie
+// which subscribes to 'publication:received' events
 
 interface RTLMessage {
   type: 'ping' | 'system' | 'error' | 'echo' | 'database';
@@ -452,6 +451,10 @@ export class RealTimeListener {
 
   /**
    * Handle publication messages (database changes)
+   * 
+   * Note: Actual cache handling is done via setupRTLDexieHandler() which
+   * subscribes to 'publication:received' events and writes to Dexie.
+   * useLiveQuery automatically reacts to changes - no Redux sync needed.
    */
   private handlePublicationMessage(data: RTLMessage): void {
     this.debugLog('Database change received:', {
@@ -462,114 +465,8 @@ export class RealTimeListener {
       old_data: data.old_data
     });
 
-    // Emit general publication event
+    // Emit event - external handler (setupRTLDexieHandler) will process it
     this.emit('publication:received', data);
-
-    // Route to appropriate cache by table name
-    this.handleTablePublication(data).catch(error => {
-      console.error('Error handling table publication:', error);
-    });
-  }
-
-  /**
-   * Generic table publication handler using CacheRegistry
-   */
-  private async handleTablePublication(data: RTLMessage): Promise<void> {
-    const table = data.table;
-    if (!table) return;
-
-    const cache = getCacheForTable(table);
-
-    if (!cache) {
-      return;
-    }
-
-    const operation = data.operation?.toUpperCase();
-    try {
-      switch (operation) {
-        case 'INSERT':
-          if (data.new_data) {
-            this.debugLog(`Processing INSERT for ${table}`, {
-              newData: data.new_data,
-              hasId: data.new_data.id !== undefined && data.new_data.id !== null,
-              idValue: data.new_data.id,
-              idType: typeof data.new_data.id,
-              tableName: data.table,
-              allFields: Object.keys(data.new_data),
-              fullMessage: data
-            });
-
-            // Log the complete new_data object to see what's different
-            this.debugLog(`Full ${table} INSERT data:`, JSON.stringify(data.new_data, null, 2));
-
-            // Check if the data has a valid ID before proceeding
-            if (data.new_data.id === undefined || data.new_data.id === null) {
-              console.error(`RTL: Skipping INSERT for ${table} - missing ID`, data.new_data);
-              return;
-            }
-
-            // Additional validation: Check if this ID already exists in IndexedDB
-            this.debugLog(`About to add ${table} with ID ${data.new_data.id} to IndexedDB`);
-
-            try {
-                const existing = await cache.getAll();
-              const existingRecord = existing.find((record: any) => record.id === data.new_data.id);
-
-              if (existingRecord) {
-                console.warn(`RTL: ID ${data.new_data.id} already exists in ${table}, skipping duplicate INSERT`, {
-                  existing: existingRecord,
-                  incoming: data.new_data
-                });
-                return;
-              }
-
-              await cache.add(data.new_data);
-              await syncReduxForTable(table);
-            } catch (dbError) {
-              console.error(`RTL: IndexedDB error for ${table} with ID ${data.new_data.id}:`, dbError);
-              // Don't throw - just log the error to prevent crashes
-              return;
-            }
-          }
-          break;
-        case 'UPDATE':
-          if (data.new_data && data.new_data.id != null) {
-            this.debugLog(`Processing UPDATE for ${table}`, {
-              newData: data.new_data,
-              id: data.new_data.id
-            });
-            // Extra debug: ensure id visibility just before cache.update
-            try {
-              const dbg = localStorage.getItem('wh-debug-cache') === 'true';
-              if (dbg) {
-                this.debugLog('pre-cache.update payload check', {
-                  table,
-                  idPresent: data.new_data.id !== undefined && data.new_data.id !== null,
-                  idType: typeof data.new_data.id,
-                  keys: Object.keys(data.new_data || {}),
-                });
-              }
-            } catch {}
-            await cache.update(data.new_data.id, data.new_data);
-            await syncReduxForTable(table);
-          }
-          break;
-        case 'DELETE':
-          if (data.old_data && data.old_data.id != null) {
-            this.debugLog(`Processing DELETE for ${table}`, {
-              oldData: data.old_data,
-              id: data.old_data.id
-            });
-            await cache.remove(data.old_data.id);
-            await syncReduxForTable(table);
-          }
-          break;
-        default:
-          break;
-      }
-    } catch (error) {
-      console.error('RTL cache handler error', { table, operation, error });
-    }
   }
 
   /**

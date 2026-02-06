@@ -150,18 +150,11 @@ export async function unregisterToken() {
 }
 
 /**
- * Store notification in IndexedDB
+ * Store notification in Dexie
  */
 async function storeNotification(payload: any) {
   try {
-    const { DB } = await import('@/store/indexedDB/DB');
-    const { store } = await import('@/store/store');
-    const { genericActions } = await import('@/store/genericSlices');
-    
-    if (!DB.inited || !DB.db) {
-      console.warn('⚠️ DB not initialized, skipping notification storage');
-      return;
-    }
+    const { db } = await import('@/store/dexie');
 
     const notification = {
       id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -174,12 +167,8 @@ async function storeNotification(payload: any) {
       viewed_at: null, // Set when user opens dropdown
     };
 
-    const tx = DB.db.transaction(['notifications'], 'readwrite');
-    const objectStore = tx.objectStore('notifications');
-    await objectStore.add(notification);
-
-    // Update Redux state
-    store.dispatch(genericActions.notifications.addAsync(notification) as any);
+    // Store in Dexie - useLiveQuery will automatically update UI
+    await db.table('notifications').add(notification);
   } catch (error) {
     console.error('❌ Error storing notification:', error);
   }

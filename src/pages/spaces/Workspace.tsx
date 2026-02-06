@@ -17,26 +17,17 @@ import { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import ChatTab from '@/pages/spaces/components/ChatTab';
 import ResourcesTab from '@/pages/spaces/components/ResourcesTab';
 import WhiteboardViewTab from '@/pages/spaces/components/WhiteboardViewTab';
-import { useSelector, useDispatch } from 'react-redux';
-import type { RootState } from '@/store';
-import {
-  setFilterModel,
-  setSearchText,
-  setGroupBy,
-  setCollapseGroups,
-  selectSearchText,
-  selectGroupBy,
-  selectCollapseGroups,
-} from '@/store/reducers/uiStateSlice';
 import { Button } from '@/components/ui/button';
 import TaskDialog from '@/pages/spaces/components/TaskDialog';
 import { TAB_ANIMATION, getTabInitialX, type TabAnimationConfig } from '@/config/tabAnimation';
 import FilterBuilderDialog from '@/pages/spaces/components/FilterBuilderDialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import TaskNotesModal from '@/pages/spaces/components/TaskNotesModal';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { useAuth } from '@/providers/AuthProvider';
 import { DeleteTaskDialog } from '@/components/tasks/DeleteTaskDialog';
 import { WorkspaceKpiCard } from '@/pages/spaces/components/WorkspaceKpiCard';
+import { useTable } from '@/store/dexie';
+import { useWorkspaceUIStore } from '@/store/workspaceUIStore';
 import { useWorkspaceRouting } from './workspace/hooks/useWorkspaceRouting';
 import { useWorkspaceTabOrder } from './workspace/hooks/useWorkspaceTabOrder';
 import { useWorkspaceDisplayOptions } from './workspace/hooks/useWorkspaceDisplayOptions';
@@ -57,7 +48,6 @@ import { WORKSPACE_TAB_PATHS, ALWAYS_VISIBLE_TABS, FIXED_TABS, type WorkspaceTab
 
 export const Workspace = () => {
   const { t } = useLanguage();
-  const dispatch = useDispatch();
   const location = useLocation();
 
   // Routing
@@ -83,19 +73,19 @@ export const Workspace = () => {
   const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
   const tableRef = useRef<WorkspaceTableHandle | null>(null);
 
-  // Redux UI state
-  const searchText = useSelector(selectSearchText);
-  const groupBy = useSelector(selectGroupBy);
-  const collapseGroups = useSelector(selectCollapseGroups);
-  const currentUser = useSelector((s: RootState) => (s as any).auth?.user);
-  const currentUserId = Number((currentUser as any)?.id);
+  // Zustand UI state
+  const { searchText, groupBy, collapseGroups } = useWorkspaceUIStore();
+  
+  // Auth state
+  const { user: currentUser } = useAuth();
+  const currentUserId = Number(currentUser?.id);
 
-  // Metadata for filters
-  const priorities = useSelector((s: RootState) => (s as any).priorities.value as any[]);
-  const statuses = useSelector((s: RootState) => (s as any).statuses.value as any[]);
-  const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
-  const users = useSelector((s: RootState) => (s as any).users.value as any[]);
-  const tags = useSelector((s: RootState) => (s as any).tags.value as any[]);
+  // Dexie data for filters
+  const priorities = useTable('priorities');
+  const statuses = useTable('statuses');
+  const spots = useTable('spots');
+  const users = useTable('users');
+  const tags = useTable('tags');
 
   // Derived status groupings for stats
   const doneStatusId = (statuses || []).find((s: any) => String((s as any).action || '').toUpperCase() === 'FINISHED')?.id
@@ -178,6 +168,9 @@ export const Workspace = () => {
     })
   );
 
+  // Zustand UI actions
+  const { setFilterModel, setSearchText, setGroupBy, setCollapseGroups } = useWorkspaceUIStore();
+
   // Load groupBy and collapseGroups from localStorage when workspace changes
   useEffect(() => {
     if (!id && !isAllWorkspaces) return;
@@ -188,13 +181,13 @@ export const Workspace = () => {
       const savedGroup = localStorage.getItem(groupKey) as any;
       const savedCollapse = localStorage.getItem(collapseKey);
       if (savedGroup) {
-        dispatch(setGroupBy(savedGroup));
+        setGroupBy(savedGroup);
       }
       if (savedCollapse !== null) {
-        dispatch(setCollapseGroups(savedCollapse === 'true'));
+        setCollapseGroups(savedCollapse === 'true');
       }
     } catch {}
-  }, [id, isAllWorkspaces, dispatch]);
+  }, [id, isAllWorkspaces, setGroupBy, setCollapseGroups]);
 
   // Listen for filter dialog open events
   useEffect(() => {
@@ -265,12 +258,12 @@ export const Workspace = () => {
     onFiltersChanged: (active) => {
       setShowClearFilters(active);
       const model = tableRef.current?.getFilterModel?.();
-      dispatch(setFilterModel(model || null));
+      setFilterModel(model || null);
     },
     onSelectionChanged: setSelectedIds,
     onOpenTaskDialog: handleOpenTaskDialog,
     onReady: handleTableReady,
-    onFilterModelChange: (model) => dispatch(setFilterModel(model)),
+    onFilterModelChange: (model) => setFilterModel(model),
   });
 
   const workspaceTabMap = workspaceTabs.reduce<Record<string, typeof workspaceTabs[number]>>((acc, tab) => {
@@ -295,7 +288,7 @@ export const Workspace = () => {
       // If no filter model, clear selection and filters
       setSelectedKpiCardId(null);
       tableRef.current?.setFilterModel?.(null);
-      dispatch(setFilterModel(null));
+      setFilterModel(null);
       try {
         localStorage.removeItem(`wh_workspace_filters_${id || 'all'}`);
       } catch {}
@@ -306,7 +299,7 @@ export const Workspace = () => {
     if (selectedKpiCardId === cardId) {
       setSelectedKpiCardId(null);
       tableRef.current?.setFilterModel?.(null);
-      dispatch(setFilterModel(null));
+      setFilterModel(null);
       try {
         localStorage.removeItem(`wh_workspace_filters_${id || 'all'}`);
       } catch {}
@@ -314,11 +307,11 @@ export const Workspace = () => {
       // Apply filter from card
       setSelectedKpiCardId(cardId);
       tableRef.current?.setFilterModel?.(card.filterModel);
-      dispatch(setFilterModel(card.filterModel));
+      setFilterModel(card.filterModel);
       try {
         localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify({ filterModel: card.filterModel, cardId: cardId }));
       } catch {}
-      dispatch(setSearchText(''));
+      setSearchText('');
     }
   };
 
@@ -664,11 +657,11 @@ export const Workspace = () => {
         currentModel={tableRef.current?.getFilterModel?.()}
         currentSearchText={searchText}
         onApply={(model) => {
-          const filterModel = model || null;
-          tableRef.current?.setFilterModel(filterModel);
-          dispatch(setFilterModel(filterModel));
-          try { localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify(filterModel)); } catch {}
-          dispatch(setSearchText(''));
+          const filterModelValue = model || null;
+          tableRef.current?.setFilterModel(filterModelValue);
+          setFilterModel(filterModelValue);
+          try { localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify(filterModelValue)); } catch {}
+          setSearchText('');
           
           // Check if the applied filter matches any KPI card
           if (!filterModel) {

@@ -1,15 +1,13 @@
 import { useEffect, useState, useMemo } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUser, faChartBar, faEnvelope } from "@fortawesome/free-solid-svg-icons";
 import { Check, Copy as CopyIcon, Plus, Trash, Crown, Shield } from "lucide-react";
 import { UrlTabs } from "@/components/ui/url-tabs";
-import { AppDispatch, RootState } from "@/store/store";
 import { useNavigate } from "react-router-dom";
 import { Team, UserTeam, Invitation, Role } from "@/store/types";
-import { genericActions } from "@/store/genericSlices";
+import { useTable, collections } from "@/store/dexie";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/providers/LanguageProvider";
@@ -34,16 +32,22 @@ import {
 } from "../../../components";
 
 function Users() {
-  const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const { t } = useLanguage();
   const tu = (key: string, fallback: string) => t(`settings.users.${key}`, fallback);
-  // Redux state for related data
-  const { value: teams, loading: teamsLoading } = useSelector((state: RootState) => state.teams) as { value: Team[]; loading: boolean };
-  const { value: jobPositions, loading: jobPositionsLoading } = useSelector((state: RootState) => state.jobPositions) as { value: any[]; loading: boolean };
-  const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
-  const { value: invitations } = useSelector((state: RootState) => state.invitations) as { value: Invitation[]; loading: boolean };
-  const { value: roles } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
+  // Dexie state for related data
+  const rawTeams = useTable<Team>('teams');
+  const teams = rawTeams ?? [];
+  const teamsLoading = rawTeams === undefined;
+  const rawJobPositions = useTable<any>('job_positions');
+  const jobPositions = rawJobPositions ?? [];
+  const jobPositionsLoading = rawJobPositions === undefined;
+  const rawUserTeams = useTable<UserTeam>('user_teams');
+  const userTeams = rawUserTeams ?? [];
+  const rawInvitations = useTable<Invitation>('invitations');
+  const invitations = rawInvitations ?? [];
+  const rawRoles = useTable<Role>('roles');
+  const roles = rawRoles ?? [];
   
   // Use shared state management
   const {
@@ -654,7 +658,7 @@ function Users() {
     if (!deletingInvitation) return;
     
     try {
-      await dispatch((genericActions as any).invitations.removeAsync(deletingInvitation.id)).unwrap();
+      await collections.invitations.delete(deletingInvitation.id);
       // Refresh invitations list from IndexedDB (will be updated by real-time listener or next validation)
       // No manual cache hydration here; state is kept in sync by login hydration + CRUD thunks/RTL.
       setIsDeleteInvitationDialogOpen(false);
@@ -848,7 +852,7 @@ function Users() {
         send_email: sendEmail && !!inviteEmail,
       };
       
-          const result = await dispatch((genericActions as any).invitations.addAsync(payload)).unwrap();
+          const result = await collections.invitations.add(payload);
           
           // Refresh invitations list from IndexedDB (real-time listener will update cache automatically)
           // No manual cache hydration here; state is kept in sync by login hydration + CRUD thunks/RTL.
@@ -905,8 +909,7 @@ function Users() {
       setIsCreating(true);
       setFormError(null);
       // Create user directly using addAsync to get the created user back
-      const createdUserResult = await dispatch((genericActions as any).users.addAsync(userData)).unwrap();
-      const createdUser = createdUserResult as UserData;
+      const createdUser = await collections.users.add(userData) as UserData;
       
       if (createdUser && createSelectedTeams.length > 0) {
         // Get default role (first available role, or first role with name "Usuario"/"User" if exists)
@@ -925,11 +928,11 @@ function Users() {
         for (const teamIdStr of createSelectedTeams) {
           const teamId = Number(teamIdStr);
           try {
-            await dispatch((genericActions as any).userTeams.addAsync({
+            await collections.user_teams.add({
               user_id: createdUser.id,
               team_id: teamId,
               role_id: defaultRole?.id || null
-            })).unwrap();
+            });
           } catch (error) {
             console.error(`Failed to add user-team relationship:`, error);
             setFormError(tu('errors.addTeamFailed', `Failed to add team relationship: ${error instanceof Error ? error.message : 'Unknown error'}`));
@@ -1033,11 +1036,11 @@ function Users() {
       // Add new user-team relationships
       for (const add of toAdd) {
         try {
-          await dispatch((genericActions as any).userTeams.addAsync({
+          await collections.user_teams.add({
             user_id: editingUser.id,
             team_id: add.teamIdNum,
             role_id: add.roleIdNum
-          })).unwrap();
+          });
         } catch (error: any) {
           console.error(`Failed to add user-team relationship:`, error);
           const errorMsg = error?.response?.data?.message || error?.message || 'Unknown error';
@@ -1049,13 +1052,10 @@ function Users() {
       // Update existing user-team relationships
       for (const upd of toUpdate) {
         try {
-          await dispatch((genericActions as any).userTeams.updateAsync({
-            id: upd.id!,
-            updates: {
-              team_id: upd.teamIdNum,
-              role_id: upd.roleIdNum
-            }
-          })).unwrap();
+          await collections.user_teams.update(upd.id!, {
+            team_id: upd.teamIdNum,
+            role_id: upd.roleIdNum
+          });
         } catch (error: any) {
           console.error(`Failed to update user-team relationship:`, error);
           const errorMsg = error?.response?.data?.message || error?.message || 'Unknown error';
@@ -1067,7 +1067,7 @@ function Users() {
       // Remove deleted user-team relationships
       for (const del of toRemove) {
         try {
-          await dispatch((genericActions as any).userTeams.removeAsync(del.id)).unwrap();
+          await collections.user_teams.delete(del.id);
         } catch (error: any) {
           console.error(`Failed to remove user-team relationship:`, error);
           const errorMsg = error?.response?.data?.message || error?.message || 'Unknown error';

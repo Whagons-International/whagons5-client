@@ -3,8 +3,13 @@
  * 
  * Handles execution of tools that run in the browser (frontend-side tools).
  * These are tools that the AI can call to interact with the browser directly,
- * such as displaying alerts, notifications, or manipulating the DOM.
+ * such as displaying alerts, notifications, creating KPI cards, or manipulating the DOM.
  */
+
+import { handleCreateKpi } from './createKpi';
+import { handleUpdateKpi } from './updateKpi';
+import { handleDeleteKpi } from './deleteKpi';
+import { handleListKpi } from './listKpi';
 
 export interface FrontendToolResult {
   action: string;
@@ -178,9 +183,10 @@ const FRONTEND_TOOL_HANDLERS: Record<string, (result: FrontendToolResult, sendMe
   'Browser_Alert': handleBrowserAlert,
   'Browser_Prompt': handleBrowserPrompt,
   'Browser_Navigate': handleBrowserNavigate,
-  // Add more frontend tools here:
-  // 'Browser_Confirm': handleBrowserConfirm,
-  // 'Show_Notification': handleShowNotification,
+  'Create_Kpi': handleCreateKpi,
+  'Update_Kpi': handleUpdateKpi,
+  'Delete_Kpi': handleDeleteKpi,
+  'List_Kpi': handleListKpi,
 };
 
 /**

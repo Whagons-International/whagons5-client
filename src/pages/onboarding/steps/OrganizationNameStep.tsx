@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import { OnboardingData } from '@/types/user';
 import { createTenantName } from '@/lib/tenant';
 import { getEnvVariables } from '@/lib/getEnvVariables';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { checkTenantAvailability, clearAvailability } from '@/store/reducers/tenantAvailabilitySlice';
-import type { RootState, AppDispatch } from '@/store/store';
+import { useTenantAvailability } from '@/store/dexie';
 
 // Normalize an organization name into a safe tenant slug:
 // - lowercase
@@ -36,8 +34,14 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
   loading,
   hasActiveSubscription = false 
 }) => {
-  const dispatch = useDispatch<AppDispatch>();
   const { t, language } = useLanguage();
+  const { 
+    loading: availabilityLoading, 
+    error: availabilityError, 
+    value: availabilityValue,
+    checkAvailability: checkTenantAvailability,
+    clearAvailability 
+  } = useTenantAvailability();
   const [organizationName, setOrganizationName] = useState(data.organization_name || '');
   const [finalTenantName, setFinalTenantName] = useState(data.tenant_domain_prefix || '');
   const [error, setError] = useState('');
@@ -48,19 +52,16 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Redux state for tenant availability
-  const tenantAvailability = useSelector((state: RootState) => state.tenantAvailability);
-  
   // Check if tenant is already set (organization is already created)
   const isTenantSet = Boolean(data.tenant_domain_prefix);
   
-  // Derive availability status from Redux state
+  // Derive availability status from hook state
   const availabilityStatus: AvailabilityStatus = useMemo(() => {
-    if (tenantAvailability.loading) return 'checking';
-    if (tenantAvailability.error) return 'error';
-    if (tenantAvailability.value === null) return 'idle';
-    return tenantAvailability.value ? 'taken' : 'available';
-  }, [tenantAvailability.loading, tenantAvailability.error, tenantAvailability.value]);
+    if (availabilityLoading) return 'checking';
+    if (availabilityError) return 'error';
+    if (availabilityValue === null) return 'idle';
+    return availabilityValue ? 'taken' : 'available';
+  }, [availabilityLoading, availabilityError, availabilityValue]);
 
   // Dynamic loading messages
   const loadingMessages = useMemo(() => {
@@ -103,22 +104,22 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
     }
   }, [isTenantSet]);
 
-  // Debounced availability check using Redux
+  // Debounced availability check using hook
   const checkAvailability = useCallback(async (cleanedName: string) => {
     if (!cleanedName || cleanedName.length < 2) {
-      dispatch(clearAvailability());
+      clearAvailability();
       return;
     }
 
-    // Dispatch Redux thunk - handles API call, caching, and error handling
+    // Call hook's checkAvailability - handles API call and caching
     try {
-      await dispatch(checkTenantAvailability(cleanedName)).unwrap();
+      await checkTenantAvailability(cleanedName);
       setRetryCount(0); // Reset retry count on success
     } catch (error) {
       console.error('Availability check failed:', error);
-      // Error is already set in Redux state
+      // Error is already set in hook state
     }
-  }, [dispatch]);
+  }, [checkTenantAvailability, clearAvailability]);
 
   // Handle organization name change with debounced availability check
   const handleOrganizationNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,13 +148,13 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
           checkAvailability(cleanedValue);
         }, 500);
       } else {
-        dispatch(clearAvailability());
+        clearAvailability();
       }
     } else {
       setFinalTenantName('');
-      dispatch(clearAvailability());
+      clearAvailability();
     }
-  }, [isTenantSet, hasActiveSubscription, checkAvailability]);
+  }, [isTenantSet, hasActiveSubscription, checkAvailability, clearAvailability]);
 
   // Cleanup debounce timer on unmount
   useEffect(() => {
@@ -182,7 +183,7 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
     if (!organizationName.trim()) return;
     const cleanedValue = slugifyOrganizationName(organizationName);
     if (cleanedValue.length >= 2) {
-      dispatch(clearAvailability()); // Clear Redux state
+      clearAvailability(); // Clear hook state
       setRetryCount(prev => prev + 1);
       checkAvailability(cleanedValue);
     }
@@ -236,9 +237,9 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
     // Final availability check before submission
     if (hasActiveSubscription) {
       try {
-        // Use Redux thunk for final check
-        const result = await dispatch(checkTenantAvailability(cleanedOrgName)).unwrap();
-        if (result) {
+        // Use hook's checkAvailability for final check
+        const isTaken = await checkTenantAvailability(cleanedOrgName);
+        if (isTaken) {
           setError(t('onboarding.organization.errorTaken', 'This organization name is already taken. Please choose another one.'));
           return;
         }

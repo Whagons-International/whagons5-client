@@ -1,7 +1,7 @@
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useSelector, useDispatch } from "react-redux";
+import { useTable } from "@/store/dexie";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -37,7 +37,6 @@ import {
   faClock
 } from "@fortawesome/free-solid-svg-icons";
 import { faStar as faStarRegular } from "@fortawesome/free-regular-svg-icons";
-import { RootState } from "@/store/store";
 import {
   DndContext,
   closestCenter,
@@ -51,7 +50,6 @@ import { arrayMove, SortableContext, rectSortingStrategy, useSortable } from '@d
 import { CSS } from '@dnd-kit/utilities';
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { useLanguage } from "@/providers/LanguageProvider";
-import { genericActions } from "@/store/genericSlices";
 
 
 const STORAGE_KEYS = {
@@ -268,7 +266,6 @@ const MAX_RECENT_ITEMS = 5;
 function Settings() {
   const navigate = useNavigate();
   const location = useLocation();
-  const dispatch = useDispatch();
   const { t } = useLanguage();
   const searchInputRef = useRef<HTMLInputElement>(null);
   
@@ -367,22 +364,22 @@ function Settings() {
 
 
 
-  // Spot count now derived from Redux slice hydrated in AuthProvider
+  // Spot count now derived from Dexie tables
 
-  // Select from store
-  const categories = useSelector((s: RootState) => s.categories?.value ?? []);
-  const templates = useSelector((s: RootState) => s.templates?.value ?? []);
-  const teams = useSelector((s: RootState) => s.teams?.value ?? []);
-  const workspaces = useSelector((s: RootState) => (s as any).workspaces?.value ?? []);
-  const statuses = useSelector((s: RootState) => s.statuses?.value ?? []);
-  const priorities = useSelector((s: RootState) => s.priorities?.value ?? []);
-  const slas = useSelector((s: RootState) => s.slas?.value ?? []);
-  const users = useSelector((s: RootState) => s.users?.value ?? []);
-  const forms = useSelector((s: RootState) => s.forms?.value ?? []);
-  const approvals = useSelector((s: RootState) => s.approvals?.value ?? []);
-  const spots = useSelector((s: RootState) => s.spots?.value ?? []);
-  const tags = useSelector((s: RootState) => s.tags?.value ?? []);
-  const workflows = useSelector((s: RootState) => (s as any).workflows?.value ?? []);
+  // Select from Dexie
+  const categories = useTable('categories');
+  const templates = useTable('templates');
+  const teams = useTable('teams');
+  const workspaces = useTable('workspaces');
+  const statuses = useTable('statuses');
+  const priorities = useTable('priorities');
+  const slas = useTable('slas');
+  const users = useTable('users');
+  const forms = useTable('forms');
+  const approvals = useTable('approvals');
+  const spots = useTable('spots');
+  const tags = useTable('tags');
+  const workflows = useTable('workflows');
 
   const counts = useMemo(() => {
     return {

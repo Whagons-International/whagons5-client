@@ -1,12 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { reorderKpiCardsAsync } from '@/store/actions/kpiCards';
-import { useDispatch } from 'react-redux';
 import { useLanguage } from '@/providers/LanguageProvider';
 import toast from 'react-hot-toast';
-import type { AppDispatch } from '@/store/store';
 import { FIXED_TABS, type WorkspaceTabKey } from '../constants';
+import { api } from '@/api/whagonsApi';
 
 type KpiCardEntity = {
   id: number;
@@ -27,7 +25,6 @@ export function useWorkspaceDragDrop(params: {
   setHeaderKpiCards: (cards: KpiCardEntity[]) => void;
 }) {
   const { customTabOrder, setCustomTabOrder, headerKpiCards, setHeaderKpiCards } = params;
-  const dispatch = useDispatch<AppDispatch>();
   const { t } = useLanguage();
   
   const [_isDraggingTab, setIsDraggingTab] = useState(false);
@@ -105,7 +102,8 @@ export function useWorkspaceDragDrop(params: {
         position: index,
       }));
       
-      await dispatch(reorderKpiCardsAsync({ cards: reorderData })).unwrap();
+      // Call API directly to reorder KPI cards
+      await api.post('/kpi-cards/reorder', { cards: reorderData });
       toast.success(t('kpiCards.reordered', 'Cards reordered successfully'));
     } catch (error) {
       console.error('[Workspace KPI] Failed to reorder KPI cards:', error);

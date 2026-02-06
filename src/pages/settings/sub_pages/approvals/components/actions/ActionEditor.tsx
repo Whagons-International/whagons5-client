@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useSelector } from 'react-redux';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -13,8 +12,8 @@ import { EmailConfigForm } from './config-forms/EmailConfigForm';
 import { BoardMessageConfigForm } from './config-forms/BoardMessageConfigForm';
 import { BroadcastConfigForm } from './config-forms/BroadcastConfigForm';
 import { WebhookConfigForm } from './config-forms/WebhookConfigForm';
-import { RootState } from '@/store/store';
 import { User } from '@/store/types';
+import { useTable } from '@/store/dexie';
 
 interface ActionEditorProps {
   action: ApprovalAction;
@@ -26,7 +25,7 @@ interface ActionEditorProps {
 
 export function ActionEditor({ action, open, onOpenChange, onSave, approvalId }: ActionEditorProps) {
   const [editedAction, setEditedAction] = useState<ApprovalAction>(action);
-  const users = useSelector((state: RootState) => (state as any).users?.value ?? []) as User[];
+  const users = useTable<User>('users') ?? [];
   const enabledUsers = useMemo(() => {
     return (users || [])
       .filter((user) => user?.is_active !== false)

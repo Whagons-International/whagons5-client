@@ -1,8 +1,6 @@
 import { useState, useCallback } from "react";
-import { useDispatch } from "react-redux";
-import { AppDispatch } from "@/store/store";
 import { Team, UserTeam, Role } from "@/store/types";
-import { genericActions } from "@/store/genericSlices";
+import { collections } from "@/store/dexie";
 
 interface UserAssignment {
   id?: number;
@@ -17,7 +15,6 @@ export function useTeamUserAssignments(
   roles: Role[],
   translate: (key: string, fallback: string) => string
 ) {
-  const dispatch = useDispatch<AppDispatch>();
   const [isUsersDialogOpen, setIsUsersDialogOpen] = useState(false);
   const [usersDialogTeam, setUsersDialogTeam] = useState<Team | null>(null);
   const [userAssignments, setUserAssignments] = useState<UserAssignment[]>([]);
@@ -123,36 +120,32 @@ export function useTeamUserAssignments(
       const toRemove = existing.filter((ex) => !current.some((c) => c.id === ex.id));
 
       for (const add of toAdd) {
-        await dispatch((genericActions as any).userTeams.addAsync({
+        await collections.userTeams.add({
           user_id: add.userIdNum,
           team_id: usersDialogTeam.id,
           role_id: add.roleIdNum
-        })).unwrap();
+        });
       }
 
       for (const upd of toUpdate) {
-        await dispatch((genericActions as any).userTeams.updateAsync({
-          id: upd.id,
-          updates: {
-            user_id: upd.userIdNum,
-            team_id: usersDialogTeam.id,
-            role_id: upd.roleIdNum
-          }
-        })).unwrap();
+        await collections.userTeams.update(upd.id!, {
+          user_id: upd.userIdNum,
+          team_id: usersDialogTeam.id,
+          role_id: upd.roleIdNum
+        });
       }
 
       for (const del of toRemove) {
-        await dispatch((genericActions as any).userTeams.removeAsync(del.id)).unwrap();
+        await collections.userTeams.delete(del.id);
       }
 
-      dispatch((genericActions as any).userTeams.getFromIndexedDB?.());
       handleCloseUsersDialog();
     } catch (err: any) {
       setUsersFormError(err?.message || translate('dialogs.manageUsers.errors.generic', 'Error updating team users'));
     } finally {
       setIsSavingUsers(false);
     }
-  }, [usersDialogTeam, userAssignments, userTeams, dispatch, handleCloseUsersDialog, translate]);
+  }, [usersDialogTeam, userAssignments, userTeams, handleCloseUsersDialog, translate]);
 
   return {
     isUsersDialogOpen,

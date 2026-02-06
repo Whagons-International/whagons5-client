@@ -1,12 +1,11 @@
-// Redux state management and derived state utilities for WorkspaceTable
+// Dexie state management and derived state utilities for WorkspaceTable
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSelector } from 'react-redux';
-import type { RootState } from '@/store';
 import type { User } from '@/store/types';
-import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { GRID_CONSTANTS } from './gridConfig';
 import { refreshClientSideGrid } from './dataSource';
+import { useTable } from '@/store/dexie';
+import { queryTasks } from '@/store/dexie';
 import type React from 'react';
 
 export interface GridStateOptions {
@@ -14,32 +13,32 @@ export interface GridStateOptions {
   searchText?: string;
 }
 
-export const useGridReduxState = () => {
-  // Redux state selectors
-  const statuses = useSelector((s: RootState) => (s as any).statuses.value as any[]);
-  const priorities = useSelector((s: RootState) => (s as any).priorities.value as any[]);
-  const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
-  const workspaces = useSelector((s: RootState) => (s as any).workspaces.value as any[]);
-  const users = useSelector((s: RootState) => (s as any).users.value as User[]);
-  const categories = useSelector((s: RootState) => (s as any).categories.value as any[]);
-  const templates = useSelector((s: RootState) => (s as any).templates?.value as any[] || []);
-  const forms = useSelector((s: RootState) => (s as any).forms?.value as any[] || []);
-  const formVersions = useSelector((s: RootState) => (s as any).formVersions?.value as any[] || []);
-  const taskForms = useSelector((s: RootState) => (s as any).taskForms?.value as any[] || []);
-  const statusTransitions = useSelector((s: RootState) => (s as any).statusTransitions.value as any[]);
-  const approvals = useSelector((s: RootState) => (s as any).approvals?.value as any[] || []);
-  const approvalApprovers = useSelector((s: RootState) => (s as any).approvalApprovers?.value as any[] || []);
-  const taskApprovalInstances = useSelector((s: RootState) => (s as any).taskApprovalInstances?.value as any[] || []);
-  const slas = useSelector((s: RootState) => (s as any).slas?.value as any[] || []);
-  const tags = useSelector((s: RootState) => (s as any).tags?.value as any[] || []);
-  const taskTags = useSelector((s: RootState) => (s as any).taskTags?.value as any[] || []);
-  const taskUsers = useSelector((s: RootState) => (s as any).taskUsers?.value as any[] || []);
-  const customFields = useSelector((s: RootState) => (s as any).customFields?.value as any[] || []);
-  const categoryCustomFields = useSelector((s: RootState) => (s as any).categoryCustomFields?.value as any[] || []);
-  const taskCustomFieldValues = useSelector((s: RootState) => (s as any).taskCustomFieldValues?.value as any[] || []);
-  const taskNotes = useSelector((s: RootState) => (s as any).taskNotes?.value as any[] || []);
-  const taskAttachments = useSelector((s: RootState) => (s as any).taskAttachments?.value as any[] || []);
-  const roles = useSelector((s: RootState) => (s as any).roles?.value as any[] || []);
+export const useGridDexieState = () => {
+  // Dexie table hooks (reactive queries)
+  const statuses = useTable('statuses') || [];
+  const priorities = useTable('priorities') || [];
+  const spots = useTable('spots') || [];
+  const workspaces = useTable('workspaces') || [];
+  const users = (useTable('users') || []) as User[];
+  const categories = useTable('categories') || [];
+  const templates = useTable('templates') || [];
+  const forms = useTable('forms') || [];
+  const formVersions = useTable('form_versions') || [];
+  const taskForms = useTable('task_forms') || [];
+  const statusTransitions = useTable('status_transitions') || [];
+  const approvals = useTable('approvals') || [];
+  const approvalApprovers = useTable('approval_approvers') || [];
+  const taskApprovalInstances = useTable('task_approval_instances') || [];
+  const slas = useTable('slas') || [];
+  const tags = useTable('tags') || [];
+  const taskTags = useTable('task_tags') || [];
+  const taskUsers = useTable('task_users') || [];
+  const customFields = useTable('custom_fields') || [];
+  const categoryCustomFields = useTable('category_custom_fields') || [];
+  const taskCustomFieldValues = useTable('task_custom_field_values') || [];
+  const taskNotes = useTable('task_notes') || [];
+  const taskAttachments = useTable('task_attachments') || [];
+  const roles = useTable('roles') || [];
 
   return {
     statuses,
@@ -69,6 +68,9 @@ export const useGridReduxState = () => {
   };
 };
 
+// Alias for backward compatibility
+export const useGridReduxState = useGridDexieState;
+
 export const useDerivedGridState = (reduxState: ReturnType<typeof useGridReduxState>, options: GridStateOptions) => {
   const { workspaceId } = options;
   const { workspaces } = reduxState;
@@ -96,14 +98,12 @@ export const useGridModeDecision = (workspaceId: string, searchText: string) => 
   return useMemo(() => {
     const decideMode = async () => {
       try {
-        if (!TasksCache.initialized) await TasksCache.init();
-
         // Build minimal params equivalent to the grid query
         const baseParams: any = { search: searchText };
-        if (workspaceId !== 'all') baseParams.workspace_id = workspaceId;
+        if (workspaceId !== 'all') baseParams.workspace_id = Number(workspaceId);
 
         // Get filtered count only
-        const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+        const countResp = await queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
         const totalFiltered = countResp?.rowCount ?? 0;
 
         return {
@@ -164,9 +164,8 @@ export const useWorkspaceTableMode = (params: WorkspaceTableModeParams) => {
       if (params.groupBy && params.groupBy !== 'none') {
         setUseClientSide(true);
         try {
-          if (!TasksCache.initialized) await TasksCache.init();
           const sortModel = [{ colId: 'id', sort: 'desc' }];
-          const { rows, totalFiltered } = await refreshClientSideGrid(params.gridApi, TasksCache, {
+          const { rows, totalFiltered } = await refreshClientSideGrid(params.gridApi, {
             search: params.searchText,
             workspaceRef: params.workspaceRef,
             statusMapRef: params.statusMapRef,

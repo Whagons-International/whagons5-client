@@ -1,10 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
-import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLocationDot, faPlus, faLayerGroup, faChartBar, faTrash } from "@fortawesome/free-solid-svg-icons";
-import { RootState, AppDispatch } from "@/store/store";
-import { genericActions } from "@/store/genericSlices";
 import { Spot } from "@/store/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +21,7 @@ import { UrlTabs } from "@/components/ui/url-tabs";
 import ReactECharts from "echarts-for-react";
 import dayjs from "dayjs";
 import { useLanguage } from "@/providers/LanguageProvider";
+import { useTable, collections } from "@/store/dexie";
 
 // Custom cell renderer for spot name with type indicator
 const SpotNameCellRenderer = (props: ICellRendererParams) => {
@@ -45,12 +43,11 @@ const SpotNameCellRenderer = (props: ICellRendererParams) => {
 };
 
 function Spots() {
-  const dispatch = useDispatch<AppDispatch>();
   const { t } = useLanguage();
   const ts = (key: string, fallback: string) => t(`settings.spots.${key}`, fallback);
-  // Redux state for related data
-  const { value: tasks } = useSelector((state: RootState) => state.tasks);
-  const { value: spotTypes } = useSelector((state: RootState) => (state as any).spotTypes || { value: [] });
+  // Dexie state for related data
+  const tasks = useTable('tasks') ?? [];
+  const spotTypes = useTable('spot_types') ?? [];
   
   // Use shared state management
   const {
@@ -335,7 +332,7 @@ function Spots() {
   const handleUpdateSpotType = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSpotType) return;
-    await dispatch((genericActions as any).spotTypes.updateAsync({ id: editingSpotType.id, updates: { color: editingSpotTypeColor } }));
+    await collections.spotTypes.update(editingSpotType.id, { color: editingSpotTypeColor });
     setIsEditSpotTypeOpen(false);
     setEditingSpotType(null);
   };

@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
 import { useAuth } from '@/providers/AuthProvider';
+import { useTable } from '@/store/dexie';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBroom, faBoxesStacked, faUsers, faDollarSign, faWarehouse, faClock, faFileAlt, faChartBar, faChartLine, faGripVertical, faCog, faLock, faCheck, faStar, faHammer, faBell, faPlus, faPuzzlePiece, faEdit, faTrash, faLink, faTrophy, faRocket, faHotel, faCalendar } from '@fortawesome/free-solid-svg-icons';
@@ -19,7 +19,6 @@ import {
 import { arrayMove, SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { RootState } from '@/store/store';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -669,10 +668,10 @@ function Plugins() {
 	const [editingCustomPlugin, setEditingCustomPlugin] = useState<CustomPlugin | null>(null);
 	// Get current user from auth hook (has global_roles loaded)
 	const { user: authUser } = useAuth();
-	// Also check Redux state as fallback
-	const reduxUser = useSelector((state: RootState) => (state as any).user?.value ?? null);
-	// Prefer authUser, fallback to reduxUser
-	const currentUser = authUser || reduxUser;
+	// Also check Dexie state as fallback
+	const dexieUser = useTable('user');
+	// Prefer authUser, fallback to dexieUser
+	const currentUser = authUser || dexieUser;
 	
 	// Check if user is admin via is_admin field OR has an admin global role
 	const hasAdminField = !!currentUser?.is_admin;
@@ -688,8 +687,8 @@ function Plugins() {
 		return unsubscribe;
 	}, []);
 
-	// Fetch plugin statuses from Redux (plugins is a generic slice)
-	const plugins = useSelector((state: RootState) => (state as any).plugins?.value || []);
+	// Fetch plugin statuses from Dexie
+	const plugins = useTable('plugins') || [];
 	useEffect(() => {
 		if (plugins.length > 0) {
 			const statuses: Record<string, boolean> = {};

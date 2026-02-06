@@ -1,5 +1,3 @@
-import { useSelector } from 'react-redux';
-import { RootState } from '@/store/store';
 import { Tag } from '@/store/types';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -8,6 +6,7 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faTrash, faTag } from '@fortawesome/free-solid-svg-icons';
 import { useMemo } from 'react';
+import { useTable } from '@/store/dexie';
 
 interface TagsConfigFormProps {
   config: Record<string, any>;
@@ -16,7 +15,7 @@ interface TagsConfigFormProps {
 }
 
 export function TagsConfigForm({ config, onChange, actionType = 'add_tags' }: TagsConfigFormProps) {
-  const tags = useSelector((s: RootState) => s.tags?.value ?? []) as Tag[];
+  const tags = useTable('tags') as Tag[];
   const tagIds = config.tag_ids || [];
   const tagNames = config.tag_names || [];
 

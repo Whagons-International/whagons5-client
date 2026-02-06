@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { ColDef } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLayerGroup, faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
-// import { RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

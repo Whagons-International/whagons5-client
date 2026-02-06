@@ -9,12 +9,7 @@ import NameStep from '@/pages/onboarding/steps/NameStep';
 import OrganizationNameStep from '@/pages/onboarding/steps/OrganizationNameStep';
 import OptionalStep from '@/pages/onboarding/steps/OptionalStep';
 import WhagonsCheck from '@/assets/WhagonsCheck';
-// Using generic caches instead of custom caches
-import { TasksCache } from '@/store/indexedDB/TasksCache';
-import { useDispatch } from 'react-redux';
-import { AppDispatch } from '@/store/store';
-import { genericActions } from '@/store/genericSlices';
-import { getTasksFromIndexedDB } from '@/store/reducers/tasksSlice';
+
 import RotatingBackground from '@/components/marketing/RotatingBackground';
 import { HERO_BACKGROUND_IMAGES } from '@/assets/marketing/heroBackgrounds';
 
@@ -26,7 +21,6 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
   const navigate = useNavigate();
   const { refetchUser, updateUser } = useAuth();
   const { language, t } = useLanguage();
-  const dispatch = useDispatch<AppDispatch>();
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({
     email: user.email,
@@ -67,11 +61,6 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
       'Dream big. Start small. Act now.'
     ];
   }, [isSpanish]);
-
-  const syncCachesAndStore = async () => {
-    // Ensure tasks cache is ready only; core slices are hydrated by AuthProvider
-    await TasksCache.init();
-  };
 
   // Determine starting step based on user's current state
   useEffect(() => {
@@ -219,7 +208,6 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
             window.dispatchEvent(new CustomEvent('wh:postOnboardingBootstrapPending'));
           } catch (_e) {}
           await refetchUser();
-          await syncCachesAndStore();
           setLoading(false);
           navigate('/');
         }

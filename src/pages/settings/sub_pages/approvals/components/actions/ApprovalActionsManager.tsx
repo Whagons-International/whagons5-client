@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useSelector } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTrash, faGripVertical, faEdit } from '@fortawesome/free-solid-svg-icons';
 import { CheckCircle2, XCircle } from 'lucide-react';
+import { useTable } from '@/store/dexie';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +20,6 @@ import {
 import { ApprovalAction, ACTION_TYPE_LABELS, ACTION_TYPE_ICONS, ACTION_TYPE_COLORS } from './ApprovalActionTypes';
 import { ActionEditor } from './ActionEditor';
 import { AddActionButton } from './AddActionButton';
-import { RootState } from '@/store/store';
 
 interface ApprovalActionsManagerProps {
   approvedActions: ApprovalAction[];
@@ -43,10 +42,10 @@ export function ApprovalActionsManager({
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [deletingAction, setDeletingAction] = useState<{ index: number; type: 'approved' | 'rejected' } | null>(null);
 
-  // Get data from Redux to display names
-  const statuses = useSelector((state: RootState) => (state as any).statuses?.value || []);
-  const tags = useSelector((state: RootState) => (state as any).tags?.value || []);
-  const users = useSelector((state: RootState) => (state as any).users?.value || []);
+  // Get data from Dexie to display names
+  const statuses = useTable('statuses') ?? [];
+  const tags = useTable('tags') ?? [];
+  const users = useTable('users') ?? [];
 
   const handleAddAction = (actionType: string, targetType: 'approved' | 'rejected') => {
     const newAction: ApprovalAction = {

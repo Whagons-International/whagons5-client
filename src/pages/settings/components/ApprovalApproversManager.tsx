@@ -1,8 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { useSelector, useDispatch } from "react-redux";
-import { RootState, AppDispatch } from "@/store/store";
 import { Approval, User, Role, ApprovalApprover, JobPosition } from "@/store/types";
-import { genericActions, genericCaches, genericEventNames, genericEvents } from '@/store/genericSlices';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { useTable, collections } from "@/store/dexie";
 
 export interface ApprovalApproversManagerProps {
   open: boolean;
@@ -32,12 +30,10 @@ type LocalApprover = {
 };
 
 export function ApprovalApproversManager({ open, onOpenChange, approval }: ApprovalApproversManagerProps) {
-  const dispatch = useDispatch<AppDispatch>();
-  const { value: users } = useSelector((s: RootState) => s.users) as { value: User[] };
-  const { value: roles } = useSelector((s: RootState) => s.roles) as { value: Role[] };
-  const { value: jobPositions } = useSelector((s: RootState) => s.jobPositions) as { value: JobPosition[] };
-  // Access slice to subscribe for external changes; actual data read via cache for consistency
-  useSelector((s: RootState) => s.approvalApprovers.value as ApprovalApprover[]);
+  const users = useTable<User>('users') ?? [];
+  const roles = useTable<Role>('roles') ?? [];
+  const jobPositions = useTable<JobPosition>('job_positions') ?? [];
+  const approvalApprovers = useTable<ApprovalApprover>('approval_approvers') ?? [];
 
   const [items, setItems] = useState<LocalApprover[]>([]);
   const lastMutationRef = React.useRef<number>(0);
@@ -57,62 +53,31 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
     return [];
   }, [type, users, roles, jobPositions]);
 
-  const refreshFromCache = React.useCallback(async (force: boolean = false) => {
-    const aid = approval ? Number(approval.id) : null;
-    if (!aid) return;
-    try {
-      // Skip transient refreshes triggered by events right after a local mutation
-      if (!force) {
-        const recentlyMutated = Date.now() - lastMutationRef.current < 1200;
-        if (recentlyMutated) return;
-      }
-      const rows = await genericCaches.approvalApprovers.getAll();
-      const filtered = rows.filter((r: any) => Number((r as any)?.approval_id ?? (r as any)?.approvalId) === aid);
-      if (filtered.length > 0) {
-        setItems((prev) => {
-          const byId = new Map<number, any>();
-          const byKey = new Map<string, any>();
-          for (const r of filtered as any[]) {
-            if (r && r.id != null) byId.set(Number(r.id), r);
-            const key = `${(r as any)?.approver_type}-${Number((r as any)?.approver_id)}`;
-            byKey.set(key, r);
-          }
-          const out: any[] = [];
-          for (const r of byId.values()) out.push(r);
-          for (const r of prev) {
-            if (r && r.id < 0) {
-              const key = `${r.approver_type}-${Number(r.approver_id)}`;
-              if (!byKey.has(key)) out.push(r);
-            }
-          }
-          return out as any;
-        });
-      } else {
-        const recentlyMutated = Date.now() - lastMutationRef.current < 2000;
-        if (!recentlyMutated) setItems([]);
-      }
-    } catch {}
-  }, [approval]);
-
-  const loadData = React.useCallback(async () => {
-    if (!approval) return;
-    await refreshFromCache(true);
-  }, [dispatch, approval, refreshFromCache]);
-
-  React.useEffect(() => {
-    if (open && approval) {
-      loadData();
-    }
-  }, [open, approval, dispatch, loadData]);
-
+  // Derive items from live Dexie data - no manual cache refresh needed
   React.useEffect(() => {
     if (!open || !approval) return;
-    const names = genericEventNames.approvalApprovers;
-    const off1 = genericEvents.on(names.CREATED, refreshFromCache);
-    const off2 = genericEvents.on(names.UPDATED, refreshFromCache);
-    const off3 = genericEvents.on(names.DELETED, refreshFromCache);
-    return () => { off1(); off2(); off3(); };
-  }, [open, approval, refreshFromCache]);
+    const aid = Number(approval.id);
+    const filtered = approvalApprovers.filter((r) => Number(r.approval_id) === aid);
+    // Merge with optimistic local items (negative IDs)
+    setItems((prev) => {
+      const byId = new Map<number, ApprovalApprover>();
+      const byKey = new Map<string, ApprovalApprover>();
+      for (const r of filtered) {
+        if (r && r.id != null) byId.set(Number(r.id), r);
+        const key = `${r.approver_type}-${Number(r.approver_id)}`;
+        byKey.set(key, r);
+      }
+      const out: LocalApprover[] = [];
+      for (const r of byId.values()) out.push(r as LocalApprover);
+      for (const r of prev) {
+        if (r && r.id < 0) {
+          const key = `${r.approver_type}-${Number(r.approver_id)}`;
+          if (!byKey.has(key)) out.push(r);
+        }
+      }
+      return out;
+    });
+  }, [open, approval, approvalApprovers]);
 
   const add = async () => {
     if (!approval || !selectedId) return;
@@ -134,7 +99,7 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
     setSelectedId("");
     lastMutationRef.current = Date.now();
     try {
-      const saved = await dispatch(genericActions.approvalApprovers.addAsync({
+      const saved = await collections.approvalApprovers.add({
         approval_id: Number(approval.id),
         approver_type: type,
         approver_id: approverId,
@@ -142,18 +107,16 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
         order_index: items.length,
         scope: 'global',
         scope_id: null,
-      } as any) as any).unwrap();
+      });
       setItems(prev => {
         const copy = [...prev];
         const idx = copy.findIndex(r => r.id === optimistic.id);
-        if (idx !== -1) copy[idx] = saved as any; else copy.push(saved as any);
+        if (idx !== -1) copy[idx] = saved as LocalApprover; else copy.push(saved as LocalApprover);
         return copy;
       });
     } catch (e) {
       // rollback optimistic
       setItems(prev => prev.filter(i => i.id !== optimistic.id));
-    } finally {
-      refreshFromCache(true);
     }
   };
 
@@ -162,12 +125,9 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
     setItems(prev => prev.filter(i => String(i.id) !== String(id)));
     lastMutationRef.current = Date.now();
     try {
-      await dispatch(genericActions.approvalApprovers.removeAsync(id) as any).unwrap();
-      // Small delay to allow IndexedDB write to settle before pulling fresh rows
-      setTimeout(() => { refreshFromCache(true); }, 120);
+      await collections.approvalApprovers.delete(id);
     } catch (e) {
-      // If server fails, re-sync from cache to restore the item
-      await refreshFromCache(true);
+      // If server fails, Dexie's live query will restore the item automatically
     }
   };
 
@@ -177,11 +137,9 @@ export function ApprovalApproversManager({ open, onOpenChange, approval }: Appro
     if (!it) return;
     lastMutationRef.current = Date.now();
     try {
-      await dispatch(genericActions.approvalApprovers.updateAsync({ id, updates: { required: !it.required } } as any) as any).unwrap();
+      await collections.approvalApprovers.update(id, { required: !it.required });
     } catch (e) {
-      // ignore
-    } finally {
-      refreshFromCache(true);
+      // ignore - Dexie's live query will revert if needed
     }
   };
 

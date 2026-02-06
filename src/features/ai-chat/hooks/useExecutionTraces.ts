@@ -357,6 +357,11 @@ function getToolCategory(toolName: string): string {
     case 'Sandbox_Run':
     case 'Confirm_With_User':
       return 'browser';
+    case 'Create_Kpi':
+    case 'Update_Kpi':
+    case 'Delete_Kpi':
+    case 'List_Kpi':
+      return 'kpi';
     default:
       if (toolName.includes('Workflow')) {
         return 'workflow';
@@ -398,6 +403,22 @@ function getToolStartLabel(toolName: string, args: any): string {
       return 'Running in sandbox';
     case 'Confirm_With_User':
       return 'Waiting for confirmation';
+    case 'Create_Kpi':
+      if (args?.name) {
+        const name = args.name.length > 40 ? args.name.slice(0, 40) + '...' : args.name;
+        return `Creating KPI: "${name}"`;
+      }
+      return 'Creating KPI card';
+    case 'Update_Kpi':
+      if (args?.name) {
+        const uName = args.name.length > 40 ? args.name.slice(0, 40) + '...' : args.name;
+        return `Updating KPI: "${uName}"`;
+      }
+      return args?.id ? `Updating KPI #${args.id}` : 'Updating KPI card';
+    case 'Delete_Kpi':
+      return args?.id ? `Deleting KPI #${args.id}` : 'Deleting KPI card';
+    case 'List_Kpi':
+      return 'Listing KPI cards';
     default:
       return `Running ${toolName.replace(/_/g, ' ')}`;
   }
@@ -436,6 +457,22 @@ function getToolEndLabel(toolName: string, args?: any): string {
       return 'Sandbox completed';
     case 'Confirm_With_User':
       return 'User responded';
+    case 'Create_Kpi':
+      if (args?.name) {
+        const name = args.name.length > 40 ? args.name.slice(0, 40) + '...' : args.name;
+        return `Created KPI: "${name}"`;
+      }
+      return 'Created KPI card';
+    case 'Update_Kpi':
+      if (args?.name) {
+        const uName = args.name.length > 40 ? args.name.slice(0, 40) + '...' : args.name;
+        return `Updated KPI: "${uName}"`;
+      }
+      return args?.id ? `Updated KPI #${args.id}` : 'Updated KPI card';
+    case 'Delete_Kpi':
+      return args?.id ? `Deleted KPI #${args.id}` : 'Deleted KPI card';
+    case 'List_Kpi':
+      return 'Listed KPI cards';
     default:
       return `Ran ${toolName.replace(/_/g, ' ')}`;
   }

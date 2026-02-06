@@ -1,16 +1,14 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { useSelector, useDispatch } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faShieldAlt, faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
 import type { ColDef } from "ag-grid-community";
 import type { Role, Permission } from "@/store/types";
-import { RootState, AppDispatch } from "@/store/store";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/animated/Tabs";
 import { actionsApi } from "@/api/whagonsActionsApi";
 import { api } from "@/store/api/internalApi";
-import { addRole, updateRole, removeRole } from "@/store/reducers/rolesSlice";
+import { useTable, collections } from "@/store/dexie";
 
 import {
   SettingsLayout,
@@ -26,10 +24,11 @@ import { useLanguage } from "@/providers/LanguageProvider";
 function RolesAndPermissions() {
   const { t } = useLanguage();
   const tu = (key: string, fallback: string) => t(`settings.rolesAndPermissions.${key}`, fallback);
-  const dispatch = useDispatch<AppDispatch>();
 
-  // Roles from Redux (loaded by DataManager)
-  const { value: roles, loading, error } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean; error: string | null };
+  // Roles from Dexie (loaded by DataManager)
+  const roles = useTable<Role>('roles');
+  const loading = false; // Dexie hooks handle loading internally
+  const error: string | null = null;
   
   // Permissions fetched from API (not a wh_* table)
   const [permissions, setPermissions] = useState<Permission[]>([]);
@@ -87,11 +86,8 @@ function RolesAndPermissions() {
     try {
       setIsSubmitting(true);
       setFormError(null);
-      const response = await actionsApi.post('/roles', data);
-      if (response.data?.data) {
-        dispatch(addRole(response.data.data));
-        setIsCreateDialogOpen(false);
-      }
+      await collections.roles.add(data);
+      setIsCreateDialogOpen(false);
     } catch (error: any) {
       setFormError(error.response?.data?.message || 'Failed to create role');
       throw error;
@@ -104,11 +100,8 @@ function RolesAndPermissions() {
     try {
       setIsSubmitting(true);
       setFormError(null);
-      const response = await actionsApi.patch(`/roles/${id}`, updates);
-      if (response.data?.data) {
-        dispatch(updateRole(response.data.data));
-        setIsEditDialogOpen(false);
-      }
+      await collections.roles.update(id, updates);
+      setIsEditDialogOpen(false);
     } catch (error: any) {
       setFormError(error.response?.data?.message || 'Failed to update role');
       throw error;
@@ -121,8 +114,7 @@ function RolesAndPermissions() {
     try {
       setIsSubmitting(true);
       setFormError(null);
-      await actionsApi.delete(`/roles/${id}`);
-      dispatch(removeRole(id));
+      await collections.roles.delete(id);
       setIsDeleteDialogOpen(false);
     } catch (error: any) {
       setFormError(error.response?.data?.message || 'Failed to delete role');

@@ -1,15 +1,26 @@
-import { useEffect, useCallback, useRef, useMemo } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useEffect, useCallback, useRef, useMemo, useState } from 'react';
 import { Excalidraw } from '@excalidraw/excalidraw';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/types';
 import type { AppState, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types/types';
-import { AppDispatch, RootState } from '@/store/store';
-import { loadWhiteboard, saveWhiteboard } from '@/store/reducers/whiteboardSlice';
 import { useTheme } from '@/providers/ThemeProvider';
+import { db, useLiveQuery } from '@/store/dexie';
+import { api } from '@/store/api/internalApi';
+
+interface WhiteboardData {
+  workspaceId: string;
+  elements: any[];
+  appState: any;
+}
 
 export default function WhiteboardViewTab({ workspaceId }: { workspaceId: string | undefined }) {
-  const dispatch = useDispatch<AppDispatch>();
-  const whiteboardState = useSelector((state: RootState) => state.whiteboard);
+  const [loading, setLoading] = useState(false);
+  
+  // Reactive query for whiteboard data from Dexie
+  const whiteboardData = useLiveQuery(
+    () => workspaceId ? db.table<WhiteboardData>('whiteboards').get(workspaceId) : undefined,
+    [workspaceId]
+  );
+  
   const { theme } = useTheme();
 
   const excalidrawTheme = useMemo(() => {
@@ -25,21 +36,40 @@ export default function WhiteboardViewTab({ workspaceId }: { workspaceId: string
 
   // Load whiteboard on mount
   useEffect(() => {
-    if (workspaceId) {
-      hasInitialized.current = false;
-      dispatch(loadWhiteboard(workspaceId));
-    }
-  }, [workspaceId, dispatch]);
+    if (!workspaceId) return;
+    
+    hasInitialized.current = false;
+    setLoading(true);
+    
+    // Load from API and save to Dexie
+    api.get(`/workspaces/${workspaceId}/whiteboard`)
+      .then(async (response) => {
+        const data = response.data?.data || response.data;
+        if (data) {
+          await db.table<WhiteboardData>('whiteboards').put({
+            workspaceId,
+            elements: data.elements || [],
+            appState: data.appState || {},
+          });
+        }
+      })
+      .catch(() => {
+        // Whiteboard may not exist yet - that's okay
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [workspaceId]);
 
   // Update excalidraw scene when data loads
   useEffect(() => {
-    if (whiteboardState.data && excalidrawAPIRef.current && !hasInitialized.current) {
+    if (whiteboardData && excalidrawAPIRef.current && !hasInitialized.current) {
       hasInitialized.current = true;
       excalidrawAPIRef.current.updateScene({
-        elements: whiteboardState.data.elements as ExcalidrawElement[],
+        elements: whiteboardData.elements as ExcalidrawElement[],
       });
     }
-  }, [whiteboardState.data]);
+  }, [whiteboardData]);
 
   const debouncedSave = useCallback(
     (elements: readonly ExcalidrawElement[], appState: AppState) => {
@@ -49,19 +79,29 @@ export default function WhiteboardViewTab({ workspaceId }: { workspaceId: string
         clearTimeout(saveTimeoutRef.current);
       }
 
-      saveTimeoutRef.current = setTimeout(() => {
+      saveTimeoutRef.current = setTimeout(async () => {
         // Only persist view-related appState, not UI state
         const { viewBackgroundColor, zoom, scrollX, scrollY } = appState;
-        dispatch(
-          saveWhiteboard({
-            workspaceId,
-            elements,
-            appState: { viewBackgroundColor, zoom, scrollX, scrollY },
-          })
-        );
+        const saveData = {
+          elements: [...elements],
+          appState: { viewBackgroundColor, zoom, scrollX, scrollY },
+        };
+        
+        // Save to Dexie
+        await db.table<WhiteboardData>('whiteboards').put({
+          workspaceId,
+          ...saveData,
+        });
+        
+        // Save to API
+        try {
+          await api.put(`/workspaces/${workspaceId}/whiteboard`, saveData);
+        } catch (err) {
+          console.error('Failed to save whiteboard to server:', err);
+        }
       }, 1000);
     },
-    [workspaceId, dispatch]
+    [workspaceId]
   );
 
   // Cleanup timeout on unmount
@@ -82,7 +122,7 @@ export default function WhiteboardViewTab({ workspaceId }: { workspaceId: string
     [debouncedSave]
   );
 
-  if (whiteboardState.loading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -98,8 +138,8 @@ export default function WhiteboardViewTab({ workspaceId }: { workspaceId: string
           excalidrawAPIRef.current = api;
         }}
         initialData={{
-          elements: (whiteboardState.data?.elements as ExcalidrawElement[]) ?? [],
-          appState: whiteboardState.data?.appState ?? {},
+          elements: (whiteboardData?.elements as ExcalidrawElement[]) ?? [],
+          appState: whiteboardData?.appState ?? {},
         }}
         onChange={handleChange}
       />

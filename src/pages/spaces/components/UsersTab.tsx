@@ -1,8 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useState, useCallback, useMemo, useRef, useEffect, lazy, Suspense } from "react";
-import { useSelector } from "react-redux";
-import { RootState } from "@/store";
+import { useTable } from "@/store/dexie";
 
 // Lazy load AgGridReact component
 const AgGridReact = lazy(() => import('ag-grid-react').then(module => ({ default: module.AgGridReact })));
@@ -23,10 +22,10 @@ function UsersTab({
   const gridRef = useRef<any>(null);
   const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
 
-  // Get users, teams, and userTeams from Redux store
-  const { value: allUsers } = useSelector((state: RootState) => (state as any).users as { value: any[] });
-  const { value: allTeams } = useSelector((state: RootState) => (state as any).teams as { value: any[] });
-  const { value: userTeams } = useSelector((state: RootState) => (state as any).userTeams as { value: any[] });
+  // Get users, teams, and userTeams from Dexie
+  const allUsers = useTable('users') ?? [];
+  const allTeams = useTable('teams') ?? [];
+  const userTeams = useTable('user_teams') ?? [];
 
   // Filter users that belong to teams with access to this workspace
   const workspaceUsers = useMemo(() => {

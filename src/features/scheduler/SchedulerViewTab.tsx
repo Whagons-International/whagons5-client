@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -13,19 +12,14 @@ import TaskDialog from "@/pages/spaces/components/TaskDialog";
 import SchedulerControls from "./components/SchedulerControls";
 import UserSelector from "./components/UserSelector";
 import { SchedulerErrorBoundary } from "./components/SchedulerErrorBoundary";
-import { TasksCache } from "@/store/indexedDB/TasksCache";
 import { api } from "@/store/api/internalApi";
 import { exportToPDF, exportToPNG, exportToExcel } from "./utils/exportUtils";
 import { UndoRedoManager } from "./utils/undoRedo";
 import { formatLocalDateTime, snapDateToInterval } from "./utils/dateTime";
 import type { ViewPreset, SchedulerEvent } from "./types/scheduler";
-import type { AppDispatch, RootState } from "@/store/store";
-import { store } from "@/store/store";
 import toast from "react-hot-toast";
 import { Maximize2, Minimize2, Calendar, Clock } from "lucide-react";
 import { TaskEvents } from "@/store/eventEmiters/taskEvents";
-import { getTasksFromIndexedDB, updateTaskLocally, applyTaskUserPivotChanges } from "@/store/reducers/tasksSlice";
-import { genericActions } from "@/store/genericSlices";
 
 export default function SchedulerViewTab({ workspaceId }: { workspaceId: string | undefined }) {
   const dispatch = useDispatch<AppDispatch>();

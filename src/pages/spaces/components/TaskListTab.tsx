@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import type { AppDispatch, RootState } from "@/store";
-import { TasksCache } from "@/store/indexedDB/TasksCache";
+import { useTable, collections, queryTasks } from "@/store/dexie";
+import { api } from "@/api/whagonsApi";
 import { TaskRow } from "@/components/TaskList/TaskRow";
 import { motion } from "motion/react";
-import { removeTaskAsync, restoreTaskAsync } from "@/store/reducers/tasksSlice";
 import { DeleteTaskDialog } from "@/components/tasks/DeleteTaskDialog";
 import toast from "react-hot-toast";
 import { useLanguage } from "@/providers/LanguageProvider";
@@ -43,11 +41,10 @@ export default function TaskListTab({
   searchText?: string;
 }) {
   const { t } = useLanguage();
-  const statuses = useSelector((s: RootState) => (s as any).statuses.value as any[]);
-  const priorities = useSelector((s: RootState) => (s as any).priorities.value as any[]);
-  const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
-  const categories = useSelector((s: RootState) => (s as any).categories.value as any[]);
-  const dispatch = useDispatch<AppDispatch>();
+  const statuses = useTable('statuses');
+  const priorities = useTable('priorities');
+  const spots = useTable('spots');
+  const categories = useTable('categories');
   const [rows, setRows] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -78,13 +75,12 @@ export default function TaskListTab({
       try {
         setError(null);
         setRows(null);
-        if (!TasksCache.initialized) await TasksCache.init();
         const baseParams: any = { search: searchText };
         const ws = workspaceId && workspaceId !== "all" ? workspaceId : undefined;
         if (ws) baseParams.workspace_id = ws;
-        const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+        const countResp = await queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
         const total = countResp?.rowCount ?? 0;
-        const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: Math.min(500, total) });
+        const rowsResp = await queryTasks({ ...baseParams, startRow: 0, endRow: Math.min(500, total) });
         if (!cancelled) setRows(rowsResp?.rows || []);
       } catch (e: any) {
         if (!cancelled) setError(e?.message || "Failed to load tasks");
@@ -129,7 +125,7 @@ export default function TaskListTab({
     let successToastId: string | undefined;
     
     try {
-      await dispatch(removeTaskAsync(taskId)).unwrap();
+      await collections.tasks.delete(taskId);
       setRows((prev) => prev ? prev.filter((t) => Number(t?.id) !== taskId) : prev);
       
       // Show success toast with undo option
@@ -145,7 +141,7 @@ export default function TaskListTab({
                 toast.dismiss(t.id);
                 const restoreToast = toast.loading("Restoring task...");
                 try {
-                  await dispatch(restoreTaskAsync(taskId)).unwrap();
+                  await api.post(`/tasks/${taskId}/restore`);
                   toast.dismiss(restoreToast);
                   toast.success(
                     taskName ? `"${taskName}" has been restored.` : "Task has been restored.",
@@ -155,9 +151,9 @@ export default function TaskListTab({
                   const baseParams: any = { search: searchText };
                   const ws = workspaceId && workspaceId !== "all" ? workspaceId : undefined;
                   if (ws) baseParams.workspace_id = ws;
-                  const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+                  const countResp = await queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
                   const total = countResp?.rowCount ?? 0;
-                  const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: Math.min(500, total) });
+                  const rowsResp = await queryTasks({ ...baseParams, startRow: 0, endRow: Math.min(500, total) });
                   setRows(rowsResp?.rows || []);
                 } catch (error: any) {
                   toast.dismiss(restoreToast);

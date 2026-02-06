@@ -1,27 +1,20 @@
-import React, { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { genericActions } from '@/store/genericSlices';
-import { RootState } from '@/store/store';
-import { AppDispatch } from '@/store/store';
+import React from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useParams } from 'react-router-dom';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useTable } from '@/store/dexie';
 
 export const ComplianceStandardDetail = () => {
     const { id } = useParams();
-    const dispatch = useDispatch<AppDispatch>();
     const standardId = parseInt(id || '0');
     
-    const standard = useSelector((state: RootState) => 
-        state.complianceStandards.value.find((s: any) => s.id === standardId)
-    );
-
-    const requirements = useSelector((state: RootState) => 
-        state.complianceRequirements.value.filter((r: any) => r.standard_id === standardId)
-    );
+    const complianceStandards = useTable('compliance_standards');
+    const complianceRequirements = useTable('compliance_requirements');
+    
+    const standard = complianceStandards.find((s: any) => s.id === standardId);
+    const requirements = complianceRequirements.filter((r: any) => r.standard_id === standardId);
 
 
     if (!standard) return <div>Loading...</div>;

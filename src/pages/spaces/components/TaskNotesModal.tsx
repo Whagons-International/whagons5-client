@@ -3,8 +3,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MessageSquare, Send, Paperclip, File, X, Smile } from "lucide-react";
-import { useDispatch, useSelector } from "react-redux";
-import { genericActions } from "@/store/genericSlices";
 import { useAuth } from "@/providers/AuthProvider";
 import dayjs from "dayjs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -12,6 +10,7 @@ import { getUserDisplayName, getUserInitials } from "./workspaceTable/utils/user
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 import { uploadFile, getFileUrl } from "@/api/assetApi";
+import { useTable, collections } from "@/store/dexie";
 
 interface TaskNotesModalProps {}
 
@@ -28,14 +27,13 @@ export default function TaskNotesModal() {
   const [taskName, setTaskName] = useState<string>("");
   const [input, setInput] = useState("");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
-  const dispatch = useDispatch<any>();
   const endRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const { user } = useAuth();
-  const users = useSelector((state: RootState) => (state.users as any).value);
-  const taskNotes = useSelector((state: RootState) => (state.taskNotes as any).value);
-  const taskAttachments = useSelector((state: RootState) => (state.taskAttachments as any).value);
+  const users = useTable('users');
+  const taskNotes = useTable('task_notes');
+  const taskAttachments = useTable('task_attachments');
 
   // Listen for open event and load notes
   useEffect(() => {
@@ -50,7 +48,7 @@ export default function TaskNotesModal() {
     };
     window.addEventListener('wh:openTaskNotes', handler);
     return () => window.removeEventListener('wh:openTaskNotes', handler);
-  }, [dispatch]);
+  }, []);
 
   // Combine and sort notes/attachments
   const items = taskId ? [
@@ -92,7 +90,7 @@ export default function TaskNotesModal() {
       };
       
       console.log("Sending note:", note);
-      const result = await dispatch(genericActions.taskNotes.addAsync(note)).unwrap();
+      const result = await collections.taskNotes.add(note);
       console.log("Note sent successfully:", result);
     } catch (error: any) {
       console.error("Failed to send note:", error);
@@ -162,7 +160,7 @@ export default function TaskNotesModal() {
         };
 
         console.log("Creating task attachment record:", attachment);
-        const result_data = await dispatch(genericActions.taskAttachments.addAsync(attachment)).unwrap();
+        const result_data = await collections.taskAttachments.add(attachment);
         console.log("Attachment created successfully:", result_data);
     } catch (error: any) {
         console.error("Failed to upload attachment:", error);

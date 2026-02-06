@@ -3,18 +3,18 @@
 // ============================================================================
 //
 // This file defines ALL tables that the frontend manages.
-// Both DB.ts (IndexedDB) and genericSlices.ts (Redux) import from here.
+// Dexie (db.ts) and collections.ts import from here.
 //
 // To add a new table:
 // 1. Add the snake_case store name to the appropriate array below
-// 2. Bump CURRENT_DB_VERSION in DB.ts
+// 2. Bump DB_VERSION in db.ts if changing schema
 // That's it!
 //
 // Naming convention (auto-derived from store name):
 //   store: 'spot_custom_fields'
 //   → table: 'wh_spot_custom_fields'
 //   → endpoint: '/spot-custom-fields'
-//   → slice name: 'spotCustomFields'
+//   → collection name: 'spotCustomFields'
 
 // ============================================================================
 // SIMPLE STORES - keyPath: 'id', no indexes

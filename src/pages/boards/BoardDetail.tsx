@@ -1,13 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Settings, Users, Globe, Lock, Plus, User, Trash2, Pencil, AlertTriangle, Cake, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { RootState } from '@/store/store';
-import { genericActions } from '@/store/genericSlices';
 import { Board, BoardMessage, BoardBirthdayImage } from '@/store/types';
+import { useTable, collections } from '@/store/dexie';
+import { useAuthUser } from '@/providers/AuthProvider';
 import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
@@ -47,18 +46,17 @@ dayjs.extend(relativeTime);
 
 function BoardDetail() {
   const { t } = useLanguage();
-  const dispatch = useDispatch();
   const navigate = useNavigate();
   const { boardId } = useParams<{ boardId: string }>();
 
-  // Redux state
-  const { value: boards } = useSelector((state: RootState) => (state as any).boards || { value: [] });
-  const { value: messages, loading: messagesLoading } = useSelector((state: RootState) => (state as any).boardMessages || { value: [], loading: false });
-  const { value: members } = useSelector((state: RootState) => (state as any).boardMembers || { value: [] });
-  const { value: users } = useSelector((state: RootState) => state.users || { value: [] });
-  const { value: teams } = useSelector((state: RootState) => (state as any).teams || { value: [] });
-  const { value: birthdayImages } = useSelector((state: RootState) => (state as any).boardBirthdayImages || { value: [] });
-  const currentUser = useSelector((state: RootState) => (state as any).user?.value ?? null);
+  // Dexie state
+  const boards = useTable<Board>('boards');
+  const messages = useTable<BoardMessage>('board_messages');
+  const members = useTable('board_members');
+  const users = useTable('users');
+  const teams = useTable('teams');
+  const birthdayImages = useTable<BoardBirthdayImage>('board_birthday_images');
+  const currentUser = useAuthUser();
 
   // Local state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -165,7 +163,7 @@ function BoardDetail() {
       };
       
       console.log('Creating board message with data:', messageData);
-      const result = await dispatch(genericActions.boardMessages.addAsync(messageData) as any).unwrap();
+      const result = await collections.boardMessages.add(messageData);
       console.log('Board message created successfully:', result);
       return result;
     } catch (error: any) {
@@ -200,7 +198,7 @@ function BoardDetail() {
       return;
     }
     try {
-      await dispatch(genericActions.boardMessages.removeAsync(deleteMessageId) as any);
+      await collections.boardMessages.delete(deleteMessageId);
       setDeleteMessageId(null);
     } catch (error) {
       console.error('Failed to delete message:', error);
@@ -219,13 +217,10 @@ function BoardDetail() {
   const handleUpdateMessage = async () => {
     if (!editMessage || !canEditMessage(editMessage)) return;
     try {
-      await dispatch(genericActions.boardMessages.updateAsync({
-        id: editMessage.id,
-        updates: {
-          title: editFormData.title.trim() ? editFormData.title.trim() : null,
-          content: editFormData.content ?? '',
-        },
-      }) as any);
+      await collections.boardMessages.update(editMessage.id, {
+        title: editFormData.title.trim() ? editFormData.title.trim() : null,
+        content: editFormData.content ?? '',
+      });
       setEditMessage(null);
     } catch (error) {
       console.error('Failed to update message:', error);
@@ -234,7 +229,7 @@ function BoardDetail() {
 
   const handlePinMessage = async (messageId: number, isPinned: boolean) => {
     try {
-      await dispatch(genericActions.boardMessages.updateAsync({ id: messageId, updates: { is_pinned: isPinned } }) as any);
+      await collections.boardMessages.update(messageId, { is_pinned: isPinned });
     } catch (error) {
       console.error('Failed to pin message:', error);
     }
@@ -245,11 +240,11 @@ function BoardDetail() {
 
     setIsSubmitting(true);
     try {
-      await dispatch(genericActions.boardMembers.addAsync({
+      await collections.boardMembers.add({
         ...memberFormData,
         board_id: parseInt(boardId || '0'),
         member_id: parseInt(memberFormData.member_id),
-      }) as any);
+      });
       
       setIsAddMemberOpen(false);
       setMemberFormData({
@@ -268,7 +263,7 @@ function BoardDetail() {
     if (!confirm(t('boards.members.confirmRemove', 'Are you sure you want to remove this member?'))) return;
     
     try {
-      await dispatch(genericActions.boardMembers.removeAsync(memberId) as any);
+      await collections.boardMembers.delete(memberId);
     } catch (error) {
       console.error('Failed to remove member:', error);
     }
@@ -300,14 +295,11 @@ function BoardDetail() {
 
     setIsSubmitting(true);
     try {
-      await dispatch(genericActions.boards.updateAsync({
-        id: parseInt(boardId || '0'),
-        updates: {
-          name: settingsFormData.name,
-          description: settingsFormData.description,
-          visibility: settingsFormData.visibility,
-        },
-      }) as any);
+      await collections.boards.update(parseInt(boardId || '0'), {
+        name: settingsFormData.name,
+        description: settingsFormData.description,
+        visibility: settingsFormData.visibility,
+      });
       setIsSettingsDialogOpen(false);
     } catch (error) {
       console.error('Failed to update board:', error);
@@ -319,7 +311,7 @@ function BoardDetail() {
   const handleDeleteBoard = async () => {
     setIsSubmitting(true);
     try {
-      await dispatch(genericActions.boards.removeAsync(parseInt(boardId || '0')) as any);
+      await collections.boards.delete(parseInt(boardId || '0'));
       setIsDeleteDialogOpen(false);
       navigate('/welcome');
     } catch (error) {
@@ -332,12 +324,9 @@ function BoardDetail() {
   const handleToggleBirthday = async (enabled: boolean) => {
     setBirthdayEnabled(enabled);
     try {
-      await dispatch(genericActions.boards.updateAsync({
-        id: parseInt(boardId || '0'),
-        updates: {
-          birthday_messages_enabled: enabled,
-        },
-      }) as any);
+      await collections.boards.update(parseInt(boardId || '0'), {
+        birthday_messages_enabled: enabled,
+      });
     } catch (error) {
       console.error('Failed to update birthday setting:', error);
       setBirthdayEnabled(!enabled); // Revert on error
@@ -346,12 +335,9 @@ function BoardDetail() {
 
   const handleUpdateBirthdayTemplate = async () => {
     try {
-      await dispatch(genericActions.boards.updateAsync({
-        id: parseInt(boardId || '0'),
-        updates: {
-          birthday_message_template: birthdayTemplate || null,
-        },
-      }) as any);
+      await collections.boards.update(parseInt(boardId || '0'), {
+        birthday_message_template: birthdayTemplate || null,
+      });
     } catch (error) {
       console.error('Failed to update birthday template:', error);
     }
@@ -649,11 +635,7 @@ function BoardDetail() {
 
         {/* Messages Feed - Threads Style */}
         <div className="divide-y divide-border">
-          {messagesLoading && boardMessages.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              {t('common.loading', 'Loading...')}
-            </div>
-          ) : boardMessages.length === 0 ? (
+          {boardMessages.length === 0 ? (
             <div className="py-12 text-center">
               <p className="text-muted-foreground mb-2">
                 {t('boards.messages.empty', 'No messages yet')}

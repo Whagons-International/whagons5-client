@@ -1,11 +1,9 @@
-import { useState, useCallback, useEffect } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { RootState, AppDispatch } from "@/store/store";
-import { genericActions } from '@/store/genericSlices';
+import { useTable, getCollection } from "@/store/dexie";
 
 export interface UseSettingsStateOptions<T> {
-  entityName: keyof RootState;
+  entityName: string;
   searchFields?: (keyof T)[];
   onError?: (error: string) => void;
 }
@@ -57,11 +55,13 @@ export function useSettingsState<T extends { id: number; [key: string]: any }>({
   searchFields = [],
   onError
 }: UseSettingsStateOptions<T>): UseSettingsStateReturn<T> {
-  const dispatch = useDispatch<AppDispatch>();
   const [searchParams, setSearchParams] = useSearchParams();
   
-  // Redux state
-  const { value: items, loading, error } = useSelector((state: RootState) => state[entityName] as { value: T[]; loading: boolean; error: string | null });
+  // Dexie state - useTable returns array or undefined while loading
+  const rawItems = useTable<T>(entityName);
+  const items = rawItems ?? [];
+  const loading = rawItems === undefined;
+  const error: string | null = null; // Dexie doesn't have built-in error state like Redux
   
   // Local state
   const [searchQuery, setSearchQuery] = useState('');
@@ -116,14 +116,22 @@ export function useSettingsState<T extends { id: number; [key: string]: any }>({
     }
   }, [items, searchQuery]);
   
+  // Get the collection for CRUD operations
+  const collection = useMemo(() => getCollection(entityName), [entityName]);
+  
   // CRUD operations
   const createItem = useCallback(async (data: Omit<T, 'id' | 'created_at' | 'updated_at'>) => {
+    if (!collection) {
+      const errorMessage = `Collection not found for entity: ${entityName}`;
+      setFormError(errorMessage);
+      onError?.(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
     try {
       setFormError(null);
       setIsSubmitting(true);
-      // Type assertion to handle dynamic key access
-      const actions = (genericActions as any)[entityName];
-      await dispatch(actions.addAsync(data)).unwrap();
+      await collection.add(data);
       setIsCreateDialogOpen(false);
     } catch (err: any) {
       const backendErrors = err?.response?.data?.errors;
@@ -137,15 +145,20 @@ export function useSettingsState<T extends { id: number; [key: string]: any }>({
     } finally {
       setIsSubmitting(false);
     }
-  }, [dispatch, entityName, onError]);
+  }, [collection, entityName, onError]);
   
   const updateItem = useCallback(async (id: number, updates: Partial<T>) => {
+    if (!collection) {
+      const errorMessage = `Collection not found for entity: ${entityName}`;
+      setFormError(errorMessage);
+      onError?.(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
     try {
       setFormError(null);
       setIsSubmitting(true);
-      // Type assertion to handle dynamic key access
-      const actions = (genericActions as any)[entityName];
-      await dispatch(actions.updateAsync({ id, updates })).unwrap();
+      await collection.update(id, updates);
       setIsEditDialogOpen(false);
       setEditingItem(null);
     } catch (err: any) {
@@ -160,14 +173,18 @@ export function useSettingsState<T extends { id: number; [key: string]: any }>({
     } finally {
       setIsSubmitting(false);
     }
-  }, [dispatch, entityName, onError]);
+  }, [collection, entityName, onError]);
   
   const deleteItem = useCallback(async (id: number) => {
+    if (!collection) {
+      const errorMessage = `Collection not found for entity: ${entityName}`;
+      onError?.(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
     try {
       setIsSubmitting(true);
-      // Type assertion to handle dynamic key access
-      const actions = (genericActions as any)[entityName];
-      await dispatch(actions.removeAsync(id)).unwrap();
+      await collection.delete(id);
       setIsDeleteDialogOpen(false);
       setDeletingItem(null);
       
@@ -183,7 +200,7 @@ export function useSettingsState<T extends { id: number; [key: string]: any }>({
     } finally {
       setIsSubmitting(false);
     }
-  }, [dispatch, entityName, onError, editingItem]);
+  }, [collection, entityName, onError, editingItem]);
   
   // Handlers
   const handleEdit = useCallback((item: T) => {

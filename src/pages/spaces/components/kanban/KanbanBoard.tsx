@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import {
   DndContext,
   DragOverlay,
@@ -10,7 +9,6 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import type { AppDispatch, RootState } from '@/store/store';
 import type { KanbanBoardProps, KanbanFilters } from './types/kanban.types';
 import type { Task } from '@/store/types';
 import KanbanColumn from './KanbanColumn';
@@ -18,25 +16,28 @@ import KanbanCard from './KanbanCard';
 import KanbanControls from './KanbanControls';
 import KanbanSwimLane from './KanbanSwimLane';
 import TaskDialog from '../TaskDialog';
-import { TasksCache } from '@/store/indexedDB/TasksCache';
-import { TaskEvents } from '@/store/eventEmiters/taskEvents';
-import { getTasksFromIndexedDB, moveTaskThunk } from '@/store/reducers/tasksSlice';
+import { collections, useLiveQuery } from '@/store/dexie';
 import { useKanbanFilters } from './hooks/useKanbanFilters';
 import { useKanbanGrouping } from './hooks/useKanbanGrouping';
 import { exportToExcel } from './utils/exportUtils';
 import toast from 'react-hot-toast';
 
 export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
-  const dispatch = useDispatch<AppDispatch>();
+  // Get data from Dexie using useLiveQuery
+  const allTasks = useLiveQuery(() => collections.tasks.getAll()) ?? [];
+  const statuses = useLiveQuery(() => collections.statuses.getAll()) ?? [];
+  const categories = useLiveQuery(() => collections.categories.getAll()) ?? [];
+  const priorities = useLiveQuery(() => collections.priorities.getAll()) ?? [];
+  const teams = useLiveQuery(() => collections.teams.getAll()) ?? [];
+  const users = useLiveQuery(() => collections.users.getAll()) ?? [];
   
-  // Get data from Redux
-  const tasks = useSelector((state: RootState) => (state.tasks as any)?.value ?? []);
-  const statuses = useSelector((state: RootState) => (state.statuses as any)?.value ?? []);
-  const categories = useSelector((state: RootState) => (state.categories as any)?.value ?? []);
-  const priorities = useSelector((state: RootState) => (state.priorities as any)?.value ?? []);
-  const teams = useSelector((state: RootState) => (state.teams as any)?.value ?? []);
-  const users = useSelector((state: RootState) => (state.users as any)?.value ?? []);
-  const loading = useSelector((state: RootState) => (state.tasks as any)?.loading ?? false);
+  // Filter tasks by workspace
+  const tasks = useMemo(() => {
+    if (!workspaceId) return allTasks;
+    return allTasks.filter((task: Task) => task.workspace_id === parseInt(workspaceId));
+  }, [allTasks, workspaceId]);
+  
+  const loading = tasks === undefined;
 
   // Preferences key
   const KANBAN_PREFS_KEY = `wh_kanban_prefs_${workspaceId || 'all'}`;
@@ -90,14 +91,9 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     }
   }, [viewMode, filters, groupBy, KANBAN_PREFS_KEY]);
 
-  // Filter tasks by workspace
-  const workspaceTasks = useMemo(() => {
-    if (!workspaceId) return tasks;
-    return tasks.filter((task: Task) => task.workspace_id === parseInt(workspaceId));
-  }, [tasks, workspaceId]);
 
   // Apply filters using the hook
-  const filteredTasks = useKanbanFilters(workspaceTasks, filters);
+  const filteredTasks = useKanbanFilters(tasks, filters);
 
   // Group tasks by selected grouping (for swim lanes)
   const taskGroups = useKanbanGrouping(filteredTasks, groupBy, priorities, teams, users);
@@ -143,29 +139,7 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     });
   }, [statuses]);
 
-  // Listen for task changes to refresh the board
-  useEffect(() => {
-    const handleTaskChange = () => {
-      dispatch(getTasksFromIndexedDB());
-    };
-
-    const unsubscribers = [
-      TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, handleTaskChange),
-      TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, handleTaskChange),
-      TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, handleTaskChange),
-      TaskEvents.on(TaskEvents.EVENTS.TASKS_BULK_UPDATE, handleTaskChange),
-    ];
-
-    return () => {
-      unsubscribers.forEach((unsub) => {
-        try {
-          unsub();
-        } catch (error) {
-          console.error('[Kanban] Error unsubscribing from task event:', error);
-        }
-      });
-    };
-  }, [dispatch]);
+  // No need to listen for events - useLiveQuery automatically updates when data changes
 
   // Drag start handler
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -185,12 +159,8 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     const taskId = Number(active.id);
     const newStatusId = Number(over.id);
 
-    // Get current task from Redux store or TasksCache for previousStatusId
-    let task = tasks.find((t: Task) => t.id === taskId);
-    if (!task) {
-      // Fallback to TasksCache if not in Redux store
-      task = await TasksCache.getTask(taskId.toString());
-    }
+    // Get current task from Dexie
+    const task = await collections.tasks.get(taskId);
     if (!task) {
       toast.error('Task not found');
       return;
@@ -201,18 +171,17 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     // Don't update if status hasn't changed
     if (previousStatusId === newStatusId) return;
 
-    // Dispatch Redux thunk to handle optimistic update, API call, and rollback
+    // Update task status directly via Dexie collection
     try {
-      const result = await dispatch(moveTaskThunk({ taskId, newStatusId, previousStatusId }));
-      if (moveTaskThunk.fulfilled.match(result)) {
-        toast.success('Task moved successfully');
-      }
-      // Note: 403 errors are handled by the API interceptor which shows a toast
-      // Other errors are silently rolled back (optimistic update reverted)
+      await collections.tasks.update(taskId, { status_id: newStatusId });
+      toast.success('Task moved successfully');
     } catch (error) {
-      console.error('Unexpected error in handleDragEnd:', error);
+      // Rollback on error
+      await collections.tasks.update(taskId, { status_id: previousStatusId });
+      console.error('Failed to move task:', error);
+      toast.error('Failed to move task');
     }
-  }, [dispatch, tasks]);
+  }, []);
 
   // Handle task click
   const handleTaskClick = useCallback((task: Task) => {
@@ -226,12 +195,9 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     setIsTaskDialogOpen(open);
     if (!open) {
       setSelectedTask(null);
-      // Refresh tasks after dialog closes
-      setTimeout(() => {
-        dispatch(getTasksFromIndexedDB());
-      }, 100);
+      // No need to refresh - useLiveQuery automatically updates
     }
-  }, [dispatch]);
+  }, []);
 
   // Handle export
   const handleExport = useCallback(async () => {

@@ -3,13 +3,11 @@
  */
 
 import { useMemo } from 'react';
-import { useDispatch } from 'react-redux';
-import { AppDispatch } from '@/store/store';
-import { updateTaskAsync } from '@/store/reducers/tasksSlice';
 import toast from 'react-hot-toast';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { celebrateTaskCompletion } from '@/utils/confetti';
 import { computeApprovalStatusForTask } from '../utils/approvalStatus';
+import { collections } from '@/store/dexie';
 
 type StatusMeta = { name: string; color?: string; icon?: string; action?: string; celebration_enabled?: boolean };
 type Category = { id: number; celebration_effect?: string | null };
@@ -22,7 +20,6 @@ export function useStatusChange(
   approvalMap?: Record<number, any>
 ) {
   const { t } = useLanguage();
-  const dispatch = useDispatch<AppDispatch>();
 
   return useMemo(() => {
     return async (task: any, toStatusId: number): Promise<boolean> => {
@@ -53,7 +50,7 @@ export function useStatusChange(
         return false;
       }
       try {
-        await dispatch(updateTaskAsync({ id: Number(task.id), updates: { status_id: Number(toStatusId) } })).unwrap();
+        await collections.tasks.update(Number(task.id), { status_id: Number(toStatusId) });
         
         // Check if the new status is a completed/done status and trigger confetti
         let isDoneStatus = false;
@@ -105,5 +102,5 @@ export function useStatusChange(
         return false;
       }
     };
-  }, [dispatch, statusMap, getDoneStatusId, categories, taskApprovalInstances, approvalMap, t]);
+  }, [statusMap, getDoneStatusId, categories, taskApprovalInstances, approvalMap, t]);
 }

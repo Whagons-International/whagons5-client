@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useDispatch } from 'react-redux';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Zap, Save, Loader2 } from 'lucide-react';
 import { ApprovalActionsManager } from './ApprovalActionsManager';
 import { Approval } from '@/store/types';
-import { genericActions } from '@/store/genericSlices';
-import type { AppDispatch } from '@/store/store';
 import { actionsApi } from '@/api/whagonsActionsApi';
+import { collections } from '@/store/dexie';
 import toast from 'react-hot-toast';
 
 interface ApprovalActionsDialogProps {
@@ -17,7 +15,6 @@ interface ApprovalActionsDialogProps {
 }
 
 export function ApprovalActionsDialog({ open, onOpenChange, approval }: ApprovalActionsDialogProps) {
-  const dispatch = useDispatch<AppDispatch>();
   const [approvedActions, setApprovedActions] = useState<any[]>([]);
   const [rejectedActions, setRejectedActions] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -65,11 +62,10 @@ export function ApprovalActionsDialog({ open, onOpenChange, approval }: Approval
       });
 
       // Update local state; cache will be updated via realtime notifications / background validation
-      dispatch((genericActions as any).approvals.updateItem({
-        id: approval.id,
+      await collections.approvals.update(approval.id, {
         on_approved_actions: approvedToSave,
         on_rejected_actions: rejectedToSave,
-      }));
+      });
 
       if (showSuccessToast) {
         toast.success('Approval actions saved successfully');

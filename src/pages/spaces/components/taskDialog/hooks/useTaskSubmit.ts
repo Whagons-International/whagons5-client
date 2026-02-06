@@ -1,9 +1,6 @@
-import { useDispatch } from 'react-redux';
-import { AppDispatch } from '@/store/store';
-import { addTaskAsync, updateTaskAsync } from '@/store/reducers/tasksSlice';
-import { genericActions } from '@/store/genericSlices';
 import toast from 'react-hot-toast';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { collections } from '@/store/dexie';
 
 export function useTaskSubmit(params: any) {
   const { t } = useLanguage();
@@ -36,8 +33,6 @@ export function useTaskSubmit(params: any) {
     syncTaskCustomFields,
   } = params;
 
-  const dispatch = useDispatch<AppDispatch>();
-
   const handleSubmit = async () => {
     if (!canSubmit || !categoryId || !derivedTeamId || !userId) return;
     if (mode === 'edit' && (!statusId || !task?.id)) return;
@@ -66,7 +61,7 @@ export function useTaskSubmit(params: any) {
           updates.spot_id = spotId;
         }
 
-        await dispatch(updateTaskAsync({ id: Number(task.id), updates })).unwrap();
+        await collections.tasks.update(Number(task.id), updates);
         
         const currentTagIds = new Set(taskTagIds);
         const newTagIds = new Set(selectedTagIds);
@@ -74,11 +69,11 @@ export function useTaskSubmit(params: any) {
         const tagsToRemove = taskTagIds.filter((tagId: number) => !newTagIds.has(tagId));
         
         for (const tagId of tagsToAdd) {
-          await dispatch(genericActions.taskTags.addAsync({
+          await collections.taskTags.add({
             task_id: Number(task.id),
             tag_id: tagId,
             user_id: userId,
-          })).unwrap();
+          });
         }
         
         for (const tagId of tagsToRemove) {
@@ -86,7 +81,7 @@ export function useTaskSubmit(params: any) {
             tt.task_id === Number(task.id) && tt.tag_id === tagId
           );
           if (taskTag) {
-            await dispatch(genericActions.taskTags.removeAsync(taskTag.id)).unwrap();
+            await collections.taskTags.delete(taskTag.id);
           }
         }
 
@@ -122,16 +117,16 @@ export function useTaskSubmit(params: any) {
           payload.spot_id = spotId;
         }
 
-        const result = await dispatch(addTaskAsync(payload)).unwrap();
+        const result = await collections.tasks.add(payload);
         const newTaskId = result?.id;
         
         if (mode === 'create' && newTaskId && selectedTagIds.length > 0) {
           for (const tagId of selectedTagIds) {
-            await dispatch(genericActions.taskTags.addAsync({
+            await collections.taskTags.add({
               task_id: Number(newTaskId),
               tag_id: tagId,
               user_id: userId,
-            })).unwrap();
+            });
           }
         }
 

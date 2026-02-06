@@ -15,9 +15,8 @@ import {
     arrayMove,
     sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
-import { useSelector } from 'react-redux';
 import { RefreshCw, Plus, Pencil, Trash2, GripVertical } from 'lucide-react';
-import type { RootState } from '@/store/store';
+import { collections, useLiveQuery } from '@/store/dexie';
 import type { DialogLayout, DialogFieldConfig, DialogTabId, CustomField, CategoryCustomField, DialogTabConfig } from '@/store/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,9 +60,9 @@ export function DialogLayoutEditor({
     value,
     onChange,
 }: DialogLayoutEditorProps) {
-    // Redux state for custom fields
-    const customFields = useSelector((state: RootState) => state.customFields.value);
-    const categoryCustomFields = useSelector((state: RootState) => state.categoryCustomFields.value);
+    // Dexie queries with useLiveQuery
+    const customFields = useLiveQuery(() => collections.customFields.getAll()) || [];
+    const categoryCustomFields = useLiveQuery(() => collections.categoryCustomFields.getAll()) || [];
 
     // Filter custom fields assigned to this category
     const assignedCustomFields = useMemo(() => {

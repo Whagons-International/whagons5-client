@@ -54,7 +54,7 @@ import {
 import { getAllowedNextStatusesFactory } from './workspaceTable/utils/mappers';
 import { normalizeFilterModelForQuery } from './workspaceTable/utils/filterUtils';
 import { buildGetRows } from './workspaceTable/grid/dataSource';
-import { TasksCache } from '@/store/indexedDB/TasksCache';
+import { collections, db } from '@/store/dexie';
 
 // Lazy load AgGridReact component
 const AgGridReact = lazy(() => import('ag-grid-react').then(module => ({ default: module.AgGridReact }))) as any;
@@ -384,7 +384,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   }, [newTaskIds, modulesLoaded]);
 
   const getRows = useMemo(
-    () => buildGetRows(TasksCache, {
+    () => buildGetRows({
       rowCache,
       workspaceRef,
       searchRef,

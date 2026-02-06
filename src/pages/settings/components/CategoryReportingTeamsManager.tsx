@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { useSelector, useDispatch } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSpinner } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { RootState, AppDispatch } from "@/store/store";
 import { Category, Team } from "@/store/types";
-import { genericActions } from "@/store/genericSlices";
+import { collections, useLiveQuery } from "@/store/dexie";
 
 export interface CategoryReportingTeamsManagerProps {
   open?: boolean;
@@ -42,8 +40,8 @@ export function CategoryReportingTeamsManager({
   teams: controlledTeams,
   hideFooter = false
 }: CategoryReportingTeamsManagerProps) {
-  const dispatch = useDispatch<AppDispatch>();
-  const teamsFromStore = useSelector((state: RootState) => (state.teams as { value: Team[] }).value);
+  // Dexie query with useLiveQuery
+  const teamsFromStore = useLiveQuery(() => collections.teams.getAll()) || [];
   const teams = controlledTeams || teamsFromStore;
   
   // Internal state for temporary selections (dialog mode)
@@ -108,10 +106,7 @@ export function CategoryReportingTeamsManager({
     try {
       // Ensure reporting_team_ids is always an array
       const safeReportingTeamIds = Array.isArray(internalSelectedTeamIds) ? internalSelectedTeamIds : [];
-      await dispatch(genericActions.categories.updateAsync({
-        id: category.id,
-        updates: { reporting_team_ids: safeReportingTeamIds }
-      })).unwrap();
+      await collections.categories.update(category.id, { reporting_team_ids: safeReportingTeamIds });
       if (onOpenChange) {
         onOpenChange(false);
       }

@@ -1,14 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Users2, Lock, Globe, Pin, PinOff } from 'lucide-react';
+import { useTable, collections } from '@/store/dexie';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { RootState } from '@/store/store';
-import { genericActions } from '@/store/genericSlices';
 import { Board } from '@/store/types';
 import {
   Dialog,
@@ -73,11 +71,10 @@ const setPinnedBoardsOrder = (boardIds: number[]) => {
 
 function Boards() {
   const { t } = useLanguage();
-  const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  // Redux state
-  const { value: boards, loading, error } = useSelector((state: RootState) => (state as any).boards || { value: [], loading: false, error: null });
+  // Dexie state
+  const boards = useTable('boards');
 
   // Local state
   const [searchQuery, setSearchQuery] = useState('');
@@ -138,7 +135,7 @@ function Boards() {
     setIsSubmitting(true);
     try {
       console.log('[Boards] Creating board with data:', formData);
-      const result = await dispatch(genericActions.boards.addAsync(formData) as any);
+      const result = await collections.boards.add(formData);
       console.log('[Boards] Board created, result:', result);
       setIsCreateDialogOpen(false);
       setFormData({ name: '', description: '', visibility: 'private' });
@@ -222,7 +219,7 @@ function Boards() {
       }}
       wrapChildrenFullHeight={false}
     >
-      {loading && boards.length === 0 ? (
+      {boards.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           {t('common.loading', 'Loading...')}
         </div>

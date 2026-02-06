@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -8,12 +7,20 @@ import { Badge } from '@/components/ui/badge';
 import { Bell, BellOff, Check, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { isFCMReady, isTokenRegistered } from '@/firebase/fcmHelper';
-import { AppDispatch, RootState } from '@/store/store';
-import { 
-  fetchNotificationPreferences, 
-  updateNotificationPreferences,
-  type NotificationPreferences 
-} from '@/store/reducers/notificationPreferencesSlice';
+import apiClient from '@/api/whagonsApi';
+
+export interface NotificationPreferences {
+  broadcasts: boolean;
+  task_assignments: boolean;
+  task_mentions: boolean;
+  task_comments: boolean;
+  task_status_changes: boolean;
+  messages: boolean;
+  approval_requests: boolean;
+  approval_decisions: boolean;
+  sla_alerts: boolean;
+  workflow_notifications: boolean;
+}
 
 const defaultPreferences: NotificationPreferences = {
   broadcasts: true,
@@ -28,23 +35,39 @@ const defaultPreferences: NotificationPreferences = {
   workflow_notifications: true,
 };
 
-function NotificationPreferences() {
+function NotificationPreferencesPage() {
   const { t } = useLanguage();
-  const dispatch = useDispatch<AppDispatch>();
   
-  // Get preferences and loading/saving state from Redux
-  const { preferences, loading, saving } = useSelector((state: RootState) => state.notificationPreferences);
-  const [localPreferences, setLocalPreferences] = useState<NotificationPreferences>(preferences);
+  const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPreferences);
+  const [localPreferences, setLocalPreferences] = useState<NotificationPreferences>(defaultPreferences);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [fcmEnabled, setFcmEnabled] = useState(false);
 
   // Load preferences on mount
   useEffect(() => {
-    dispatch(fetchNotificationPreferences());
+    fetchPreferences();
     checkFCMStatus();
-  }, [dispatch]);
+  }, []);
 
-  // Sync local preferences with Redux state
+  const fetchPreferences = async () => {
+    try {
+      setLoading(true);
+      const response = await apiClient.get<NotificationPreferences>('/notification-preferences');
+      setPreferences(response.data);
+      setLocalPreferences(response.data);
+    } catch (error) {
+      console.error('Failed to fetch notification preferences:', error);
+      // Use defaults on error
+      setPreferences(defaultPreferences);
+      setLocalPreferences(defaultPreferences);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Sync local preferences when server preferences change
   useEffect(() => {
     setLocalPreferences(preferences);
     setHasChanges(false);
@@ -85,8 +108,18 @@ function NotificationPreferences() {
     setHasChanges(true);
   };
 
-  const handleSave = () => {
-    dispatch(updateNotificationPreferences(localPreferences));
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      const response = await apiClient.put<NotificationPreferences>('/notification-preferences', localPreferences);
+      setPreferences(response.data);
+      setLocalPreferences(response.data);
+      setHasChanges(false);
+    } catch (error) {
+      console.error('Failed to save notification preferences:', error);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -296,4 +329,4 @@ function NotificationPreferences() {
   );
 }
 
-export default NotificationPreferences;
+export default NotificationPreferencesPage;

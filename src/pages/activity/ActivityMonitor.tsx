@@ -2,12 +2,10 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Activity as ActivityIcon } from 'lucide-react';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState, AppDispatch } from '@/store/store';
 import { RealTimeListener } from '@/store/realTimeListener/RTL';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { genericInternalActions } from '@/store/genericSlices';
+import { useTable } from '@/store/dexie';
 
 // Import visualization components
 import ActivityCosmos from './visualizations/ActivityCosmos';
@@ -75,10 +73,9 @@ export default function ActivityMonitor() {
   const [isConnected, setIsConnected] = useState(false);
   const { user } = useAuth();
   const { t } = useLanguage();
-  const dispatch = useDispatch<AppDispatch>();
-  const users = useSelector((s: RootState) => (s as any).users?.value as any[] || []);
-  const priorities = useSelector((s: RootState) => (s as any).priorities?.value as any[] || []);
-  const taskLogs = useSelector((s: RootState) => (s as any).taskLogs?.value as any[] || []);
+  const users = useTable('users') ?? [];
+  const priorities = useTable('priorities') ?? [];
+  const taskLogs = useTable('task_logs') ?? [];
 
   // Build visualization options with translations
   const visualizationOptions = useMemo(() => 
@@ -308,14 +305,8 @@ export default function ActivityMonitor() {
     };
   }, [user, convertPublicationToActivity]);
 
-  // Load historical task logs on mount
-  useEffect(() => {
-    if (!user) return;
-    // First try to get from IndexedDB (fast)
-    dispatch(genericInternalActions.taskLogs.getFromIndexedDB({}));
-    // Then fetch from API to ensure we have latest data
-    dispatch(genericInternalActions.taskLogs.fetchFromAPI({}));
-  }, [user, dispatch]);
+  // Task logs are now automatically loaded via Dexie's useTable hook
+  // No manual fetch needed - data is synced via DataManager
 
   // Debug: log taskLogs changes
   useEffect(() => {

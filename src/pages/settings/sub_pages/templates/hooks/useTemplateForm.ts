@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
-import { useDispatch } from "react-redux";
 import { Template } from "@/store/types";
 import { TemplateFormData } from "../types";
-import { genericActions } from "@/store/genericSlices";
+import { collections } from "@/store/dexie";
 
 const initialFormData: TemplateFormData = {
   name: '',
@@ -26,7 +25,6 @@ export function useTemplateForm(
   priorities: any[],
   translate: (key: string, fallback: string) => string
 ) {
-  const dispatch = useDispatch();
   const tt = (key: string, fallback: string) => translate(`validation.${key}`, fallback);
 
   const [createFormData, setCreateFormData] = useState<TemplateFormData>(initialFormData);
@@ -106,12 +104,12 @@ export function useTemplateForm(
   const handleAddMapping = async (editingTemplate: Template | null) => {
     if (!selectedRequirement || !editingTemplate) return;
     try {
-      await dispatch(genericActions.complianceMappings.addAsync({
+      await collections.complianceMappings.add({
         requirement_id: selectedRequirement,
         entity_type: 'template',
         entity_id: editingTemplate.id,
         justification: 'Mapped via Template Settings'
-      }) as any);
+      });
       setSelectedRequirement('');
     } catch (error) {
       console.error('Failed to add mapping:', error);
@@ -120,7 +118,7 @@ export function useTemplateForm(
 
   const handleRemoveMapping = async (mappingId: number) => {
     try {
-      await dispatch(genericActions.complianceMappings.removeAsync(mappingId) as any);
+      await collections.complianceMappings.delete(mappingId);
     } catch (error) {
       console.error('Failed to remove mapping:', error);
     }

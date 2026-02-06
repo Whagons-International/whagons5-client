@@ -6,14 +6,11 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useDispatch } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 import { Button } from '@/components/ui/button';
 import { SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/animated/Tabs';
-import { genericActions } from '@/store/genericSlices';
-import { AppDispatch } from '@/store/store';
 import { useLanguage } from '@/providers/LanguageProvider';
 
 import { useTaskDialogData } from './hooks/useTaskDialogData';
@@ -37,6 +34,7 @@ import type { TaskDialogProps } from './types';
 import { celebrateTaskCompletion } from '@/utils/confetti';
 import { combineLocalDateAndTime, formatLocalDateTime } from '@/features/scheduler/utils/dateTime';
 import { trackSelection, trackSelections } from '@/utils/taskCreationPreferences';
+import { collections } from '@/store/dexie';
 
 type Props = TaskDialogProps & {
   clickTime?: number;
@@ -55,7 +53,6 @@ export default function TaskDialogContent({
   perfEnabled = false,
 }: Props) {
   const { t } = useLanguage();
-  const dispatch = useDispatch<AppDispatch>();
 
   const perfRef = useRef<{ marks: Record<string, number> }>({ marks: {} });
   const markOnce = (name: string, start: number, end: number) => {
@@ -165,6 +162,16 @@ export default function TaskDialogContent({
   }, [open, data.spots, data.spotTypes, computed.workspaceId]);
   const t13 = perfEnabled ? performance.now() : 0;
   markOnce('workspaceSpots-memo', t12, t13);
+
+  // Create status map for celebration logic
+  const statusMap = useMemo(() => {
+    const map: Record<number, any> = {};
+    for (const s of data.statuses || []) {
+      const id = Number((s as any)?.id);
+      if (Number.isFinite(id)) map[id] = s;
+    }
+    return map;
+  }, [data.statuses]);
 
   const t14 = perfEnabled ? performance.now() : 0;
   const taskTagIds = useMemo(() => {
@@ -337,7 +344,6 @@ export default function TaskDialogContent({
         };
         if (computed.spotsApplicable) updates.spot_id = formState.spotId;
 
-        await dispatch((await import('@/store/reducers/tasksSlice')).updateTaskAsync({ id: Number(task.id), updates })).unwrap();
 
         // Check if the task was marked as completed and trigger confetti
         if (updates.status_id) {
@@ -364,11 +370,11 @@ export default function TaskDialogContent({
         const currentTagIds = new Set(taskTagIds);
         const newTagIds = new Set(formState.selectedTagIds);
         for (const tagId of formState.selectedTagIds.filter((tagId: number) => !currentTagIds.has(tagId))) {
-          await dispatch(genericActions.taskTags.addAsync({ task_id: Number(task.id), tag_id: tagId, user_id: data.user.id })).unwrap();
+          await collections.taskTags.add({ task_id: Number(task.id), tag_id: tagId, user_id: data.user.id });
         }
         for (const tagId of taskTagIds.filter((tagId: number) => !newTagIds.has(tagId))) {
           const taskTag = data.taskTags.find((tt: any) => tt.task_id === Number(task.id) && tt.tag_id === tagId);
-          if (taskTag) await dispatch(genericActions.taskTags.removeAsync(taskTag.id)).unwrap();
+          if (taskTag) await collections.taskTags.delete(taskTag.id);
         }
         await syncTaskCustomFields(Number(task.id));
         // Note: taskUsers pivot sync is handled by the backend PATCH endpoint
@@ -398,12 +404,11 @@ export default function TaskDialogContent({
         };
         if (computed.spotsApplicable) payload.spot_id = formState.spotId;
 
-        const result = await dispatch((await import('@/store/reducers/tasksSlice')).addTaskAsync(payload)).unwrap();
         const newTaskId = result?.id;
 
         if (mode === 'create' && newTaskId && formState.selectedTagIds.length > 0) {
           for (const tagId of formState.selectedTagIds) {
-            await dispatch(genericActions.taskTags.addAsync({ task_id: Number(newTaskId), tag_id: tagId, user_id: data.user.id })).unwrap();
+            await collections.taskTags.add({ task_id: Number(newTaskId), tag_id: tagId, user_id: data.user.id });
           }
         }
         if (newTaskId) await syncTaskCustomFields(Number(newTaskId));

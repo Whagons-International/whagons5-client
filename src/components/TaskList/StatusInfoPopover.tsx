@@ -2,9 +2,8 @@
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Clock, Calendar } from "lucide-react";
-import { DB } from "@/store/database";
-import { TasksCache } from "@/store/indexedDB/TasksCache";
 import { cn } from "@/lib/utils";
+import { db, getTask } from "@/store/dexie";
 
 interface StatusTransitionLog {
   id: number;
@@ -71,12 +70,10 @@ export function StatusInfoPopover({ taskId, statusId, children }: StatusInfoPopo
 
     async function fetchStatusInfo() {
       try {
-        await DB.init();
-        
         // Try to get status transition logs (store might not exist yet)
         let allLogs: StatusTransitionLog[] = [];
         try {
-          allLogs = await DB.getAll('status_transition_logs') as StatusTransitionLog[];
+          allLogs = await db.table('status_transition_logs').toArray() as StatusTransitionLog[];
         } catch (storeError: any) {
           // Store doesn't exist yet - that's okay, we'll use task data as fallback
           if (storeError.name !== 'NotFoundError') {
@@ -120,12 +117,9 @@ export function StatusInfoPopover({ taskId, statusId, children }: StatusInfoPopo
           }
         }
 
-        // No transition log found, try to get task data as fallback using TasksCache
+        // No transition log found, try to get task data as fallback using Dexie
         try {
-          await TasksCache.init();
-          const allTasks = await TasksCache.getTasks();
-          const taskIdNum = Number(taskId);
-          const task = allTasks.find(t => Number(t.id) === taskIdNum);
+          const task = await getTask(taskId);
           
           if (task) {
             // For working/in-progress statuses, prefer start_date, otherwise use created_at

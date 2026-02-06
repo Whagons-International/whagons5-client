@@ -497,7 +497,7 @@ export const enTranslations: Record<string, string> = {
   // KPI Card Builder translations
   "kpiCards.builder.createTitle": "Create KPI Card",
   "kpiCards.builder.editTitle": "Edit KPI Card",
-  "kpiCards.builder.description": "Step {step} of 3",
+  
   "kpiCards.builder.name": "Card Name",
   "kpiCards.builder.namePlaceholder": "My Custom KPI",
   "kpiCards.builder.type": "Card Type",

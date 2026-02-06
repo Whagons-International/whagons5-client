@@ -1,8 +1,6 @@
 import { useEffect } from 'react';
-import { useDispatch } from 'react-redux';
-import { setPresets, setFilterModel, setSearchText } from '@/store/reducers/uiStateSlice';
 import { listPresets, listPinnedPresets, savePreset } from '@/pages/spaces/components/workspaceTable/utils/filterPresets';
-import type { AppDispatch } from '@/store/store';
+import { useWorkspaceUIStore } from '@/store/workspaceUIStore';
 
 export function useWorkspaceFilters(params: {
   workspaceKey: string;
@@ -11,7 +9,7 @@ export function useWorkspaceFilters(params: {
   tableRef: { current: { getFilterModel?: () => any; setFilterModel?: (model: any) => void; clearSelection?: () => void } | null };
 }) {
   const { workspaceKey, currentUser, filtersOpen, tableRef } = params;
-  const dispatch = useDispatch<AppDispatch>();
+  const { setFilterModel, setSearchText, setQuickPresets, setAllPresets } = useWorkspaceUIStore();
 
   // Initialize common presets if they don't exist
   useEffect(() => {
@@ -39,20 +37,23 @@ export function useWorkspaceFilters(params: {
     if (needsUpdate) {
       const quick = listPinnedPresets(workspaceKey).slice(0, 4);
       const updatedAll = listPresets(workspaceKey);
-      dispatch(setPresets({ quickPresets: quick, allPresets: updatedAll }));
+      setQuickPresets(quick);
+      setAllPresets(updatedAll);
     }
-  }, [workspaceKey, currentUser, dispatch]);
+  }, [workspaceKey, currentUser, setQuickPresets, setAllPresets]);
 
   // Load quick presets scoped to workspace
   useEffect(() => {
     try {
       const quick = listPinnedPresets(workspaceKey).slice(0, 4);
       const all = listPresets(workspaceKey);
-      dispatch(setPresets({ quickPresets: quick, allPresets: all }));
+      setQuickPresets(quick);
+      setAllPresets(all);
     } catch {
-      dispatch(setPresets({ quickPresets: [], allPresets: [] }));
+      setQuickPresets([]);
+      setAllPresets([]);
     }
-  }, [workspaceKey, filtersOpen, dispatch]);
+  }, [workspaceKey, filtersOpen, setQuickPresets, setAllPresets]);
 
   // Persist and restore search text globally
   useEffect(() => {
@@ -60,10 +61,10 @@ export function useWorkspaceFilters(params: {
     try {
       const saved = localStorage.getItem(key);
       if (saved != null) {
-        dispatch(setSearchText(saved));
+        setSearchText(saved);
       }
     } catch {}
-  }, [dispatch]);
+  }, [setSearchText]);
 
   // Listen for filter apply events from Header component
   useEffect(() => {
@@ -71,7 +72,7 @@ export function useWorkspaceFilters(params: {
       if (tableRef.current) {
         const filterModel = event.detail.filterModel || null;
         tableRef.current.setFilterModel?.(filterModel);
-        dispatch(setFilterModel(filterModel));
+        setFilterModel(filterModel);
         const key = `wh_workspace_filters_${workspaceKey}`;
         try {
           if (filterModel) {
@@ -81,7 +82,7 @@ export function useWorkspaceFilters(params: {
           }
         } catch {}
         if (event.detail.clearSearch) {
-          dispatch(setSearchText(''));
+          setSearchText('');
         }
       }
     };
@@ -89,7 +90,7 @@ export function useWorkspaceFilters(params: {
     return () => {
       window.removeEventListener('workspace-filter-apply', handleFilterApply as EventListener);
     };
-  }, [workspaceKey, dispatch, tableRef]);
+  }, [workspaceKey, setFilterModel, setSearchText, tableRef]);
 
   const handleTableReady = () => {
     const key = `wh_workspace_filters_${workspaceKey}`;

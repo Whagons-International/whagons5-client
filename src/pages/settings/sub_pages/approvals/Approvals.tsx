@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSelector } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleQuestion, faPlus, faSquareCheck } from "@fortawesome/free-solid-svg-icons";
 import type { ColDef } from "ag-grid-community";
@@ -7,8 +6,8 @@ import type { ColDef } from "ag-grid-community";
 import { Button } from "@/components/ui/button";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { useLanguage } from "@/providers/LanguageProvider";
-import type { RootState } from "@/store/store";
 import type { Approval, ApprovalApprover, CustomField, Status } from "@/store/types";
+import { useTable } from "@/store/dexie";
 
 import { SettingsLayout, SettingsDialog, SettingsGrid, useSettingsState, ApprovalApproversManager } from "../../components";
 
@@ -108,20 +107,16 @@ function Approvals() {
   const [isActionsDialogOpen, setIsActionsDialogOpen] = useState(false);
   const [actionsApproval, setActionsApproval] = useState<Approval | null>(null);
 
-  const { value: approvalApprovers } = useSelector((s: RootState) => (s as any).approvalApprovers) as { value: ApprovalApprover[] };
-  const { value: statuses } = useSelector((s: RootState) => (s as any).statuses || { value: [] }) as { value: Status[] };
-  const { value: customFields } = useSelector((s: RootState) => (s as any).customFields || { value: [] }) as { value: CustomField[] };
-  const { value: priorities } = useSelector((s: RootState) => (s as any).priorities || { value: [] }) as {
-    value: Array<{ id: number; name?: string; category_id?: number | null }>;
-  };
-  const { value: categories } = useSelector((s: RootState) => (s as any).categories || { value: [] }) as {
-    value: Array<{ id: number; name?: string; approval_id?: number | null }>;
-  };
-  const { value: slas } = useSelector((s: RootState) => (s as any).slas || { value: [] }) as { value: Array<{ id: number; name?: string }> };
-  const { value: users } = useSelector((s: RootState) => (s as any).users || { value: [] }) as { value: any[] };
-  const { value: roles } = useSelector((s: RootState) => (s as any).roles || { value: [] }) as { value: any[] };
-  const tasks = useSelector((s: any) => s?.tasks?.value || []) as any[];
-  const { value: approvalsStateValue } = useSelector((s: RootState) => (s as any).approvals || { value: [] }) as { value: Approval[] };
+  const approvalApprovers = useTable<ApprovalApprover>('approval_approvers') ?? [];
+  const statuses = useTable<Status>('statuses') ?? [];
+  const customFields = useTable<CustomField>('custom_fields') ?? [];
+  const priorities = useTable<{ id: number; name?: string; category_id?: number | null }>('priorities') ?? [];
+  const categories = useTable<{ id: number; name?: string; approval_id?: number | null }>('categories') ?? [];
+  const slas = useTable<{ id: number; name?: string }>('slas') ?? [];
+  const users = useTable<any>('users') ?? [];
+  const roles = useTable<any>('roles') ?? [];
+  const tasks = useTable<any>('tasks') ?? [];
+  const approvalsStateValue = useTable<Approval>('approvals') ?? [];
 
   const approverCountByApproval = useMemo(() => {
     const map = new Map<number, number>();

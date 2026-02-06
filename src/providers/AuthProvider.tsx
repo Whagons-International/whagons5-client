@@ -1,5 +1,5 @@
 // src/context/AuthContext.tsx
-import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth } from '../firebase/firebaseConfig';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import {
@@ -8,16 +8,10 @@ import {
   initializeAuth,
 } from '../api/whagonsApi';
 import { User } from '../types/user';
-import { useDispatch, useSelector, shallowEqual } from 'react-redux';
-import { AppDispatch, RootState } from '../store/store';
-import { TasksCache } from '@/store/indexedDB/TasksCache';
-import { getTasksFromIndexedDB } from '../store/reducers/tasksSlice';
-import { fetchNotificationPreferences } from '../store/reducers/notificationPreferencesSlice';
 
-// Custom caches with advanced features
+// Dexie-based data layer
+import { db, getDataManager, setupRTLDexieHandler, clearAllData } from '@/store/dexie';
 import { RealTimeListener, setGlobalRtl } from '@/store/realTimeListener/RTL';
-import { DB } from '@/store/database';
-import { DataManager } from '@/store/DataManager';
 import { requestNotificationPermission, setupForegroundMessageHandler, unregisterToken } from '@/firebase/fcmHelper';
 
 // Define context types
@@ -60,34 +54,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   });
   const [hydrationError, setHydrationError] = useState<string | null>(null);
-  const dispatch = useDispatch<AppDispatch>();
-  
-  // Only access userTeams if user has a tenant (avoid fetching during onboarding)
-  // Must check user state OUTSIDE of useSelector to avoid triggering slice auto-fetch
-  const hasTenant = user?.tenant_domain_prefix;
-  
-  // Memoized selector with shallow equality check to prevent unnecessary rerenders
-  const userTeams = useSelector(
-    (state: RootState) => {
-      if (!hasTenant) {
-        return [] as Array<{ team_id?: number }>;
-      }
-      return ((state as any)?.userTeams?.value ?? []) as Array<{ team_id?: number }>;
-    },
-    shallowEqual // Use shallow equality to compare array contents
-  );
-  const teamKey = useMemo(() => {
-    if (!hasTenant) return '';
-    const ids = Array.from(
-      new Set(
-        (userTeams || [])
-          .map((ut) => Number((ut as any)?.team_id))
-          .filter((n) => Number.isFinite(n))
-      )
-    ).sort((a, b) => a - b);
-    return ids.join(',');
-  }, [userTeams, hasTenant]);
-  const prevTeamKeyRef = useRef<string | null>(null);
 
   // Initialize FCM (Firebase Cloud Messaging) for push notifications
   const initializeFCM = async (userData: User | null, fbUser: FirebaseUser | null) => {
@@ -176,9 +142,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
           })();
 
-          // Load notification preferences at login
-          dispatch(fetchNotificationPreferences());
-
           // Kick off background hydration so UI can render immediately
           (async () => {
             try {
@@ -195,28 +158,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 setBootstrapComplete(true);
                 return;
               }
-              console.log(firebaseUser.uid);
-              const result = await DB.init(firebaseUser.uid);
-              console.log('DB.init: result', result);
-              if (!result) {
-                console.warn('DB failed to initialize, deferring cache hydration');
-                // Keep the bootstrap gate in place; user can refresh to retry.
-                return;
-              }
+              console.log('[Dexie] Database ready:', db.name);
 
-              // Explicitly wait for DB readiness to avoid races during first login
-              const ready = await DB.whenReady();
-              if (!ready) {
-                console.warn('DB not ready after init, deferring cache hydration');
-                return;
-              }
-
-              const dataManager = new DataManager(dispatch);
-              try {
-                await dataManager.loadCoreFromIndexedDB();
-              } catch (err) {
-                console.warn('AuthProvider: loadCoreFromIndexedDB failed (continuing to network hydration)', err);
-              }
+                              // Get the Dexie-based DataManager
+                              const dataManager = getDataManager();
               if (shouldBlockWelcome) {
                 // First load after onboarding: block the Welcome "Get Started" button
                 // until the initial validation + refresh finishes.
@@ -249,14 +194,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 setBootstrapComplete(true);
               }
 
-              // Category custom fields will be hydrated by DataManager + on-demand fetches
-              const rtl = new RealTimeListener(
-                // {
-                //   debug: true,
-                // }
-              );
-              setGlobalRtl(rtl);
-              rtl.connectAndHold();
+              // Setup RTL (Real-Time Listener) for live updates
+                              const rtl = new RealTimeListener();
+                              setGlobalRtl(rtl);
+                              
+                              // Wire RTL to write directly to Dexie (no Redux sync needed)
+                              setupRTLDexieHandler(rtl);
+                              
+                              rtl.connectAndHold();
             } catch (err) {
               console.warn('AuthProvider: background hydration failed', err);
             } finally {
@@ -337,29 +282,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setHydrationError(null);
         
         // Unregister FCM token on logout
-        try {
-          await unregisterToken();
-        } catch (err) {
-          console.warn('AuthProvider: failed to unregister FCM token on logout', err);
-        }
-        
-        try {
-          const uid: string | undefined =
-            (currentUser ? (currentUser as FirebaseUser).uid : undefined) ??
-            firebaseUser?.uid ??
-            auth.currentUser?.uid ??
-            undefined;
-          if (uid) {
-            await DB.deleteDatabase(uid);
-          }
-        } catch (err) {
-          console.warn('AuthProvider: failed to delete IndexedDB on logout', err);
-        }
-        try {
-          dispatch({ type: 'auth/logout/reset' });
-        } catch (err) {
-          console.warn('AuthProvider: failed to reset Redux store on logout', err);
-        }
+                        try {
+                          await unregisterToken();
+                        } catch (err) {
+                          console.warn('AuthProvider: failed to unregister FCM token on logout', err);
+                        }
+                        
+                        // Clear Dexie data on logout
+                        try {
+                          await clearAllData();
+                        } catch (err) {
+                          console.warn('AuthProvider: failed to clear Dexie on logout', err);
+                        }
+                        
+                        // Clear sync cursors
+                        try {
+                          const dataManager = getDataManager();
+                          await dataManager.reset();
+                        } catch (err) {
+                          console.warn('AuthProvider: failed to reset DataManager on logout', err);
+                        }
+                        
+                        // Redux store reset no longer needed - using Dexie only
       }
 
       setLoading(false);
@@ -371,36 +315,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []); // Note: fetchUser checks window.location.pathname dynamically, so no need to re-run on route change
 
-  // Note: userTeams is now hydrated via DataManager.bootstrapAndSync()
-  // which uses batch integrity checking - no need for separate fetch here
-
-  // Refresh Redux from cache when user's team memberships change.
-  // Sync stream (DataManager) handles task visibility changes automatically.
-  useEffect(() => {
-    if (loading || userLoading || hydrating || !firebaseUser) {
-      prevTeamKeyRef.current = null;
-      return;
-    }
-
-    if (prevTeamKeyRef.current === null) {
-      prevTeamKeyRef.current = teamKey;
-      return;
-    }
-
-    if (prevTeamKeyRef.current === teamKey) {
-      return;
-    }
-
-    prevTeamKeyRef.current = teamKey;
-
-    (async () => {
-      try {
-        await dispatch(getTasksFromIndexedDB());
-      } catch (err) {
-        console.warn('AuthProvider: failed to refresh tasks after team change', err);
-      }
-    })();
-  }, [teamKey, loading, userLoading, hydrating, firebaseUser, dispatch]);
+  // Note: With Dexie + useLiveQuery, components automatically re-render
+  // when data changes. No need for manual Redux refresh on team changes.
 
   return (
     <AuthContext.Provider

@@ -13,8 +13,6 @@ import { LanguageProvider } from './providers/LanguageProvider';
 import { LaserPointerProvider } from './providers/LaserPointerProvider';
 import { LaserPointer } from './components/LaserPointer';
 import { Toaster } from 'react-hot-toast';
-import { Provider } from 'react-redux';
-import {store } from './store';
 import { initFontStyle } from './utils/fontStyle';
 
 // Initialize font style
@@ -22,48 +20,46 @@ initFontStyle();
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   // <React.StrictMode>
-    <Provider store={store}>
-        <ThemeProvider defaultTheme="light" storageKey="whagons-ui-theme">
-          <LanguageProvider>
-            <BrandingProvider>
-<AuthProvider>
-                <LaserPointerProvider>
-                  <App />
-                  <LaserPointer />
-                </LaserPointerProvider>
-                <Toaster
-                  position="bottom-right"
-                  containerStyle={{
-                    bottom: '20px',
-                    right: '100px',
-                  }}
-                  toastOptions={{
-                    duration: 5000,
-                    style: {
-                      background: '#363636',
-                      color: '#fff',
-                    },
-                    success: {
-                      duration: 8000,
-                      iconTheme: {
-                        primary: '#4ade80',
-                        secondary: '#fff',
-                      },
-                    },
-                    error: {
-                      duration: 5000,
-                      iconTheme: {
-                        primary: '#ef4444',
-                        secondary: '#fff',
-                      },
-},
-                  }}
-                />
-                </AuthProvider>
-            </BrandingProvider>
-          </LanguageProvider>
-        </ThemeProvider>
-    </Provider>
+    <ThemeProvider defaultTheme="light" storageKey="whagons-ui-theme">
+      <LanguageProvider>
+        <BrandingProvider>
+          <AuthProvider>
+            <LaserPointerProvider>
+              <App />
+              <LaserPointer />
+            </LaserPointerProvider>
+            <Toaster
+              position="bottom-right"
+              containerStyle={{
+                bottom: '20px',
+                right: '100px',
+              }}
+              toastOptions={{
+                duration: 5000,
+                style: {
+                  background: '#363636',
+                  color: '#fff',
+                },
+                success: {
+                  duration: 8000,
+                  iconTheme: {
+                    primary: '#4ade80',
+                    secondary: '#fff',
+                  },
+                },
+                error: {
+                  duration: 5000,
+                  iconTheme: {
+                    primary: '#ef4444',
+                    secondary: '#fff',
+                  },
+                },
+              }}
+            />
+          </AuthProvider>
+        </BrandingProvider>
+      </LanguageProvider>
+    </ThemeProvider>
   // {/* </React.StrictMode>, */}
 );
 

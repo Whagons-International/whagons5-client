@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import { useTable, collections } from "@/store/dexie";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faClock,
@@ -9,7 +9,6 @@ import {
   faCircleInfo,
   faGripVertical,
 } from "@fortawesome/free-solid-svg-icons";
-import { RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -43,7 +42,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { useLanguage } from "@/providers/LanguageProvider";
-import { genericActions, genericInternalActions } from "@/store/genericSlices";
 import toast from "react-hot-toast";
 import {
   DndContext,
@@ -198,14 +196,14 @@ function SortableScheduleCard({
 
 function WorkingSchedules() {
   const { t } = useLanguage();
-  const dispatch = useDispatch();
   const tt = (key: string, fallback: string) => t(`settings.workingSchedules.${key}`, fallback);
 
-  // Redux state
-  const { value: schedules, loading } = useSelector((state: RootState) => state.workingSchedules) as { value: WorkingSchedule[]; loading: boolean };
-  const { value: countryConfigs } = useSelector((state: RootState) => state.countryConfigs) as { value: CountryConfig[]; loading: boolean };
-  const { value: holidayCalendars } = useSelector((state: RootState) => state.holidayCalendars) as { value: HolidayCalendar[]; loading: boolean };
-  const { value: overtimeRules } = useSelector((state: RootState) => state.overtimeRules) as { value: OvertimeRule[]; loading: boolean };
+  // Dexie state
+  const schedules = useTable('working_schedules') as WorkingSchedule[];
+  const countryConfigs = useTable('country_configs') as CountryConfig[];
+  const holidayCalendars = useTable('holiday_calendars') as HolidayCalendar[];
+  const overtimeRules = useTable('overtime_rules') as OvertimeRule[];
+  const loading = false; // Dexie loads synchronously from IndexedDB
 
   // Dialog state
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -235,20 +233,7 @@ function WorkingSchedules() {
     return calculateWeeklyHours(formData.schedule_type, formData.schedule_config);
   }, [formData.schedule_type, formData.schedule_config]);
 
-  // Load data on mount
-  useEffect(() => {
-    // First try to load from IndexedDB
-    dispatch(genericInternalActions.workingSchedules.getFromIndexedDB() as any);
-    dispatch(genericInternalActions.countryConfigs.getFromIndexedDB() as any);
-    dispatch(genericInternalActions.holidayCalendars.getFromIndexedDB() as any);
-    dispatch(genericInternalActions.overtimeRules.getFromIndexedDB() as any);
-    
-    // Then fetch from API to ensure we have the latest data
-    dispatch(genericInternalActions.workingSchedules.fetchFromAPI() as any);
-    dispatch(genericInternalActions.countryConfigs.fetchFromAPI() as any);
-    dispatch(genericInternalActions.holidayCalendars.fetchFromAPI() as any);
-    dispatch(genericInternalActions.overtimeRules.fetchFromAPI() as any);
-  }, [dispatch]);
+  // Data is loaded automatically via Dexie's live queries
 
   // Local order state for drag and drop
   const [orderedSchedules, setOrderedSchedules] = useState<WorkingScheduleWithPosition[]>([]);
@@ -364,7 +349,7 @@ function WorkingSchedules() {
     }
     setIsSubmitting(true);
     try {
-      await dispatch(genericActions.workingSchedules.addAsync(formData) as any);
+      await collections.working_schedules.add(formData);
       toast.success(tt('messages.created', 'Schedule created successfully'));
       setIsCreateDialogOpen(false);
       resetForm();
@@ -383,7 +368,7 @@ function WorkingSchedules() {
     }
     setIsSubmitting(true);
     try {
-      await dispatch(genericActions.workingSchedules.updateAsync({ id: editingSchedule.id, updates: formData }) as any);
+      await collections.working_schedules.update(editingSchedule.id, formData);
       toast.success(tt('messages.updated', 'Schedule updated successfully'));
       setIsEditDialogOpen(false);
       setEditingSchedule(null);
@@ -400,7 +385,7 @@ function WorkingSchedules() {
     if (!deletingSchedule) return;
     setIsSubmitting(true);
     try {
-      await dispatch(genericActions.workingSchedules.removeAsync(deletingSchedule.id) as any);
+      await collections.working_schedules.delete(deletingSchedule.id);
       toast.success(tt('messages.deleted', 'Schedule deleted successfully'));
       setIsDeleteDialogOpen(false);
       setDeletingSchedule(null);

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDiagramProject } from "@fortawesome/free-solid-svg-icons";
 import { SettingsLayout } from "../../components";
@@ -14,10 +13,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { genericActions } from "@/store/genericSlices";
-import { AppDispatch, RootState } from "@/store/store";
 import { Workflow } from "@/store/types";
 import { api } from "@/store/api/internalApi";
+import { useTable, collections } from "@/store/dexie";
 
 type NodeType = "trigger" | "condition" | "action" | "branch" | "delay";
 
@@ -200,11 +198,9 @@ const WIZARD_STEPS = [
 ] as const;
 
 function Workflows() {
-  const dispatch = useDispatch<AppDispatch>();
-  const workflowsState = useSelector((s: RootState) => (s as any).workflows);
-  const workflows = workflowsState?.value ?? [];
-  const workflowsLoading = workflowsState?.loading;
-  const workflowsError = workflowsState?.error;
+  const workflows = useTable('workflows') as Workflow[];
+  const workflowsLoading = false;
+  const workflowsError = null;
 
   const [draft, setDraft] = useState<WorkflowDraft>(() => createEmptyDraft());
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<number | null>(null);
@@ -699,7 +695,7 @@ function Workflows() {
     setIsDeleting(true);
     setApiError(null);
     try {
-      await dispatch(genericActions.workflows.removeAsync(id)).unwrap();
+      await collections.workflows.delete(id);
       setStatusMessage("Workflow deleted");
       if (selectedWorkflowId === id) {
         handleNew();
@@ -710,7 +706,7 @@ function Workflows() {
     } finally {
       setIsDeleting(false);
     }
-  }, [dispatch, handleNew, refreshWorkflows, selectedWorkflowId]);
+  }, [handleNew, refreshWorkflows, selectedWorkflowId]);
 
   const buildPayload = useCallback(() => {
     return {
@@ -743,12 +739,12 @@ function Workflows() {
     try {
       const payload = buildPayload();
       if (draft.id) {
-        await dispatch(genericActions.workflows.updateAsync({ id: draft.id, updates: payload })).unwrap();
+        await collections.workflows.update(draft.id, payload);
         setStatusMessage("Workflow updated.");
         const latest = workflows.find(w => w.id === draft.id);
         if (latest) handleLoadWorkflow(latest);
       } else {
-        const created = await dispatch(genericActions.workflows.addAsync(payload as any)).unwrap();
+        const created = await collections.workflows.add(payload as any);
         setStatusMessage("Workflow created.");
         if (created) {
           handleLoadWorkflow(created as Workflow);
@@ -761,7 +757,7 @@ function Workflows() {
     } finally {
       setIsSaving(false);
     }
-  }, [draft, buildPayload, dispatch, refreshWorkflows, workflows, handleLoadWorkflow]);
+  }, [draft, buildPayload, refreshWorkflows, workflows, handleLoadWorkflow]);
 
   const handleTestRun = useCallback(async () => {
     if (!draft.id) {

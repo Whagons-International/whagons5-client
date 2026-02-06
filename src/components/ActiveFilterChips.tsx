@@ -2,8 +2,7 @@
 
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useSelector } from "react-redux";
-import { RootState } from "@/store";
+import { useTable } from "@/store/dexie";
 
 interface ActiveFilterChipsProps {
   filterModel?: any;
@@ -12,11 +11,11 @@ interface ActiveFilterChipsProps {
 }
 
 export function ActiveFilterChips({ filterModel, onRemoveFilter, onClearAll }: ActiveFilterChipsProps) {
-  const statuses = useSelector((s: RootState) => (s as any).statuses.value as any[]);
-  const priorities = useSelector((s: RootState) => (s as any).priorities.value as any[]);
-  const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
-  const users = useSelector((s: RootState) => (s as any).users.value as any[]);
-  const tags = useSelector((s: RootState) => (s as any).tags.value as any[]);
+  const statuses = useTable('statuses');
+  const priorities = useTable('priorities');
+  const spots = useTable('spots');
+  const users = useTable('users');
+  const tags = useTable('tags');
 
   if (!filterModel || Object.keys(filterModel).length === 0) {
     return null;

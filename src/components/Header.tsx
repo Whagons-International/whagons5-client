@@ -15,23 +15,7 @@ import { User, LogOut, Plus, Layers, Search, Bell, X } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./ModeToggle";
 import { LaserPointerToggle } from "./LaserPointerToggle";
-import { useSelector, useDispatch } from "react-redux";
-import { RootState } from "@/store/store";
-import {
-  setFilterModel,
-  setSearchText,
-  setGroupBy,
-  setCollapseGroups,
-  setPresets,
-  selectFilterModel,
-  selectSearchText,
-  selectGroupBy,
-  selectCollapseGroups,
-  selectQuickPresets,
-  selectAllPresets,
-} from "@/store/reducers/uiStateSlice";
 import TaskDialog from '@/pages/spaces/components/TaskDialog';
-import { AvatarCache } from '@/store/indexedDB/AvatarCache';
 import { getAssetDisplayUrl } from '@/lib/assetHelpers';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { MultiStateBadge } from "@/animated/Status";
@@ -45,15 +29,12 @@ import { Switch } from '@/components/ui/switch';
 import { ApiLoadingTracker } from '@/api/apiLoadingTracker';
 import { useLanguage } from "@/providers/LanguageProvider";
 import { ActiveFilterChips } from "@/components/ActiveFilterChips";
-import { genericActions, genericInternalActions } from "@/store/genericSlices";
-import { cleanupExpiredNotifications, markAllViewedNotifications } from "@/store/reducers/notificationThunks";
-import { DB } from "@/store/database";
+import { collections, useLiveQuery, db } from "@/store/dexie";
+import { useWorkspaceUIStore } from "@/store/workspaceUIStore";
 
 
-// Avatars are now cached globally in IndexedDB via AvatarCache
 
 function Header() {
-    const dispatch = useDispatch();
     const { firebaseUser, user, userLoading, hydrating, hydrationError } = useAuth();
     const [apiLoading, setApiLoading] = useState<boolean>(false);
     const { isMobile } = useSidebar();
@@ -63,24 +44,24 @@ function Header() {
     const [imageError, setImageError] = useState(false);
     const [, setIsLoading] = useState(false);
 
-    const workspacesState = useSelector((s: RootState) => s.workspaces);
-    const { value: workspaces = [] } = workspacesState || {};
+    // Dexie queries with useLiveQuery
+    const workspaces = useLiveQuery(() => collections.workspaces.getAll()) || [];
+    const boards = useLiveQuery(() => collections.boards.getAll()) || [];
+    const allNotifications = useLiveQuery(() => collections.notifications.getAll()) || [];
 
-    // Get boards for breadcrumb
-    const boardsState = useSelector((s: RootState) => (s as any).boards);
-    const { value: boards = [] } = boardsState || {};
-
-    // Get notifications
-    const notificationsState = useSelector((s: RootState) => (s as any).notifications);
-    const { value: allNotifications = [] } = notificationsState || {};
-
-    // Redux UI state selectors
-    const currentFilterModel = useSelector(selectFilterModel);
-    const searchText = useSelector(selectSearchText);
-    const groupBy = useSelector(selectGroupBy);
-    const collapseGroups = useSelector(selectCollapseGroups);
-    const quickPresets = useSelector(selectQuickPresets);
-    const allPresets = useSelector(selectAllPresets);
+    // Zustand UI state (replacing Redux)
+    const {
+        filterModel: currentFilterModel,
+        searchText,
+        groupBy,
+        collapseGroups,
+        quickPresets,
+        allPresets,
+        setFilterModel,
+        setSearchText,
+        setGroupBy,
+        setCollapseGroups,
+    } = useWorkspaceUIStore();
 
     const isSettings = useMemo(() => location.pathname.startsWith('/settings'), [location.pathname]);
     const isAnalytics = useMemo(() => location.pathname.startsWith('/analytics'), [location.pathname]);
@@ -101,18 +82,46 @@ function Header() {
         return notifications.filter((n: any) => !n.viewed_at).length;
     }, [notifications]);
 
-    // Cleanup expired notifications (24h after viewed) on mount and load notifications
+    // Cleanup expired notifications (24h after viewed) on mount
     useEffect(() => {
-        dispatch(cleanupExpiredNotifications() as any);
-    }, [dispatch]);
+        const cleanup = async () => {
+            try {
+                const now = Date.now();
+                const allNotifs = await db.table('notifications').toArray();
+                const expiredIds = allNotifs
+                    .filter((n: any) => {
+                        if (!n.viewed_at) return false;
+                        const viewedTime = new Date(n.viewed_at).getTime();
+                        return (now - viewedTime) >= (24 * 60 * 60 * 1000);
+                    })
+                    .map((n: any) => n.id);
+                if (expiredIds.length > 0) {
+                    await db.table('notifications').bulkDelete(expiredIds);
+                }
+            } catch (e) {
+                console.error('Error cleaning up notifications:', e);
+            }
+        };
+        cleanup();
+    }, []);
 
 
     // Mark all notifications as viewed when dropdown opens
     const handleDropdownOpenChange = useCallback(async (open: boolean) => {
         if (open && unviewedCount > 0) {
-            dispatch(markAllViewedNotifications(notifications) as any);
+            try {
+                const now = new Date().toISOString();
+                const updates = notifications
+                    .filter((n: any) => !n.viewed_at)
+                    .map((n: any) => ({ key: n.id, changes: { viewed_at: now } }));
+                if (updates.length > 0) {
+                    await db.table('notifications').bulkUpdate(updates);
+                }
+            } catch (e) {
+                console.error('Error marking notifications as viewed:', e);
+            }
         }
-    }, [unviewedCount, notifications, dispatch]);
+    }, [unviewedCount, notifications]);
 
 
 
@@ -251,12 +260,12 @@ function Header() {
         try {
             const saved = localStorage.getItem(key);
             if (saved != null) {
-                dispatch(setSearchText(saved));
+                setSearchText(saved);
             } else {
-                dispatch(setSearchText(''));
+                setSearchText('');
             }
         } catch {}
-    }, [currentWorkspaceName, dispatch]);
+    }, [currentWorkspaceName, setSearchText]);
 
     // Save search text to localStorage when it changes
     useEffect(() => {
@@ -280,13 +289,13 @@ function Header() {
             const savedGroup = localStorage.getItem(groupKey) as any;
             const savedCollapse = localStorage.getItem(collapseKey);
             if (savedGroup) {
-                dispatch(setGroupBy(savedGroup));
+                setGroupBy(savedGroup);
             }
             if (savedCollapse !== null) {
-                dispatch(setCollapseGroups(savedCollapse === 'true'));
+                setCollapseGroups(savedCollapse === 'true');
             }
         } catch {}
-    }, [currentWorkspaceName, currentWorkspaceId, dispatch]);
+    }, [currentWorkspaceName, currentWorkspaceId, setGroupBy, setCollapseGroups]);
 
     // Save groupBy to localStorage when changed
     useEffect(() => {
@@ -535,7 +544,6 @@ function Header() {
         setIsLoading(true);
         try {
             if (!forceRefresh) {
-                const cachedRow = await AvatarCache.getByAnyRow([firebaseUser.uid, user?.google_uuid, user?.id]);
                 if (cachedRow?.data && (!cachedRow.url || cachedRow.url === url)) {
                     setImageUrl(cachedRow.data);
                     setImageError(false);
@@ -544,7 +552,6 @@ function Header() {
             }
 
             const aliases = [user?.google_uuid, user?.id].filter(Boolean) as Array<string | number>;
-            const dataUrl = await AvatarCache.fetchAndCache(firebaseUser.uid, url, aliases);
             if (dataUrl) {
                 setImageUrl(dataUrl);
                 setImageError(false);
@@ -578,7 +585,6 @@ function Header() {
         const handleProfileUpdate = async (event?: CustomEvent) => {
             if (firebaseUser?.uid && user?.id) {
                 // Clear avatar cache for all user identifiers FIRST
-                await AvatarCache.deleteByAny([String(firebaseUser.uid), String(user.google_uuid), String(user.id)]);
                 
                 // ALWAYS use the URL from event detail if available (it's the new one)
                 // Only fall back to user.url_picture if event detail doesn't have it
@@ -788,7 +794,7 @@ function Header() {
                                 placeholder={t('workspace.search.placeholder', 'Search...')}
                                 className="h-9 pl-9 pr-9 rounded-[8px] border border-border/40 placeholder:text-muted-foreground/50 dark:bg-[#252b36] dark:border-[#2A2A2A] dark:placeholder-[#6B7280] focus-visible:border-[#6366F1]"
                                 value={searchText}
-                                onChange={(e) => dispatch(setSearchText(e.target.value))}
+                                onChange={(e) => setSearchText(e.target.value)}
                             />
                         </div>
                     </div>
@@ -844,13 +850,11 @@ function Header() {
                                     {notifications.length > 0 && (
                                         <button
                                             onClick={async () => {
-                                                // Clear all notifications
-                                                if (DB.db) {
-                                                    const tx = DB.db.transaction(['notifications'], 'readwrite');
-                                                    const store = tx.objectStore('notifications');
-                                                    await store.clear();
-                                                    // Reload from IndexedDB (which is now empty)
-                                                    dispatch(genericInternalActions.notifications.getFromIndexedDB({ force: true }) as any);
+                                                // Clear all notifications using Dexie
+                                                try {
+                                                    await db.table('notifications').clear();
+                                                } catch (e) {
+                                                    console.error('Error clearing notifications:', e);
                                                 }
                                             }}
                                             className="text-xs text-destructive hover:underline"
@@ -879,7 +883,7 @@ function Header() {
                                                     }
                                                     
                                                     // Delete notification after navigation
-                                                    await dispatch(genericActions.notifications.removeAsync(notification.id) as any);
+                                                    await collections.notifications.delete(notification.id);
                                                 }}
                                             >
                                                 <div className="flex items-start gap-2">
@@ -936,9 +940,9 @@ function Header() {
                                 delete newModel.name;
                                 delete newModel.description;
                                 // Clear search input and signal Workspace to not re-apply the filter
-                                dispatch(setSearchText(''));
+                                setSearchText('');
                                 const finalModel = Object.keys(newModel).length > 0 ? newModel : null;
-                                dispatch(setFilterModel(finalModel));
+                                setFilterModel(finalModel);
                                 // Dispatch to Workspace component for table update with clearSearch: true
                                 window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
                                     detail: { filterModel: finalModel, clearSearch: true } 
@@ -948,15 +952,15 @@ function Header() {
                                 delete newModel[filterKey];
                             }
                             const finalModel = Object.keys(newModel).length > 0 ? newModel : null;
-                            dispatch(setFilterModel(finalModel));
+                            setFilterModel(finalModel);
                             // Dispatch to Workspace component for table update
                             window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
                                 detail: { filterModel: finalModel, clearSearch: false } 
                             }));
                         }}
                         onClearAll={() => {
-                            dispatch(setFilterModel(null));
-                            dispatch(setSearchText(''));
+                            setFilterModel(null);
+                            setSearchText('');
                             // Dispatch to Workspace component for table update
                             window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
                                 detail: { filterModel: null, clearSearch: true } 
@@ -971,8 +975,8 @@ function Header() {
                             size="sm"
                             title={t('workspace.filters.allTasks', 'All tasks')}
                             onClick={() => {
-                                dispatch(setFilterModel(null));
-                                dispatch(setSearchText(''));
+                                setFilterModel(null);
+                                setSearchText('');
                                 // Dispatch to Workspace component for table update
                                 window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
                                     detail: { filterModel: null, clearSearch: true } 
@@ -988,8 +992,8 @@ function Header() {
                                 size="sm"
                                 title={p.name}
                                 onClick={() => {
-                                    dispatch(setFilterModel(p.model));
-                                    dispatch(setSearchText(''));
+                                    setFilterModel(p.model);
+                                    setSearchText('');
                                     // Dispatch to Workspace component for table update
                                     window.dispatchEvent(new CustomEvent('workspace-filter-apply', { 
                                         detail: { filterModel: p.model, clearSearch: true } 
@@ -1044,7 +1048,7 @@ function Header() {
                         {/* Group by control */}
                         <div className="flex items-center gap-2 ml-auto">
                             <Label className="text-sm whitespace-nowrap font-semibold">{t('workspace.group.group', 'Group')}</Label>
-                            <Select value={groupBy} onValueChange={(v) => dispatch(setGroupBy(v as any))}>
+                            <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
                                 <SelectTrigger size="sm" className="h-8 w-[120px]">
                                     <SelectValue placeholder={t('workspace.group.group', 'Group')} />
                                 </SelectTrigger>
@@ -1057,7 +1061,7 @@ function Header() {
                             </Select>
                             {groupBy !== 'none' && (
                                 <div className="flex items-center gap-2">
-                                    <Switch checked={collapseGroups} onCheckedChange={(checked) => dispatch(setCollapseGroups(checked))} />
+                                    <Switch checked={collapseGroups} onCheckedChange={(checked) => setCollapseGroups(checked)} />
                                     <Label className="text-sm whitespace-nowrap font-semibold">{t('workspace.group.collapse', 'Collapse')}</Label>
                                 </div>
                             )}

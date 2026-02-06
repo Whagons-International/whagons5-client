@@ -1,8 +1,4 @@
-import React, { useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { genericInternalActions } from '@/store/genericSlices';
-import { RootState } from '@/store/store';
-import { AppDispatch } from '@/store/store';
+import React from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -10,18 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { useTable } from '@/store/dexie';
 
 export const ComplianceStandards = () => {
-    const dispatch = useDispatch<AppDispatch>();
-    const { value: standards, loading } = useSelector((state: RootState) => state.complianceStandards);
+    const standards = useTable('compliance_standards');
     const { t } = useLanguage();
-
-    useEffect(() => {
-        // First try to get from IndexedDB (fast)
-        dispatch(genericInternalActions.complianceStandards.getFromIndexedDB());
-        // Then fetch from API to ensure we have latest data
-        dispatch(genericInternalActions.complianceStandards.fetchFromAPI());
-    }, [dispatch]);
 
     return (
         <PageContainer title={t('compliance.standards.title', 'Standards and Norms')}>

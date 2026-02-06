@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, useRef, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   Plus,
@@ -10,9 +9,8 @@ import {
   Activity,
   ListTodo,
 } from 'lucide-react';
-import { TasksCache } from '@/store/indexedDB/TasksCache';
-import { TaskEvents } from '@/store/eventEmiters/taskEvents';
 import { useAuth } from '@/providers/AuthProvider';
+import { collections, useLiveQuery, queryTasks, getTaskCount } from '@/store/dexie';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -43,8 +41,6 @@ import { ColorPicker, ColorPickerAlpha, ColorPickerFormat, ColorPickerHue, Color
 import { MultiSelect } from '@/components/ui/multi-select';
 import Color, { ColorLike } from 'color';
 import { Workspace, Team, Category } from '@/store/types';
-import { genericActions } from '@/store/genericSlices';
-import { RootState } from '@/store/store';
 import {
   DndContext,
   closestCenter,
@@ -317,7 +313,6 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
 }
 
 export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, showEverythingButton = true }: AppSidebarWorkspacesProps) {
-  const dispatch = useDispatch();
   const { isMobile, state } = useSidebar();
   const isCollapsedState = state === 'collapsed';
   const collapsed = isCollapsedState && !isMobile;
@@ -340,23 +335,11 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
   useEffect(() => {
     let cancelled = false;
     const loadTaskCounts = async () => {
-      if (!TasksCache.initialized) {
-        try {
-          await TasksCache.init();
-        } catch {
-          return;
-        }
-      }
-      
       // Map workspaces to promises for parallel execution
       const promises = visibleWorkspaces.map(async (workspace) => {
         try {
-          const result = await TasksCache.queryTasks({ 
-            workspace_id: Number(workspace.id), 
-            startRow: 0, 
-            endRow: 0 
-          });
-          return { id: String(workspace.id), count: result?.rowCount || 0 };
+          const count = await getTaskCount(Number(workspace.id));
+          return { id: String(workspace.id), count };
         } catch {
           // Handle per-workspace failures by mapping to 0 counts
           return { id: String(workspace.id), count: 0 };
@@ -381,31 +364,17 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
     // Initial load
     loadTaskCounts();
     
-    // Subscribe to task change events to refresh counts
-    const unsubscribeCreated = TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, () => {
+    // Refresh counts periodically (every 30s) since we don't have Redux events anymore
+    const interval = setInterval(() => {
       if (!cancelled) {
         loadTaskCounts();
       }
-    });
+    }, 30000);
     
-    const unsubscribeUpdated = TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, () => {
-      if (!cancelled) {
-        loadTaskCounts();
-      }
-    });
-    
-    const unsubscribeDeleted = TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, () => {
-      if (!cancelled) {
-        loadTaskCounts();
-      }
-    });
-    
-    // Cleanup: cancel flag and unsubscribe from all events
+    // Cleanup
     return () => {
       cancelled = true;
-      unsubscribeCreated();
-      unsubscribeUpdated();
-      unsubscribeDeleted();
+      clearInterval(interval);
     };
   }, [visibleWorkspaces]);
 
@@ -419,8 +388,9 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
   const [quickAccessOpen, setQuickAccessOpen] = useState(true);
 
   // Get teams and categories from Redux store
-  const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
-  const { value: categories } = useSelector((state: RootState) => state.categories) as { value: Category[] };
+  // Dexie queries with useLiveQuery
+  const teams = useLiveQuery(() => collections.teams.getAll()) || [];
+  const categories = useLiveQuery(() => collections.categories.getAll()) || [];
   
   // Filter categories that don't already have a workspace (DEFAULT workspaces are 1:1 with categories)
   // Only show categories that don't have a workspace_id for optional association
@@ -544,7 +514,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
     }
 
     try {
-      await dispatch((genericActions.workspaces.addAsync as any)(workspaceData)).unwrap();
+      await collections.workspaces.add(workspaceData);
 
       // Reset form
       setWorkspaceName('');

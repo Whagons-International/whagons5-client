@@ -1,9 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
-import { useSelector } from "react-redux";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowUpWideShort, faPlus, faChartBar, faGlobe, faTags, faTrash } from "@fortawesome/free-solid-svg-icons";
-import { RootState } from "@/store/store";
 import type { Priority } from "@/store/types";
 import { Button } from "@/components/ui/button";
 import { UrlTabs } from "@/components/ui/url-tabs";
@@ -17,6 +15,7 @@ import {
   SelectField
 } from "../../components";
 import { StatisticsTab } from "./components/StatisticsTab";
+import { useTable } from "@/store/dexie";
 
 const PriorityNameCellRenderer = (props: ICellRendererParams) => {
   const name = props.data?.name as string;
@@ -27,8 +26,8 @@ const PriorityNameCellRenderer = (props: ICellRendererParams) => {
 };
 
 function Priorities() {
-  const { value: priorities } = useSelector((state: RootState) => state.priorities);
-  const { value: categories } = useSelector((state: RootState) => state.categories);
+  const priorities = useTable('priorities') ?? [];
+  const categories = useTable('categories') ?? [];
 
   const {
     filteredItems,

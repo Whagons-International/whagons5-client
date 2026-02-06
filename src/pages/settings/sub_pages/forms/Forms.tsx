@@ -1,11 +1,10 @@
 import { useMemo, useCallback, useEffect, useState } from "react";
-import { useSelector } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faClipboardList, faEdit, faEye, faXmark } from "@fortawesome/free-solid-svg-icons";
-import { RootState } from "@/store/store";
 import { Form, FormVersion } from "@/store/types";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTable, collections } from "@/store/dexie";
 
 // Extended types for form builder
 interface FormBuilderSchema {
@@ -34,9 +33,6 @@ interface ExtendedForm extends Omit<Form, 'is_active'> {
   created_by?: number;
   current_version_id?: number;
 }
-import { useDispatch } from "react-redux";
-import { AppDispatch } from "@/store/store";
-import { genericActions } from "@/store/genericSlices";
 import { useAuthUser } from "@/providers/AuthProvider";
 import {
   SettingsLayout,
@@ -64,8 +60,7 @@ import StatusButton from "@/components/ui/StatusButton";
 
 function Forms() {
   // Bring in forms and versions for context rendering
-  const { value: formVersions } = useSelector((state: RootState) => (state as any).formVersions || { value: [] });
-  const dispatch = useDispatch<AppDispatch>();
+  const formVersions = useTable<FormVersion>('formVersions') ?? [];
   const authUser = useAuthUser();
   const navigate = useNavigate();
   const location = useLocation();
@@ -189,9 +184,9 @@ function Forms() {
       version: nextVersion,
       fields: schemaData
     } as any;
-    const response = await dispatch(genericActions.formVersions.addAsync(payload)).unwrap();
+    const response = await collections.formVersions.add(payload);
     return response as unknown as { id: number; form_id: number; version: number; fields?: any };
-  }, [builderMeta, builderSchema, formVersions, dispatch]);
+  }, [builderMeta, builderSchema, formVersions]);
 
   // Function to load form for editing
   const loadFormForEditing = useCallback(async (formId: number) => {
@@ -515,14 +510,14 @@ function Forms() {
                           version: nextVersion,
                           fields: schemaData
                         };
-                        const newVersion = await dispatch(genericActions.formVersions.addAsync(newVersionPayload)).unwrap();
+                        const newVersion = await collections.formVersions.add(newVersionPayload);
                         // Update form current_version_id
                         await updateItem(selectedForm.id, { current_version_id: newVersion.id } as any);
                         // Refresh the editor state
                         await loadFormForEditing(selectedForm.id);
                       } else if (currentVersionId) {
                         // Update current
-                        await dispatch(genericActions.formVersions.updateAsync({ id: currentVersionId, updates: { fields: schemaData } })).unwrap();
+                        await collections.formVersions.update(currentVersionId, { fields: schemaData });
                       }
                       // Saved to backend → clear local edit draft so it won't override next time
                       clearDraft(selectedForm.id);
@@ -564,7 +559,7 @@ function Forms() {
                           description: builderMeta.description || undefined,
                           created_by: authUser?.id,
                         };
-                        const newForm = await dispatch(genericActions.forms.addAsync(formPayload)).unwrap();
+                        const newForm = await collections.forms.add(formPayload);
                         formId = newForm.id;
                         newFormId = formId;
                         setSelectedFormId(formId);

@@ -1,9 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { AppDispatch, RootState } from '@/store/store';
-import { genericActions, genericInternalActions } from '@/store/genericSlices';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -33,6 +30,7 @@ import {
   faClipboardCheck,
   faHashtag,
   faPercent,
+  faLock,
   IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -80,7 +78,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { useLanguage } from '@/providers/LanguageProvider';
 import toast from 'react-hot-toast';
 import KpiCardBuilder from '../kpi/KpiCardBuilder';
-import { reorderKpiCardsAsync } from '@/store/actions/kpiCards';
+import { reorderKpiCards } from '@/store/actions/kpiCards';
+import { useTable, collections } from '@/store/dexie';
 
 interface KpiQueryConfig {
   filters?: Record<string, any>;
@@ -183,9 +182,15 @@ function SortableKpiCard({ card, onEdit, onToggle, toggling }: {
                   <span className="text-xs">Workspace #{card.workspace_id}</span>
                 )}
                 {!card.workspace_id && !card.user_id && (
-                  <span className="text-xs">{t('kpiCards.global', 'Global')}</span>
-                )}
-              </div>
+                   <span className="text-xs">{t('kpiCards.global', 'Global')}</span>
+                 )}
+                 {isDefault && (
+                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                     <FontAwesomeIcon icon={faLock} className="text-[10px]" />
+                     {t('kpiCards.default', 'Default')}
+                   </span>
+                 )}
+               </div>
             </div>
 
             {/* Actions */}
@@ -212,17 +217,10 @@ function SortableKpiCard({ card, onEdit, onToggle, toggling }: {
 export default function KpiCardsManage() {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const dispatch = useDispatch<AppDispatch>();
-  const kpiCards = useSelector((state: RootState) => (state as any).kpiCards?.value ?? []);
+  const kpiCards = useTable('kpi_cards');
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<KpiCard | null>(null);
   const [toggling, setToggling] = useState<number | null>(null);
-
-  // Ensure KPI cards are loaded from IndexedDB and refreshed from API
-  useEffect(() => {
-    dispatch(genericInternalActions.kpiCards.getFromIndexedDB(undefined));
-    dispatch(genericInternalActions.kpiCards.fetchFromAPI(undefined));
-  }, [dispatch]);
 
   // Fallback default cards (shown when database has no default cards seeded)
   const fallbackDefaultCards: KpiCard[] = useMemo(() => [
@@ -344,7 +342,7 @@ export default function KpiCardsManage() {
       }));
 
     try {
-      await dispatch(reorderKpiCardsAsync({ cards: reorderData })).unwrap();
+      await reorderKpiCards(reorderData);
       toast.success(t('kpiCards.reordered', 'Cards reordered successfully'));
     } catch (error: any) {
       console.error('Error reordering cards:', error);
@@ -377,7 +375,7 @@ export default function KpiCardsManage() {
     );
     
     try {
-      await dispatch(genericActions.kpiCards.updateAsync({ id, updates: { is_enabled: enabled } as any })).unwrap();
+      await collections.kpiCards.update(id, { is_enabled: enabled });
       
       // Dismiss loading and show success
       toast.dismiss(loadingToast);
@@ -402,14 +400,11 @@ export default function KpiCardsManage() {
       
       if (editingCard) {
         // Update existing card
-        await dispatch(genericActions.kpiCards.updateAsync({
-          id: editingCard.id,
-          updates: cardData,
-        })).unwrap();
+        await collections.kpiCards.update(editingCard.id, cardData);
         toast.success(t('kpiCards.updated', 'KPI card updated successfully'));
       } else {
         // Create new card
-        await dispatch(genericActions.kpiCards.addAsync(cardData)).unwrap();
+        await collections.kpiCards.add(cardData);
         toast.success(t('kpiCards.created', 'KPI card created successfully'));
       }
       setIsBuilderOpen(false);
@@ -432,7 +427,7 @@ export default function KpiCardsManage() {
   const handleDelete = async () => {
     if (!editingCard?.id) return;
     try {
-      await dispatch(genericActions.kpiCards.removeAsync(editingCard.id)).unwrap();
+      await collections.kpiCards.delete(editingCard.id);
       toast.success(t('kpiCards.deleted', 'KPI card deleted successfully'));
       setIsBuilderOpen(false);
       setEditingCard(null);

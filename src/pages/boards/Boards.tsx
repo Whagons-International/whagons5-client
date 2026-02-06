@@ -1,15 +1,13 @@
-import { useState, useEffect } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Users2, Lock, Globe } from 'lucide-react';
+import { useTable, collections } from '@/store/dexie';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useTheme } from '@/providers/ThemeProvider';
-import { RootState } from '@/store/store';
-import { genericActions } from '@/store/genericSlices';
 import { Board } from '@/store/types';
 import {
   Dialog,
@@ -32,11 +30,10 @@ import {
 function Boards() {
   const { t } = useLanguage();
   const { theme } = useTheme();
-  const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  // Redux state
-  const { value: boards, loading, error } = useSelector((state: RootState) => (state as any).boards || { value: [], loading: false, error: null });
+  // Dexie state
+  const boards = useTable('boards') ?? [];
 
   // Local state
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,13 +64,11 @@ function Boards() {
     setIsSubmitting(true);
     try {
       console.log('[Boards] Creating board with data:', formData);
-      const result = await dispatch(genericActions.boards.addAsync(formData) as any);
+      const result = await collections.boards.add(formData);
       console.log('[Boards] Board created, result:', result);
       console.log('[Boards] Current boards in state:', boards);
       setIsCreateDialogOpen(false);
       setFormData({ name: '', description: '', visibility: 'private' });
-      // Note: We rely on the optimistic update from addAsync
-      // No need to call fetchFromAPI as it might prune the board if there's a timing issue
     } catch (error) {
       console.error('Failed to create board:', error);
     } finally {
@@ -119,11 +114,7 @@ function Boards() {
       </div>
 
       {/* Boards Grid */}
-      {loading && boards.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          {t('common.loading', 'Loading...')}
-        </div>
-      ) : filteredBoards.length === 0 ? (
+      {filteredBoards.length === 0 ? (
         <Card className="mt-8">
           <CardContent className="pt-6 text-center py-12">
             <Users2 className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />

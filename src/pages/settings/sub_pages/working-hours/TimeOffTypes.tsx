@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { useSelector } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faUmbrellaBeach,
@@ -7,7 +6,6 @@ import {
   faChartBar,
   faCircleInfo
 } from "@fortawesome/free-solid-svg-icons";
-import { RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import {

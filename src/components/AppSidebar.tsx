@@ -27,9 +27,7 @@ import {
   Hotel, // Add Hotel icon for hotel analytics
   HeartPulse, // Add HeartPulse icon for real-time status
 } from 'lucide-react';
-import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
-import { RootState } from '@/store';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 // import { useAuth } from '@/providers/AuthProvider'; // Currently not used, uncomment when needed
 import { Button } from '@/components/ui/button';
@@ -48,7 +46,6 @@ import { Workspace } from '@/store/types';
 // Removed Messages feature
 import AppSidebarWorkspaces from './AppSidebarWorkspaces';
 import AppSidebarBoards from './AppSidebarBoards';
-import { genericCaches } from '@/store/genericSlices';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { getRtlConnected, subscribeRtlConnected } from '@/store/realTimeListener/RTL';
 import {
@@ -64,6 +61,7 @@ import {
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useBranding } from '@/providers/BrandingProvider';
+import { useTable, useLiveQuery, collections } from '@/store/dexie';
 
 // Global pinned state management
 let isPinnedGlobal = localStorage.getItem('sidebarPinned') === 'true';
@@ -516,61 +514,14 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   // const [boards, setBoards] = useState<{ id: string; name: string }[]>([]);
   // const [createBoardOpen, setCreateBoardOpen] = useState(false);
 
-  const workspacesState = useSelector(
-    (state: RootState) => state.workspaces
-  );
-  const { value: workspaces = [] } = workspacesState || {};
+  // Dexie queries
+  const workspaces = useTable<Workspace>('workspaces');
 
   // Boards state
-  const boardsState = useSelector(
-    (state: RootState) => (state as any).boards || { value: [] }
-  );
-  const { value: boards = [] } = boardsState;
+  const boards = useTable('boards');
 
-  // Load boards on mount if boards plugin is enabled
-  useEffect(() => {
-    const boardsPlugin = pluginsConfig.find(p => p.id === 'boards');
-    if (boardsPlugin?.enabled && boards.length === 0) {
-      // Try to load boards from IndexedDB
-      const loadBoards = async () => {
-        try {
-          const cache = (genericCaches as any)?.boards;
-          if (cache && typeof cache.getAll === 'function') {
-            await cache.getAll();
-          }
-        } catch (error) {
-          console.error('Error loading boards:', error);
-        }
-      };
-      loadBoards();
-    }
-  }, [pluginsConfig, boards.length]);
-
-  // Local-first: read workspaces directly from IndexedDB to render immediately, then let Redux take over
-  const [initialWorkspaces, setInitialWorkspaces] = useState<Workspace[] | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    const loadLocal = async () => {
-      try {
-        const cache = (genericCaches as any)?.workspaces;
-        if (cache && typeof cache.getAll === 'function') {
-          const rows = await cache.getAll();
-          if (!cancelled) setInitialWorkspaces(rows || []);
-        }
-      } catch {
-        // ignore
-      }
-    };
-    loadLocal();
-    return () => { cancelled = true; };
-  }, []);
-
-  // Prefer Redux once it has data; otherwise show local IndexedDB rows
-  const displayWorkspaces: Workspace[] = useMemo(() => {
-    return (workspaces && workspaces.length > 0)
-      ? workspaces as any
-      : (initialWorkspaces || []);
-  }, [workspaces, initialWorkspaces]);
+  // Dexie handles local-first automatically via useLiveQuery in useTable
+  const displayWorkspaces: Workspace[] = workspaces;
 
   const workspaceIconKey = useMemo(() => displayWorkspaces
     .map((workspace) => `${workspace.id}:${workspace.icon ?? ''}`)

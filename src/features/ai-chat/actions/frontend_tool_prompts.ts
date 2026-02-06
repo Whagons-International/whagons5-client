@@ -1,3 +1,8 @@
+import { handleCreateKpiPrompt } from './createKpi';
+import { handleUpdateKpiPrompt } from './updateKpi';
+import { handleDeleteKpiPrompt } from './deleteKpi';
+import { handleListKpiPrompt } from './listKpi';
+
 export type FrontendToolPromptMessage = {
   type: "frontend_tool_prompt";
   tool?: string;
@@ -210,6 +215,27 @@ export function handleFrontendToolPromptMessage(
         });
       });
 
+    return true;
+  }
+
+  if (action === "create_kpi") {
+    // Async handler — fires and returns true immediately
+    handleCreateKpiPrompt(data, send, navigate);
+    return true;
+  }
+
+  if (action === "update_kpi") {
+    handleUpdateKpiPrompt(data, send, navigate);
+    return true;
+  }
+
+  if (action === "delete_kpi") {
+    handleDeleteKpiPrompt(data, send, navigate);
+    return true;
+  }
+
+  if (action === "list_kpi") {
+    handleListKpiPrompt(data, send, navigate);
     return true;
   }
 

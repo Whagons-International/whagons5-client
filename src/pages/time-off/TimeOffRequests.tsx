@@ -1,5 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
-import { useSelector } from "react-redux";
+import { useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCalendarDays,
@@ -9,8 +8,6 @@ import {
   faTimes,
   faHourglass
 } from "@fortawesome/free-solid-svg-icons";
-import { RootState } from "@/store/store";
-import { useDispatch } from "react-redux";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -33,8 +30,9 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useLanguage } from "@/providers/LanguageProvider";
-import { genericActions } from "@/store/genericSlices";
 import { TimeOffRequest, TimeOffType, TimeOffBalance } from "@/pages/settings/sub_pages/working-hours/types";
+import { useTable, collections } from "@/store/dexie";
+import { useAuth } from "@/providers/AuthProvider";
 import dayjs from "dayjs";
 
 interface TimeOffRequestsProps {
@@ -43,17 +41,12 @@ interface TimeOffRequestsProps {
 
 function TimeOffRequests({ userId }: TimeOffRequestsProps) {
   const { t } = useLanguage();
-  const dispatch = useDispatch();
   const tt = (key: string, fallback: string) => t(`timeOff.${key}`, fallback);
 
-  // Redux state
-  const currentUser = useSelector((state: RootState) => state.auth.user);
-  const { value: requests, loading: requestsLoading } = useSelector(
-    (state: RootState) => state.timeOffRequests
-  ) as { value: TimeOffRequest[]; loading: boolean };
-  const { value: types } = useSelector(
-    (state: RootState) => state.timeOffTypes
-  ) as { value: TimeOffType[]; loading: boolean };
+  // Auth state
+  const { user: currentUser } = useAuth();
+  const requests = useTable('time_off_requests') as TimeOffRequest[];
+  const types = useTable('time_off_types') as TimeOffType[];
 
   // Filter requests for current user
   const myRequests = useMemo(() => {
@@ -149,14 +142,14 @@ function TimeOffRequests({ userId }: TimeOffRequestsProps) {
 
     setIsSubmitting(true);
     try {
-      await dispatch(genericActions.timeOffRequests.addAsync({
+      await collections.time_off_requests.add({
         time_off_type_id: Number(formData.time_off_type_id),
         start_date: formData.start_date,
         end_date: formData.end_date,
         start_half_day: formData.start_half_day,
         end_half_day: formData.end_half_day,
         reason: formData.reason || null
-      }));
+      });
       setIsRequestDialogOpen(false);
       resetForm();
     } catch (err: any) {
@@ -168,10 +161,7 @@ function TimeOffRequests({ userId }: TimeOffRequestsProps) {
 
   // Handle cancel request
   const handleCancelRequest = async (requestId: number) => {
-    await dispatch(genericActions.timeOffRequests.updateAsync({
-      id: requestId,
-      updates: { status: 'cancelled' }
-    }));
+    await collections.time_off_requests.update(requestId, { status: 'cancelled' });
   };
 
   // Status badge

@@ -3,8 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Upload, Trash2, Download, Folder } from "lucide-react";
 import { useLanguage } from "@/providers/LanguageProvider";
-import { useDispatch, useSelector } from "react-redux";
-import { genericActions } from "@/store/genericSlices";
 import {
   uploadWorkspaceResource,
   deleteWorkspaceResource,
@@ -12,17 +10,17 @@ import {
   type WorkspaceResource,
 } from "@/api/workspaceResourcesApi";
 import { FileTree, type FileTreeItem, type FileTreeFile, type FileTreeFolder } from "@/components/ui/file-tree";
+import { useTable, collections } from "@/store/dexie";
 
 export default function ResourcesTab({ workspaceId }: { workspaceId: string | undefined }) {
   const { t } = useLanguage();
-  const dispatch = useDispatch<any>();
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Read resources from Redux store (synced via DataManager/IndexedDB)
-  const allResources = useSelector((state: RootState) => (state.workspaceResources as any)?.value) || [];
+  // Read resources from Dexie (live query, auto-updates)
+  const allResources = useTable('workspace_resources') || [];
 
   // Filter to current workspace
   const resources: WorkspaceResource[] = useMemo(() => {
@@ -46,9 +44,9 @@ export default function ResourcesTab({ workspaceId }: { workspaceId: string | un
       }
     }
     // The upload API creates the resource in the DB, which triggers a real-time notification
-    // that the DataManager/cache will pick up automatically. But we can also do a refresh:
+    // that Dexie will pick up automatically. But we can also do a refresh:
     try {
-      await dispatch(genericActions.workspaceResources.fetchFromAPI());
+      await collections.workspaceResources.fetchAll();
     } catch {}
     setUploading(false);
     setError(null);
@@ -81,7 +79,7 @@ export default function ResourcesTab({ workspaceId }: { workspaceId: string | un
     try {
       await deleteWorkspaceResource(workspaceId, resourceId);
       // Refresh from API to update cache
-      await dispatch(genericActions.workspaceResources.fetchFromAPI());
+      await collections.workspaceResources.fetchAll();
       setError(null);
     } catch (error: any) {
       setError(error?.response?.data?.message || t('workspace.collab.resources.failedToDelete', 'Failed to delete resource'));

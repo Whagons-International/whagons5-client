@@ -1,6 +1,5 @@
 import { useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faUsers,
@@ -8,7 +7,6 @@ import {
   faChartBar,
   faCircleInfo
 } from "@fortawesome/free-solid-svg-icons";
-import { RootState } from "@/store/store";
 import { Team } from "@/store/types";
 import { Button } from "@/components/ui/button";
 import { UrlTabs } from "@/components/ui/url-tabs";
@@ -29,6 +27,7 @@ import { useTeamColumnDefs } from "./utils/columnDefs";
 import { useTeamFormData } from "./hooks/useTeamFormData";
 import { useTeamValidation } from "./hooks/useTeamValidation";
 import { useTeamUserAssignments } from "./hooks/useTeamUserAssignments";
+import { useTable } from "@/store/dexie";
 
 function Teams() {
   const navigate = useNavigate();
@@ -37,12 +36,12 @@ function Teams() {
   const noneOptionLabel = tt('fields.none', 'None');
   const unassignedOptionLabel = tt('fields.unassigned', 'Unassigned');
   
-  // Redux state for related data
-  const { value: categories } = useSelector((state: RootState) => state.categories);
-  const { value: tasks } = useSelector((state: RootState) => state.tasks);
-  const { value: users } = useSelector((state: RootState) => (state as any).users || { value: [] });
-  const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: any[]; loading: boolean };
-  const { value: roles } = useSelector((state: RootState) => state.roles) as { value: any[]; loading: boolean };
+  // Dexie state for related data
+  const categories = useTable('categories');
+  const tasks = useTable('tasks');
+  const users = useTable('users');
+  const userTeams = useTable('user_teams');
+  const roles = useTable('roles');
   
   // Use shared state management
   const {

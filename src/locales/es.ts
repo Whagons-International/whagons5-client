@@ -1918,7 +1918,7 @@ export const esTranslations: Record<string, string> = {
   // KPI Card Builder translations
   "kpiCards.builder.createTitle": "Crear Tarjeta KPI",
   "kpiCards.builder.editTitle": "Editar Tarjeta KPI",
-  "kpiCards.builder.description": "Paso {step} de 3",
+  
   "kpiCards.builder.name": "Nombre de la Tarjeta",
   "kpiCards.builder.namePlaceholder": "Mi KPI Personalizado",
   "kpiCards.builder.type": "Tipo de Tarjeta",

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -14,9 +13,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Trash2, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { genericActions } from '@/store/genericSlices';
 import { actionsApi } from '@/api/whagonsActionsApi';
-import type { RootState } from '@/store/store';
+import { useTableWhere, collections } from '@/store/dexie';
 
 interface TaskShare {
   id: number;
@@ -40,13 +38,10 @@ interface TaskShareManagerProps {
 }
 
 export default function TaskShareManager({ taskId, onShareChange }: TaskShareManagerProps) {
-  const dispatch = useDispatch<any>();
-  // Get all task shares from Redux and filter by task_id
-  const allShares = useSelector((state: RootState) => (state as any).taskShares?.value || []) as TaskShare[];
-  const shares = allShares.filter(
-    (share) => share.task_id === taskId && !share.revoked_at
-  );
-  const loading = useSelector((state: RootState) => (state as any).taskShares?.loading || false);
+  // Get task shares filtered by task_id using Dexie
+  const allShares = useTableWhere<TaskShare>('task_shares', 'task_id', taskId);
+  const shares = allShares.filter((share) => !share.revoked_at);
+  const loading = allShares === undefined; // useLiveQuery returns undefined while loading
   
   const [revokeTarget, setRevokeTarget] = useState<{ shareId?: number; userId?: number; teamId?: number } | null>(null);
   const [revoking, setRevoking] = useState(false);
@@ -56,9 +51,9 @@ export default function TaskShareManager({ taskId, onShareChange }: TaskShareMan
 
     setRevoking(true);
     try {
-      // If we have the share ID, use generic slice removeAsync
+      // If we have the share ID, use Dexie collection
       if (revokeTarget.shareId) {
-        await dispatch(genericActions.taskShares.removeAsync(revokeTarget.shareId)).unwrap();
+        await collections.taskShares.delete(revokeTarget.shareId);
       } else {
         // Fallback to nested endpoint for backward compatibility
         await actionsApi.delete(`/tasks/${taskId}/share`, {

@@ -7,13 +7,11 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { FormFiller, validateFormData, FormSchema } from '../formFiller';
-import { genericActions } from '@/store/genericSlices';
-import { AppDispatch, RootState } from '@/store/store';
 import { Loader2 } from 'lucide-react';
+import { useTable, collections } from '@/store/dexie';
 
 function safeJsonParse(text: string, fallback: any = {}) {
   try {
@@ -45,11 +43,9 @@ export function FormFillDialog({
   existingTaskFormId,
   existingData,
 }: FormFillDialogProps) {
-  const dispatch = useDispatch<AppDispatch>();
-  
-  // Get form versions from Redux store
-  const { value: formVersions } = useSelector((state: RootState) => (state as any).formVersions || { value: [] });
-  const { value: forms } = useSelector((state: RootState) => (state as any).forms || { value: [] });
+  // Get form versions and forms from Dexie
+  const formVersions = useTable('form_versions');
+  const forms = useTable('forms');
   
   // Local state
   const [values, setValues] = useState<Record<string, any>>({});
@@ -130,17 +126,14 @@ export function FormFillDialog({
     try {
       if (existingTaskFormId) {
         // Update existing task form
-        await dispatch(genericActions.taskForms.updateAsync({
-          id: existingTaskFormId,
-          updates: { data: values }
-        })).unwrap();
+        await collections.taskForms.update(existingTaskFormId, { data: values });
       } else {
         // Create new task form
-        await dispatch(genericActions.taskForms.addAsync({
+        await collections.taskForms.add({
           task_id: taskId,
           form_version_id: formVersionId,
           data: values,
-        })).unwrap();
+        });
       }
 
       // Close dialog on success

@@ -1,17 +1,18 @@
 // Datasource and refresh helpers for WorkspaceTable
 
 import type React from 'react';
+import { queryTasks } from '@/store/dexie';
 
 const DEFAULT_SORT = [{ colId: 'id', sort: 'desc' }];
 const getSort = (s?: any[]) => Array.isArray(s) && s.length > 0 ? s : DEFAULT_SORT;
 const buildParams = (wr: React.MutableRefObject<string>, sm: any, pm: any, spm: any, um: any, tm: any, tt: any) => {
   const p: any = { __statusMap: sm.current, __priorityMap: pm.current, __spotMap: spm.current, __userMap: um.current, __tagMap: tm.current, __taskTags: tt.current };
   if (wr.current === 'shared') p.shared_with_me = true;
-  else if (wr.current !== 'all') p.workspace_id = wr.current;
+  else if (wr.current !== 'all') p.workspace_id = Number(wr.current);
   return p;
 };
 
-export function buildGetRows(TasksCache: any, refs: any) {
+export function buildGetRows(refs: any) {
   const { rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, externalFilterModelRef, normalizeFilterModelForQuery, setEmptyOverlayVisible } = refs;
   return async (params: any) => {
     const sortModel = getSort(params.sortModel);
@@ -23,9 +24,6 @@ export function buildGetRows(TasksCache: any, refs: any) {
       return;
     }
     try {
-      if (!TasksCache.initialized) {
-        await TasksCache.init();
-      }
       const normalized: any = { ...params };
 
       const gridFm = params?.filterModel || {};
@@ -71,7 +69,7 @@ export function buildGetRows(TasksCache: any, refs: any) {
         ...buildParams(workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef),
       };
 
-      const result = await TasksCache.queryTasks(queryParams);
+      const result = await queryTasks(queryParams);
       const rows = result?.rows || [];
       const total = result?.rowCount || 0;
       try { if (localStorage.getItem('wh-debug-filters') === 'true') console.log('[WT getRows] result rows=', rows.length, 'total=', total); } catch {}
@@ -86,14 +84,14 @@ export function buildGetRows(TasksCache: any, refs: any) {
   };
 }
 
-export async function refreshClientSideGrid(gridApi: any, TasksCache: any, params: any) {
+export async function refreshClientSideGrid(gridApi: any, params: any) {
   const { search, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, sortModel } = params;
   const baseParams: any = { search, ...buildParams(workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef) };
   const effectiveSortModel = getSort(sortModel);
 
-  const countResp = await TasksCache.queryTasks({ ...baseParams, sortModel: effectiveSortModel, startRow: 0, endRow: 0 });
+  const countResp = await queryTasks({ ...baseParams, sortModel: effectiveSortModel, startRow: 0, endRow: 0 });
   const totalFiltered = countResp?.rowCount ?? 0;
-  const rowsResp = await TasksCache.queryTasks({ ...baseParams, sortModel: effectiveSortModel, startRow: 0, endRow: totalFiltered });
+  const rowsResp = await queryTasks({ ...baseParams, sortModel: effectiveSortModel, startRow: 0, endRow: totalFiltered });
   const rows = rowsResp?.rows || [];
   try {
     gridApi?.setGridOption?.('rowData', rows);

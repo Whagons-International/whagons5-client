@@ -133,15 +133,8 @@ export async function getMessagingInstance(): Promise<Messaging | null> {
           if (!resolved) {
             cleanup();
             console.warn('[FCM Config] Service worker activation timeout - may need manual refresh');
-            // Show non-blocking prompt to user (only if in browser context)
-            if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
-              const shouldRefresh = window.confirm(
-                'Firebase messaging needs a page refresh to work properly. Refresh now?'
-              );
-              if (shouldRefresh) {
-                window.location.reload();
-              }
-            }
+            // Disabled: auto-refresh prompt was too disruptive during development
+            // Users can manually refresh if push notifications aren't working
             resolve(false);
           }
         }, 5000);

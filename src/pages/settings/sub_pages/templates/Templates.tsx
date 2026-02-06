@@ -1,8 +1,6 @@
 import { useMemo, useState, useCallback } from "react";
-import { useSelector } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faClipboardList, faPlus, faChartBar } from "@fortawesome/free-solid-svg-icons";
-import { RootState } from "@/store/store";
 import { Template, Task } from "@/store/types";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import {
@@ -19,22 +17,23 @@ import { useTemplateColumnDefs } from "./utils/columnDefs";
 import { useTemplateStatistics } from "./hooks/useTemplateStatistics";
 import { useTemplateForm } from "./hooks/useTemplateForm";
 import { renderTemplatePreview } from "./utils/renderHelpers";
+import { useTable } from "@/store/dexie";
 
 function Templates() {
   const { t } = useLanguage();
   const tt = (key: string, fallback: string) => t(`settings.templates.${key}`, fallback);
   
-  // Redux state for related data
-  const { value: categories } = useSelector((state: RootState) => state.categories);
-  const { value: tasks } = useSelector((state: RootState) => state.tasks);
-  const { value: priorities } = useSelector((state: RootState) => state.priorities);
-  const { value: slas } = useSelector((state: RootState) => state.slas);
-  const { value: forms } = useSelector((state: RootState) => (state as any).forms || { value: [] });
-  const { value: approvals } = useSelector((state: RootState) => (state as any).approvals || { value: [] });
-  const { value: requirements } = useSelector((state: RootState) => (state as any).complianceRequirements || { value: [] });
-  const { value: mappings } = useSelector((state: RootState) => (state as any).complianceMappings || { value: [] });
-  const { value: spots } = useSelector((state: RootState) => (state as any).spots || { value: [] });
-  const { value: users } = useSelector((state: RootState) => (state as any).users || { value: [] });
+  // Dexie state for related data
+  const categories = useTable('categories') ?? [];
+  const tasks = useTable('tasks') ?? [];
+  const priorities = useTable('priorities') ?? [];
+  const slas = useTable('slas') ?? [];
+  const forms = useTable('forms') ?? [];
+  const approvals = useTable('approvals') ?? [];
+  const requirements = useTable('compliance_requirements') ?? [];
+  const mappings = useTable('compliance_mappings') ?? [];
+  const spots = useTable('spots') ?? [];
+  const users = useTable('users') ?? [];
   
   const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
   const [summaryTemplate, setSummaryTemplate] = useState<Template | null>(null);

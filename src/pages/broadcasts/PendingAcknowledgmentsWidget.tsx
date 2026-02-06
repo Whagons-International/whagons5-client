@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useState } from 'react';
 import { Bell, ChevronRight } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,23 +6,17 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuthUser } from '@/providers/AuthProvider';
-import { RootState } from '@/store/store';
-import { genericActions } from '@/store/genericSlices';
 import { Broadcast } from '@/types/broadcast';
 import AcknowledgeDialog from './AcknowledgeDialog';
+import { useTable } from '@/store/dexie';
 
 function PendingAcknowledgmentsWidget() {
   const { t } = useLanguage();
-  const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  // Redux state
-  const { value: broadcasts } = useSelector(
-    (state: RootState) => (state as any).broadcasts || { value: [] }
-  );
-  const { value: acknowledgments } = useSelector(
-    (state: RootState) => (state as any).broadcastAcknowledgments || { value: [] }
-  );
+  // Dexie state
+  const broadcasts = useTable('broadcasts') ?? [];
+  const acknowledgments = useTable('broadcast_acknowledgments') ?? [];
   const currentUser = useAuthUser();
 
   // Local state

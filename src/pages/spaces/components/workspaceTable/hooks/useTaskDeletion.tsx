@@ -1,16 +1,14 @@
 import React, { useState, useCallback } from 'react';
-import { useDispatch } from 'react-redux';
-import { AppDispatch } from '@/store/store';
-import { removeTaskAsync, restoreTaskAsync } from '@/store/reducers/tasksSlice';
 import toast from 'react-hot-toast';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { collections } from '@/store/dexie';
+import { api } from '@/api/whagonsApi';
 
 /**
  * Hook for managing task deletion with undo functionality
  */
 export const useTaskDeletion = (gridRef: React.MutableRefObject<any>, refreshGrid: () => void) => {
   const { t } = useLanguage();
-  const dispatch = useDispatch<AppDispatch>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<{ id: number; name?: string } | null>(null);
 
@@ -20,9 +18,9 @@ export const useTaskDeletion = (gridRef: React.MutableRefObject<any>, refreshGri
     // Get task data from grid if available
     let taskData: { id: number; name?: string } = { id: taskId };
     try {
-      const api = gridRef.current?.api;
-      if (api) {
-        api.forEachNode((node: any) => {
+      const gridApi = gridRef.current?.api;
+      if (gridApi) {
+        gridApi.forEachNode((node: any) => {
           if (node.data?.id === taskId) {
             taskData = { id: taskId, name: node.data?.name || taskName };
           }
@@ -49,11 +47,11 @@ export const useTaskDeletion = (gridRef: React.MutableRefObject<any>, refreshGri
     let successToastId: string | undefined;
 
     try {
-      await dispatch(removeTaskAsync(taskId)).unwrap();
+      await collections.tasks.delete(taskId);
 
       // Show success toast with undo option
       successToastId = toast.success(
-        (t) => (
+        (toastObj) => (
           <div className="flex flex-col gap-1">
             <div className="font-semibold">Task deleted</div>
             <div className="text-sm opacity-90">
@@ -61,10 +59,15 @@ export const useTaskDeletion = (gridRef: React.MutableRefObject<any>, refreshGri
             </div>
             <button
               onClick={async () => {
-                toast.dismiss(t.id);
+                toast.dismiss(toastObj.id);
                 const restoreToast = toast.loading("Restoring task...");
                 try {
-                  await dispatch(restoreTaskAsync(taskId)).unwrap();
+                  // Restore via API endpoint
+                  const response = await api.post(`/tasks/${taskId}/restore`);
+                  // Update local cache with restored task
+                  if (response.data?.data) {
+                    await collections.tasks.put(response.data.data);
+                  }
                   toast.dismiss(restoreToast);
                   toast.success(
                     taskName ? `"${taskName}" has been restored.` : "Task has been restored.",
@@ -103,7 +106,7 @@ export const useTaskDeletion = (gridRef: React.MutableRefObject<any>, refreshGri
     } finally {
       setTaskToDelete(null);
     }
-  }, [taskToDelete, dispatch, refreshGrid]);
+  }, [taskToDelete, refreshGrid]);
 
   return {
     deleteDialogOpen,

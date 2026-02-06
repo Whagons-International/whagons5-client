@@ -3,11 +3,10 @@ import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
 import { User } from 'lucide-react';
 import { forwardRef } from 'react';
-import { useSelector } from 'react-redux';
-import type { RootState } from '@/store/store';
 import type { KanbanCardProps } from './types/kanban.types';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { useTable } from '@/store/dexie';
 
 const KanbanCard = forwardRef<HTMLDivElement, KanbanCardProps>(function KanbanCard({ task, onClick }, forwardedRef) {
   const {
@@ -25,9 +24,9 @@ const KanbanCard = forwardRef<HTMLDivElement, KanbanCardProps>(function KanbanCa
     opacity: isDragging ? 0.5 : 1,
   };
 
-  // Get related data from Redux
-  const priorities = useSelector((state: RootState) => (state.priorities as any)?.value ?? []);
-  const users = useSelector((state: RootState) => (state.users as any)?.value ?? []);
+  // Get related data from Dexie
+  const priorities = useTable('priorities');
+  const users = useTable('users');
 
   const priority = priorities.find((p: any) => p.id === task.priority_id);
   

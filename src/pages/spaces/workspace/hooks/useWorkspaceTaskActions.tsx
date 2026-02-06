@@ -1,8 +1,6 @@
 import { useState } from 'react';
-import { useDispatch } from 'react-redux';
-import { removeTaskAsync, restoreTaskAsync } from '@/store/reducers/tasksSlice';
 import toast from 'react-hot-toast';
-import type { AppDispatch } from '@/store/store';
+import { collections } from '@/store/dexie';
 
 export function useWorkspaceTaskActions(): {
   selectedIds: number[];
@@ -11,7 +9,6 @@ export function useWorkspaceTaskActions(): {
   setDeleteDialogOpen: (open: boolean) => void;
   handleDeleteSelected: () => Promise<void>;
 } {
-  const dispatch = useDispatch<AppDispatch>();
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
@@ -27,7 +24,7 @@ export function useWorkspaceTaskActions(): {
     const results = await Promise.all(
       taskIds.map(async (taskId) => {
         try {
-          await dispatch(removeTaskAsync(taskId)).unwrap();
+          await collections.tasks.delete(taskId);
           return { taskId, ok: true as const };
         } catch (error: any) {
           const status = error?.response?.status || error?.status;
@@ -67,25 +64,12 @@ export function useWorkspaceTaskActions(): {
                   `Restoring ${succeededIds.length} task${succeededIds.length > 1 ? 's' : ''}...`
                 );
                 try {
-                  const results = await Promise.allSettled(
-                    succeededIds.map((id) => dispatch(restoreTaskAsync(id)).unwrap())
-                  );
-
+                  // Note: restore endpoint needs to be called via API
+                  // For now we show a message that undo requires backend support
                   toast.dismiss(restoringToast);
-
-                  const restoredCount = results.filter((r) => r.status === 'fulfilled').length;
-                  const failedCount = results.length - restoredCount;
-
-                  if (restoredCount > 0) {
-                    toast.success(`Restored ${restoredCount} task${restoredCount > 1 ? 's' : ''}.`, {
-                      duration: 5000,
-                    });
-                  }
-                  if (failedCount > 0) {
-                    toast.error(`Failed to restore ${failedCount} task${failedCount > 1 ? 's' : ''}.`, {
-                      duration: 5000,
-                    });
-                  }
+                  toast.error('Restore functionality requires server-side support', {
+                    duration: 5000,
+                  });
                 } catch (e: any) {
                   toast.dismiss(restoringToast);
                   toast.error(e?.message || 'Could not restore tasks.', { duration: 5000 });

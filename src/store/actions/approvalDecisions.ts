@@ -1,7 +1,5 @@
 import { actionsApi } from '@/api/whagonsActionsApi';
-import { genericCaches } from '@/store/genericSlices';
-import { TasksCache } from '@/store/indexedDB/TasksCache';
-import { syncReduxForTable } from '@/store/indexedDB/CacheRegistry';
+import { collections } from '@/store/dexie';
 
 export type ApprovalDecision = 'approved' | 'rejected';
 
@@ -33,22 +31,22 @@ export async function decideApprovalAndSync(payload: DecideApprovalPayload): Pro
   const resp = await actionsApi.post('/approvals/decide', payload);
   const data: DecideApprovalResponseData = resp?.data?.data ?? {};
 
-  // 1) Update task approval instances in IndexedDB
+  // 1) Update task approval instances in Dexie
   const instances = Array.isArray(data?.instances) ? data.instances : [];
   if (instances.length > 0) {
-    // Note: GenericCache.update() is upsert-like (DB.put), so this works for inserts too.
+    // Dexie's put is upsert - works for both insert and update
     await Promise.all(
       instances
         .filter((r) => r && (r.id !== undefined && r.id !== null))
-        .map((r) => genericCaches.taskApprovalInstances.update(r.id, r))
+        .map((r) => collections.taskApprovalInstances.put(r))
     );
-    await syncReduxForTable('wh_task_approval_instances');
+    // No need for syncReduxForTable - useLiveQuery reacts automatically
   }
 
-  // 2) If server actions updated the task (status change, etc), update TasksCache too
+  // 2) If server actions updated the task (status change, etc), update tasks too
   if (data?.task && (data.task.id !== undefined && data.task.id !== null)) {
-    await TasksCache.updateTask(String(data.task.id), data.task);
-    await syncReduxForTable('wh_tasks');
+    await collections.tasks.put(data.task);
+    // No need for syncReduxForTable - useLiveQuery reacts automatically
   }
 
   return data;

@@ -1,5 +1,4 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { useSelector, useDispatch } from "react-redux";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -9,9 +8,8 @@ import {
 	faCircleQuestion,
 	faTrash
 } from "@fortawesome/free-solid-svg-icons";
-import { RootState } from "@/store/store";
 import type { Tag, Category } from "@/store/types";
-import { genericActions } from "@/store/genericSlices";
+import { useTable } from "@/store/dexie";
 import { Button } from "@/components/ui/button";
 import { iconService } from "@/database/iconService";
 import { UrlTabs } from "@/components/ui/url-tabs";
@@ -63,10 +61,9 @@ const TagNameCellRenderer = (props: ICellRendererParams) => {
 };
 
 function Tags() {
-    const dispatch = useDispatch();
 	const { t } = useLanguage();
 	const tt = (key: string, fallback: string) => t(`settings.tags.${key}`, fallback);
-	const { value: categories } = useSelector((state: RootState) => state.categories);
+	const categories = useTable('categories');
 
 
 	const {
@@ -97,7 +94,7 @@ function Tags() {
 		searchFields: ["name"] as any
 	});
 
-	const resolvedCategories = useMemo(() => ((categories as Category[]) ?? []), [categories]);
+	const resolvedCategories = useMemo(() => (categories ?? []) as Category[], [categories]);
 
 	const [quickFilterText, setQuickFilterText] = useState("");
 

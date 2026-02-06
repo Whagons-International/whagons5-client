@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { useSelector, useDispatch } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faTags,
@@ -8,8 +7,7 @@ import {
   faChartBar,
   faTrash
 } from "@fortawesome/free-solid-svg-icons";
-import { RootState, AppDispatch } from "@/store/store";
-import { genericActions } from '@/store/genericSlices';
+import { collections, useLiveQuery } from "@/store/dexie";
 import { Category, Task, Team, StatusTransitionGroup, Sla, Approval, DialogLayout } from "@/store/types";
 import { DialogLayoutEditorDialog } from "@/components/dialogLayout";
 import { Badge } from "@/components/ui/badge";
@@ -140,19 +138,16 @@ const EnabledCellRenderer = ({ value }: ICellRendererParams & { t: (key: string,
 
 
 function Categories() {
-  const dispatch = useDispatch<AppDispatch>();
   const { t } = useLanguage();
   const tc = (key: string, fallback: string) => t(`settings.categories.${key}`, fallback);
-  const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
-  const { value: tasks } = useSelector((state: RootState) => state.tasks) as { value: Task[] };
-  const { value: categoryCustomFields } = useSelector((state: RootState) => state.categoryCustomFields) as { value: any[] };
-  const statusTransitionGroups = useSelector((s: RootState) => (s as any).statusTransitionGroups.value) as StatusTransitionGroup[];
-  const slasState = useSelector((state: RootState) => (state as any).slas) as { value?: Sla[] } | undefined;
-  const slas: Sla[] = slasState?.value ?? [];
-  const approvalsState = useSelector((state: RootState) => (state as any).approvals) as { value?: Approval[] } | undefined;
-  const approvals: Approval[] = approvalsState?.value ?? [];
-  const workspacesState = useSelector((state: RootState) => (state as any).workspaces) as { value?: any[] } | undefined;
-  const workspaces: any[] = workspacesState?.value ?? [];
+  // Dexie queries with useLiveQuery
+  const teams = useLiveQuery(() => collections.teams.getAll()) || [];
+  const tasks = useLiveQuery(() => collections.tasks.getAll()) || [];
+  const categoryCustomFields = useLiveQuery(() => collections.categoryCustomFields.getAll()) || [];
+  const statusTransitionGroups = useLiveQuery(() => collections.statusTransitionGroups.getAll()) || [];
+  const slas = useLiveQuery(() => collections.slas.getAll()) || [];
+  const approvals = useLiveQuery(() => collections.approvals.getAll()) || [];
+  const workspaces = useLiveQuery(() => collections.workspaces.getAll()) || [];
 
   // Use shared state management
   const {
@@ -350,10 +345,7 @@ function Categories() {
     try {
       // Ensure reporting_team_ids is always an array
       const safeReportingTeamIds = Array.isArray(selectedReportingTeamIds) ? selectedReportingTeamIds : [];
-      await dispatch(genericActions.categories.updateAsync({
-        id: editingCategory.id,
-        updates: { reporting_team_ids: safeReportingTeamIds }
-      })).unwrap();
+      await collections.categories.update(editingCategory.id, { reporting_team_ids: safeReportingTeamIds });
     } catch (e: any) {
       console.error('Error saving reporting teams', e);
       setReportingTeamsError(e?.message || 'Failed to save reporting teams');

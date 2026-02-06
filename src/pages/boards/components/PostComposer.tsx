@@ -3,9 +3,8 @@ import { Image, X } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { useDispatch } from 'react-redux';
-import { genericActions } from '@/store/genericSlices';
 import { uploadFile, getFileUrl } from '@/api/assetApi';
+import { collections } from '@/store/dexie';
 
 interface PostComposerProps {
   user: {
@@ -22,7 +21,6 @@ interface PostComposerProps {
 
 export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: PostComposerProps) {
   const { t } = useLanguage();
-  const dispatch = useDispatch();
   const [content, setContent] = useState('');
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -158,7 +156,7 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
             };
             console.log('Creating attachment:', attachment);
 
-            const attachmentResult = await dispatch(genericActions.boardAttachments.addAsync(attachment) as any).unwrap();
+            const attachmentResult = await collections.boardAttachments.add(attachment);
             console.log('Attachment created successfully:', attachmentResult);
             return { success: true, attachment: attachmentResult };
           } catch (error: any) {

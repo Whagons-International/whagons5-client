@@ -1,12 +1,10 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
-import { useSelector, useDispatch } from "react-redux";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faClipboardList, faPlus, faFileAlt, faTags, faChartBar, faSpinner, faExclamationTriangle, faCheckCircle, faClock, faShieldAlt, faFilePdf, faTrash, faInfoCircle, faLock } from "@fortawesome/free-solid-svg-icons";
-import { RootState } from "@/store/store";
 import { Template, Task, Category, Approval } from "@/store/types";
-import { genericActions } from "@/store/genericSlices";
 import { iconService } from '@/database/iconService';
+import { useTable, collections } from '@/store/dexie';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,19 +87,18 @@ const TemplateNameCellRenderer = (props: ICellRendererParams) => {
 };
 
 function Templates() {
-  const dispatch = useDispatch();
   const { t } = useLanguage();
   const tt = (key: string, fallback: string) => t(`settings.templates.${key}`, fallback);
-  // Redux state for related data
-  const { value: categories } = useSelector((state: RootState) => state.categories);
-  const { value: tasks } = useSelector((state: RootState) => state.tasks);
-  const { value: priorities } = useSelector((state: RootState) => state.priorities);
-  const { value: slas } = useSelector((state: RootState) => state.slas);
-  const { value: approvals } = useSelector((state: RootState) => (state as any).approvals || { value: [] });
-  const { value: requirements } = useSelector((state: RootState) => (state as any).complianceRequirements || { value: [] });
-  const { value: mappings } = useSelector((state: RootState) => (state as any).complianceMappings || { value: [] });
-  const { value: spots } = useSelector((state: RootState) => (state as any).spots || { value: [] });
-  const { value: users } = useSelector((state: RootState) => (state as any).users || { value: [] });
+  // Dexie state for related data
+  const categories = useTable<Category>('categories') ?? [];
+  const tasks = useTable<Task>('tasks') ?? [];
+  const priorities = useTable<any>('priorities') ?? [];
+  const slas = useTable<any>('slas') ?? [];
+  const approvals = useTable<Approval>('approvals') ?? [];
+  const requirements = useTable<any>('compliance_requirements') ?? [];
+  const mappings = useTable<any>('compliance_mappings') ?? [];
+  const spots = useTable<any>('spots') ?? [];
+  const users = useTable<any>('users') ?? [];
   const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
   const [summaryTemplate, setSummaryTemplate] = useState<Template | null>(null);
   // State for default users (using string IDs for MultiSelect)
@@ -254,12 +251,12 @@ function Templates() {
   const handleAddMapping = async () => {
     if (!selectedRequirement || !editingTemplate) return;
     try {
-      await dispatch(genericActions.complianceMappings.addAsync({
+      await collections.complianceMappings.add({
         requirement_id: selectedRequirement,
         entity_type: 'template',
         entity_id: editingTemplate.id,
         justification: 'Mapped via Template Settings'
-      }) as any);
+      });
       setSelectedRequirement('');
     } catch (error) {
       console.error('Failed to add mapping:', error);
@@ -268,7 +265,7 @@ function Templates() {
 
   const handleRemoveMapping = async (mappingId: number) => {
     try {
-      await dispatch(genericActions.complianceMappings.removeAsync(mappingId) as any);
+      await collections.complianceMappings.delete(mappingId);
     } catch (error) {
       console.error('Failed to remove mapping:', error);
     }

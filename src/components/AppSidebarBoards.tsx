@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
 import {
   ChevronDown,
   Users2,
@@ -42,7 +41,7 @@ import {
   useSidebar
 } from '@/components/ui/sidebar';
 import { useLanguage } from '@/providers/LanguageProvider';
-import { genericActions } from '@/store/genericSlices';
+import { collections } from '@/store/dexie';
 
 export interface AppSidebarBoardsProps {
   boards: any[];
@@ -77,7 +76,6 @@ export function AppSidebarBoards({ boards, pathname }: AppSidebarBoardsProps) {
   const isCollapsedState = state === 'collapsed';
   const collapsed = isCollapsedState && !isMobile;
   const { t } = useLanguage();
-  const dispatch = useDispatch();
   const navigate = useNavigate();
 
   // Create board dialog state
@@ -94,12 +92,12 @@ export function AppSidebarBoards({ boards, pathname }: AppSidebarBoardsProps) {
 
     setIsSubmitting(true);
     try {
-      const result = await dispatch(genericActions.boards.addAsync(formData) as any);
+      const result = await collections.boards.add(formData);
       setIsCreateDialogOpen(false);
       setFormData({ name: '', description: '', visibility: 'private' });
       // Navigate to the newly created board
-      if (result?.payload?.id) {
-        navigate(`/boards/${result.payload.id}`);
+      if (result?.id) {
+        navigate(`/boards/${result.id}`);
       }
     } catch (error) {
       console.error('Failed to create board:', error);

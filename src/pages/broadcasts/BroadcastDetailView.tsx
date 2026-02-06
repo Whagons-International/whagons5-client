@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
 import {
   Dialog,
   DialogContent,
@@ -17,13 +16,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { CheckCircle2, Clock, X, Send } from 'lucide-react';
+import { CheckCircle2, Clock, X } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useAuthUser } from '@/providers/AuthProvider';
 import { Broadcast } from '@/types/broadcast';
-import { RootState } from '@/store/store';
-import { genericActions } from '@/store/genericSlices';
 import AcknowledgeDialog from './AcknowledgeDialog';
+import { useTable } from '@/store/dexie';
 
 interface BroadcastDetailViewProps {
   broadcast: Broadcast;
@@ -32,15 +30,10 @@ interface BroadcastDetailViewProps {
 
 function BroadcastDetailView({ broadcast, onClose }: BroadcastDetailViewProps) {
   const { t } = useLanguage();
-  const dispatch = useDispatch();
 
-  // Redux state
-  const { value: acknowledgments } = useSelector(
-    (state: RootState) => (state as any).broadcastAcknowledgments || { value: [] }
-  );
-  const { value: users } = useSelector(
-    (state: RootState) => (state as any).users || { value: [] }
-  );
+  // Dexie state
+  const acknowledgments = useTable('broadcast_acknowledgments');
+  const users = useTable('users');
   const currentUser = useAuthUser();
 
   // Local state

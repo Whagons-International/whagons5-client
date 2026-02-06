@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useDispatch } from "react-redux";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBriefcase, faPlus, faChartBar, faTrash } from "@fortawesome/free-solid-svg-icons";
@@ -8,9 +7,7 @@ import { useLanguage } from "@/providers/LanguageProvider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { UrlTabs } from "@/components/ui/url-tabs";
-import { AppDispatch } from "@/store/store";
 import type { JobPosition, JobPositionLevel } from "@/store/types";
-import { genericActions } from "@/store/genericSlices";
 import {
 	SettingsLayout,
 	SettingsGrid,
@@ -80,7 +77,6 @@ const createDefaultFormState = (): JobPositionFormState => ({
 });
 
 function JobPositions() {
-	const dispatch = useDispatch<AppDispatch>();
 	const { t } = useLanguage();
 
 	const {

@@ -3,7 +3,6 @@
  */
 
 import { useCallback } from 'react';
-import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { refreshClientSideGrid } from '../grid/dataSource';
 
 export function useGridRefresh(opts: {
@@ -52,9 +51,8 @@ export function useGridRefresh(opts: {
 
     if (useClientSide) {
       try {
-        if (!TasksCache.initialized) await TasksCache.init();
         const sortModel = gridRef.current.api.getSortModel?.() || [{ colId: 'id', sort: 'desc' }];
-        const { rows, totalFiltered } = await refreshClientSideGrid(gridRef.current.api, TasksCache, {
+        const { rows, totalFiltered } = await refreshClientSideGrid(gridRef.current.api, {
           search: searchRef.current,
           workspaceRef,
           statusMapRef,

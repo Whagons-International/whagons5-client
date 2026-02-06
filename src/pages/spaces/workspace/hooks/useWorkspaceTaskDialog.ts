@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { TasksCache } from '@/store/indexedDB/TasksCache';
+import { collections } from '@/store/dexie';
 
 export function useWorkspaceTaskDialog() {
   const location = useLocation();
@@ -18,12 +18,10 @@ export function useWorkspaceTaskDialog() {
 
     (async () => {
       try {
-        if (!TasksCache.initialized) await TasksCache.init();
-        
         const taskId = Number(taskIdFromUrl);
         if (!Number.isFinite(taskId)) return;
 
-        const task = await TasksCache.getTask(String(taskId));
+        const task = await collections.tasks.get(taskId);
         if (task) {
           setSelectedTask(task);
           setOpenEditTask(true);
@@ -41,21 +39,20 @@ export function useWorkspaceTaskDialog() {
   }, [taskIdFromUrl, location.pathname, location.search, navigate]);
 
   const handleOpenTaskDialog = async (task: any) => {
-    // Fetch full task data from cache to ensure all fields are available
+    // Fetch full task data from Dexie to ensure all fields are available
     // AG Grid row data might be incomplete (missing some fields)
     if (task?.id) {
       try {
-        if (!TasksCache.initialized) await TasksCache.init();
-        const fullTask = await TasksCache.getTask(String(task.id));
+        const fullTask = await collections.tasks.get(task.id);
         if (fullTask) {
           setSelectedTask(fullTask);
         } else {
-          // Fallback to provided task if cache doesn't have it
-          console.warn('[useWorkspaceTaskDialog] Task not found in cache, using provided task data:', task.id);
+          // Fallback to provided task if not found in Dexie
+          console.warn('[useWorkspaceTaskDialog] Task not found in Dexie, using provided task data:', task.id);
           setSelectedTask(task);
         }
       } catch (error) {
-        console.error('[useWorkspaceTaskDialog] Failed to fetch task from cache:', error);
+        console.error('[useWorkspaceTaskDialog] Failed to fetch task from Dexie:', error);
         // Fallback to provided task on error
         setSelectedTask(task);
       }

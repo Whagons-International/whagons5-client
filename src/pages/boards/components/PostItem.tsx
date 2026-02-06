@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTable } from '@/store/dexie';
 import { Heart, MessageCircle, Repeat2, Send, MoreHorizontal, Pin, Pencil } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -10,8 +11,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { BoardMessage } from '@/store/types';
-import { useSelector } from 'react-redux';
-import { RootState } from '@/store/store';
 import { getFileUrl } from '@/api/assetApi';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -49,8 +48,8 @@ export function PostItem({
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   
-  // Get board attachments from Redux
-  const { value: attachments } = useSelector((state: RootState) => (state as any).boardAttachments || { value: [] });
+  // Get board attachments from Dexie
+  const attachments = useTable('board_attachments') ?? [];
   
   // Filter attachments for this message (only images)
   const messageImages = attachments.filter((att: any) => {

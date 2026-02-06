@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState, useRef } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { AppDispatch, RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faCubes, faCheck, faLayerGroup, faGripVertical } from "@fortawesome/free-solid-svg-icons";
 import { faArrowDown, faArrowUp } from "@fortawesome/free-solid-svg-icons";
-import { genericActions } from '@/store/genericSlices';
+import { collections, useLiveQuery } from '@/store/dexie';
+import { api } from '@/store/api/internalApi';
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { SettingsLayout } from "../../components";
 import { createSwapy } from 'swapy';
@@ -42,11 +41,11 @@ const TYPES = [
 ];
 
 export default function CustomFieldsTab() {
-  const dispatch = useDispatch<AppDispatch>();
   const { t } = useLanguage();
   const tc = (key: string, fallback: string) => t(`settings.customFields.${key}`, fallback);
-  const { value: fields } = useSelector((s: RootState) => s.customFields);
-  const { value: categories } = useSelector((s: RootState) => s.categories || { value: [] });
+  // Dexie queries with useLiveQuery
+  const fields = useLiveQuery(() => collections.customFields.getAll()) || [];
+  const categories = useLiveQuery(() => collections.categories.getAll()) || [];
 
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
@@ -214,7 +213,7 @@ export default function CustomFieldsTab() {
       validation_rules: validationValue,
     };
     try {
-      await dispatch(genericActions.customFields.addAsync(payload)).unwrap();
+      await collections.customFields.add(payload);
       setOpen(false);
       setDraft({ name: "", field_type: "text", optionsText: "", isRequired: false, minLength: "", maxLength: "", minNumber: "", maxNumber: "", pattern: "" });
       // toast removed
@@ -238,7 +237,7 @@ export default function CustomFieldsTab() {
       validation_rules: validationValue,
     };
     try {
-      await dispatch(genericActions.customFields.updateAsync({ id: selectedField.id, updates } as any)).unwrap();
+      await collections.customFields.update(selectedField.id, updates);
       setOpen(false);
       setSelectedField(null);
     } catch (e: any) {
@@ -293,10 +292,10 @@ export default function CustomFieldsTab() {
   const onAssign = async () => {
     if (!selectedField) return;
     try {
-      await dispatch(genericActions.customFields.assignToCategories({ 
-        id: selectedField.id, 
-        category_ids: selectedCategoryIds 
-      } as any)).unwrap?.();
+      // Assign custom field to categories via API
+      await api.post(`/custom-fields/${selectedField.id}/assign-categories`, {
+        category_ids: selectedCategoryIds
+      });
       setAssignOpen(false);
     } catch (_) {
       // best-effort
@@ -307,7 +306,7 @@ export default function CustomFieldsTab() {
   const onDelete = async (f: any) => {
     try {
       setIsDeleting(true);
-      await dispatch(genericActions.customFields.removeAsync(f.id as any)).unwrap?.();
+      await collections.customFields.delete(f.id);
     } catch (_) {
       // best-effort
     } finally {

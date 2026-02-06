@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/ui/sidebar";
 import { Calendar as CalendarIcon, Maximize2, Minimize2 } from "lucide-react";
@@ -10,13 +9,10 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
 import type { EventClickArg, EventDropArg, EventResizeDoneArg, DateSelectArg, EventContentArg } from "@fullcalendar/core";
-import type { AppDispatch, RootState } from "@/store/store";
 import type { Task } from "@/store/types";
 import TaskDialog from "./TaskDialog";
-import { TasksCache } from "@/store/indexedDB/TasksCache";
+import { collections, useLiveQuery } from "@/store/dexie";
 import { api } from "@/store/api/internalApi";
-import { TaskEvents } from "@/store/eventEmiters/taskEvents";
-import { getTasksFromIndexedDB } from "@/store/reducers/tasksSlice";
 
 // Helper to format date as local time without timezone conversion
 const formatAsLocalTime = (d: Date) => {
@@ -32,17 +28,16 @@ const formatAsLocalTime = (d: Date) => {
 type CalendarView = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay' | 'listWeek';
 
 export default function CalendarViewTab({ workspaceId }: { workspaceId: string | undefined }) {
-  const dispatch = useDispatch<AppDispatch>();
   const calendarRef = useRef<FullCalendar>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { state: sidebarState, isMobile } = useSidebar();
   
-  // Redux selectors
-  const tasks = useSelector((state: RootState) => state.tasks.value || []);
-  const users = useSelector((state: RootState) => state.users.value || []);
-  const categories = useSelector((state: RootState) => state.categories.value || []);
-  const statuses = useSelector((state: RootState) => state.statuses.value || []);
-  const priorities = useSelector((state: RootState) => state.priorities.value || []);
+  // Dexie queries with useLiveQuery
+  const tasks = useLiveQuery(() => collections.tasks.getAll()) || [];
+  const users = useLiveQuery(() => collections.users.getAll()) || [];
+  const categories = useLiveQuery(() => collections.categories.getAll()) || [];
+  const statuses = useLiveQuery(() => collections.statuses.getAll()) || [];
+  const priorities = useLiveQuery(() => collections.priorities.getAll()) || [];
 
   // Local state
   const [currentView, setCurrentView] = useState<CalendarView>('dayGridMonth');
@@ -152,20 +147,7 @@ export default function CalendarViewTab({ workspaceId }: { workspaceId: string |
       });
   }, [workspaceTasks, categories, statuses, priorities, users]);
 
-  // Real-time updates listener
-  useEffect(() => {
-    const handleTaskChange = () => {
-      dispatch(getTasksFromIndexedDB());
-    };
-
-    const unsubscribers = [
-      TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, handleTaskChange),
-      TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, handleTaskChange),
-      TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, handleTaskChange),
-    ];
-
-    return () => unsubscribers.forEach((unsub) => unsub());
-  }, [dispatch]);
+  // Note: useLiveQuery automatically handles real-time updates, no manual listeners needed
 
   // Handle event click (edit task)
   const handleEventClick = useCallback((info: EventClickArg) => {
@@ -288,16 +270,9 @@ export default function CalendarViewTab({ workspaceId }: { workspaceId: string |
       }
     }
 
-    // Optimistic update to cache
+    // Optimistic update via collections (handles both Dexie and API)
     try {
-      await TasksCache.updateTask(task.id.toString(), {
-        ...task,
-        start_date: newStartDate,
-        due_date: newDueDate,
-      });
-
-      // Update via API
-      await api.patch(`/tasks/${task.id}`, {
+      await collections.tasks.update(task.id, {
         start_date: newStartDate,
         due_date: newDueDate,
       });
@@ -307,9 +282,6 @@ export default function CalendarViewTab({ workspaceId }: { workspaceId: string |
       console.error('Failed to update task dates:', error);
       toast.error('Failed to update task dates');
       info.revert(); // Revert the calendar change
-      
-      // Revert cache
-      await TasksCache.updateTask(task.id.toString(), task);
     }
   }, []);
 
@@ -323,16 +295,9 @@ export default function CalendarViewTab({ workspaceId }: { workspaceId: string |
     const newStartDate = task.start_date ? formatAsLocalTime(start) : null;
     const newDueDate = formatAsLocalTime(end);
 
-    // Optimistic update to cache
+    // Optimistic update via collections (handles both Dexie and API)
     try {
-      await TasksCache.updateTask(task.id.toString(), {
-        ...task,
-        start_date: newStartDate,
-        due_date: newDueDate,
-      });
-
-      // Update via API
-      await api.patch(`/tasks/${task.id}`, {
+      await collections.tasks.update(task.id, {
         start_date: newStartDate,
         due_date: newDueDate,
       });
@@ -342,9 +307,6 @@ export default function CalendarViewTab({ workspaceId }: { workspaceId: string |
       console.error('Failed to update task duration:', error);
       toast.error('Failed to update task duration');
       info.revert(); // Revert the calendar change
-      
-      // Revert cache
-      await TasksCache.updateTask(task.id.toString(), task);
     }
   }, []);
 

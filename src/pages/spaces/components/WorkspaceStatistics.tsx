@@ -1,15 +1,23 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useSelector } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faExclamationTriangle, faCheckCircle, faTasks } from "@fortawesome/free-solid-svg-icons";
-import { RootState } from "@/store/store";
 import { Task, Category, Team, Workspace } from "@/store/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import { Badge } from "@/components/ui/badge";
-import { TasksCache } from "@/store/indexedDB/TasksCache";
-import { TaskEvents } from "@/store/eventEmiters/taskEvents";
+import { 
+  db, 
+  useLiveQuery,
+  useCategories,
+  useTeams,
+  useWorkspaces,
+  usePriorities,
+  useStatuses,
+  useTemplates,
+  useUsers,
+  useSpots,
+} from "@/store/dexie";
 import { useLanguage } from "@/providers/LanguageProvider";
 
 interface WorkspaceStatisticsProps {
@@ -38,15 +46,15 @@ type WorkspaceStats = {
 function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
   const { t } = useLanguage();
   
-  // Redux state - ensure we get arrays, not undefined
-  const categories = useSelector((state: RootState) => (state.categories as any)?.value ?? []) as Category[];
-  const teams = useSelector((state: RootState) => (state.teams as any)?.value ?? []) as Team[];
-  const workspaces = useSelector((state: RootState) => (state as any).workspaces?.value ?? []) as Workspace[];
-  const priorities = useSelector((state: RootState) => (state.priorities as any)?.value ?? []) as any[];
-  const statuses = useSelector((state: RootState) => (state.statuses as any)?.value ?? []) as any[];
-  const templates = useSelector((state: RootState) => (state as any).templates?.value ?? []) as any[];
-  const users = useSelector((state: RootState) => (state as any).users?.value ?? []) as any[];
-  const spots = useSelector((state: RootState) => (state as any).spots?.value ?? []) as any[];
+  // Dexie state - hooks return arrays directly (never undefined)
+  const categories = useCategories() as Category[];
+  const teams = useTeams() as Team[];
+  const workspaces = useWorkspaces() as Workspace[];
+  const priorities = usePriorities();
+  const statuses = useStatuses();
+  const templates = useTemplates();
+  const users = useUsers();
+  const spots = useSpots();
   
   // Statistics state
   const [statsLoading, setStatsLoading] = useState(false);
@@ -59,73 +67,41 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
   const loadingWorkspaceRef = useRef<string | undefined>(undefined);
   const [isLoadingTasks, setIsLoadingTasks] = useState(true);
 
-  // Load tasks from TasksCache (same as Workspace component)
+  // Load tasks reactively using useLiveQuery (Dexie)
+  const wsIdNum = workspaceId && workspaceId !== 'all' ? parseInt(workspaceId) : null;
+  const dexieTasks = useLiveQuery(
+    async () => {
+      if (wsIdNum != null && Number.isFinite(wsIdNum)) {
+        return db.table('tasks').where('workspace_id').equals(wsIdNum).toArray();
+      }
+      return db.table('tasks').toArray();
+    },
+    [wsIdNum]
+  );
+
+  // Sync dexieTasks to state for statistics calculation
   useEffect(() => {
-    let cancelled = false;
-    
     // Reset state immediately when workspace changes
     setWorkspaceTasks([]);
     setStatistics(null);
     setIsLoadingTasks(true);
     isCalculatingRef.current = false;
     loadingWorkspaceRef.current = workspaceId;
-    
-    const loadTasks = async () => {
-      try {
-        // Initialize cache if needed
-        if (!TasksCache.initialized) {
-          await TasksCache.init();
-        }
-        
-        // Build query filter
-        const query: any = { startRow: 0, endRow: 10000 }; // Get all tasks
-        if (workspaceId && workspaceId !== 'all' && workspaceId !== undefined) {
-          const wsId = parseInt(workspaceId);
-          if (!isNaN(wsId)) {
-            query.workspace_id = wsId;
-          }
-        }
-        
-        console.log('[WorkspaceStatistics] Loading tasks with query:', query, 'workspaceId:', workspaceId);
-        
-        // Query tasks from cache
-        const result = await TasksCache.queryTasks(query);
-        const loadedTasks = result?.rows || [];
-        
-        console.log('[WorkspaceStatistics] Loaded tasks:', loadedTasks.length, 'for workspace:', workspaceId);
-        
-        // Only update if this is still the current workspace
-        if (!cancelled && loadingWorkspaceRef.current === workspaceId) {
-          setWorkspaceTasks(loadedTasks);
-          setIsLoadingTasks(false);
-        }
-      } catch (error) {
-        console.error('[WorkspaceStatistics] Error loading tasks:', error);
-        if (!cancelled && loadingWorkspaceRef.current === workspaceId) {
-          setWorkspaceTasks([]);
-          setIsLoadingTasks(false);
-        }
-      }
-    };
-    
-    loadTasks();
-    
-    // Subscribe to task events to reload when cache updates
-    const unsubscribes = [
-      TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, loadTasks),
-      TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, loadTasks),
-      TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, loadTasks),
-      TaskEvents.on(TaskEvents.EVENTS.TASKS_BULK_UPDATE, loadTasks),
-      TaskEvents.on(TaskEvents.EVENTS.CACHE_INVALIDATE, loadTasks),
-    ];
-    
-    return () => {
-      cancelled = true;
-      unsubscribes.forEach((unsub) => {
-        try { unsub(); } catch {}
-      });
-    };
   }, [workspaceId]);
+
+  useEffect(() => {
+    if (dexieTasks === undefined) {
+      // Still loading
+      return;
+    }
+    
+    console.log('[WorkspaceStatistics] Loaded tasks:', dexieTasks.length, 'for workspace:', workspaceId);
+    
+    if (loadingWorkspaceRef.current === workspaceId) {
+      setWorkspaceTasks(dexieTasks as Task[]);
+      setIsLoadingTasks(false);
+    }
+  }, [dexieTasks, workspaceId]);
 
   // Calculate statistics
   const calculateStatistics = useCallback(async () => {

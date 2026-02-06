@@ -1,29 +1,28 @@
-import { useSelector } from 'react-redux';
 import { useMemo } from 'react';
-import { RootState } from '@/store/store';
 import { useAuth } from '@/providers/AuthProvider';
+import { useTable } from '@/store/dexie';
 
 export function useTaskDialogData() {
-  const { value: categories = [] } = useSelector((s: RootState) => (s as any).categories || { value: [] });
-  const { value: priorities = [] } = useSelector((s: RootState) => (s as any).priorities || { value: [] });
-  const { value: categoryPriorityAssignments = [] } = useSelector((s: RootState) => (s as any).categoryPriorities || { value: [] });
-  const { value: statuses = [] } = useSelector((s: RootState) => (s as any).statuses || { value: [] });
-  const { value: statusTransitions = [] } = useSelector((s: RootState) => (s as any).statusTransitions || { value: [] });
-  const { value: spots = [] } = useSelector((s: RootState) => (s as any).spots || { value: [] });
-  const { value: users = [] } = useSelector((s: RootState) => (s as any).users || { value: [] });
-  const { value: teams = [] } = useSelector((s: RootState) => (s as any).teams || { value: [] });
-  const { value: spotTypes = [] } = useSelector((s: RootState) => (s as any).spotTypes || { value: [] });
-  const { value: workspaces = [] } = useSelector((s: RootState) => (s as any).workspaces || { value: [] });
-  const { value: slas = [] } = useSelector((s: RootState) => (s as any).slas || { value: [] });
-  const { value: approvals = [] } = useSelector((s: RootState) => (s as any).approvals || { value: [] });
-  const { value: templates = [] } = useSelector((s: RootState) => (s as any).templates || { value: [] });
-  const { value: tags = [] } = useSelector((s: RootState) => (s as any).tags || { value: [] });
-  const { value: taskTags = [] } = useSelector((s: RootState) => (s as any).taskTags || { value: [] });
-  const { value: taskUsers = [] } = useSelector((s: RootState) => (s as any).taskUsers || { value: [] });
-  const { value: customFields = [] } = useSelector((s: RootState) => (s as any).customFields || { value: [] });
-  const { value: categoryCustomFields = [] } = useSelector((s: RootState) => (s as any).categoryCustomFields || { value: [] });
-  const { value: taskCustomFieldValues = [] } = useSelector((s: RootState) => (s as any).taskCustomFieldValues || { value: [] });
-  const { value: userTeams = [] } = useSelector((s: RootState) => (s as any).userTeams || { value: [] });
+  const categories = useTable('categories') ?? [];
+  const priorities = useTable('priorities') ?? [];
+  const categoryPriorityAssignments = useTable('category_priorities') ?? [];
+  const statuses = useTable('statuses') ?? [];
+  const statusTransitions = useTable('status_transitions') ?? [];
+  const spots = useTable('spots') ?? [];
+  const users = useTable('users') ?? [];
+  const teams = useTable('teams') ?? [];
+  const spotTypes = useTable('spot_types') ?? [];
+  const workspaces = useTable('workspaces') ?? [];
+  const slas = useTable('slas') ?? [];
+  const approvals = useTable('approvals') ?? [];
+  const templates = useTable('templates') ?? [];
+  const tags = useTable('tags') ?? [];
+  const taskTags = useTable('task_tags') ?? [];
+  const taskUsers = useTable('task_users') ?? [];
+  const customFields = useTable('custom_fields') ?? [];
+  const categoryCustomFields = useTable('category_custom_fields') ?? [];
+  const taskCustomFieldValues = useTable('task_custom_field_values') ?? [];
+  const userTeams = useTable('user_teams') ?? [];
   
   const { user } = useAuth();
 

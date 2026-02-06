@@ -61,11 +61,12 @@ import {
   HolidayCalendar,
   OvertimeRule,
   ScheduleConfig,
+  ScheduleAssignment,
   FixedScheduleConfig,
   RotatingScheduleConfig,
   FlexibleScheduleConfig,
 } from "./types";
-import { FixedScheduleConfig as FixedConfigUI, RotatingScheduleConfig as RotatingConfigUI, FlexibleScheduleConfig as FlexibleConfigUI } from "./components";
+import { FixedScheduleConfig as FixedConfigUI, RotatingScheduleConfig as RotatingConfigUI, FlexibleScheduleConfig as FlexibleConfigUI, ScheduleAssignments, AllAssignments } from "./components";
 import { getDefaultConfig, calculateWeeklyHours, formatHours } from "./scheduleUtils";
 
 // Extend WorkingSchedule type to include optional position
@@ -86,11 +87,13 @@ function SortableScheduleCard({
   onEdit,
   scheduleTypeOptions,
   tt,
+  assignmentCount,
 }: {
   schedule: WorkingScheduleWithPosition;
   onEdit: (schedule: WorkingSchedule) => void;
   scheduleTypeOptions: { value: string; label: string }[];
   tt: (key: string, fallback: string) => string;
+  assignmentCount: number;
 }) {
   const {
     attributes,
@@ -180,6 +183,12 @@ function SortableScheduleCard({
                 {schedule.weekly_hours}h
               </div>
             </div>
+            <div className="text-center">
+              <div className="text-xs text-muted-foreground/70 uppercase tracking-wide">{tt('assignments.title', 'Assigned')}</div>
+              <div className={`font-medium ${isInactive ? 'text-muted-foreground' : assignmentCount > 0 ? 'text-foreground' : 'text-muted-foreground/50'}`}>
+                {assignmentCount}
+              </div>
+            </div>
           </div>
 
           {/* Status badge */}
@@ -206,6 +215,7 @@ function WorkingSchedules() {
   const { value: countryConfigs } = useSelector((state: RootState) => state.countryConfigs) as { value: CountryConfig[]; loading: boolean };
   const { value: holidayCalendars } = useSelector((state: RootState) => state.holidayCalendars) as { value: HolidayCalendar[]; loading: boolean };
   const { value: overtimeRules } = useSelector((state: RootState) => state.overtimeRules) as { value: OvertimeRule[]; loading: boolean };
+  const { value: allAssignments } = useSelector((state: RootState) => state.scheduleAssignments) as { value: ScheduleAssignment[] };
 
   // Dialog state
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -242,12 +252,14 @@ function WorkingSchedules() {
     dispatch(genericInternalActions.countryConfigs.getFromIndexedDB() as any);
     dispatch(genericInternalActions.holidayCalendars.getFromIndexedDB() as any);
     dispatch(genericInternalActions.overtimeRules.getFromIndexedDB() as any);
+    dispatch(genericInternalActions.scheduleAssignments.getFromIndexedDB() as any);
     
     // Then fetch from API to ensure we have the latest data
     dispatch(genericInternalActions.workingSchedules.fetchFromAPI() as any);
     dispatch(genericInternalActions.countryConfigs.fetchFromAPI() as any);
     dispatch(genericInternalActions.holidayCalendars.fetchFromAPI() as any);
     dispatch(genericInternalActions.overtimeRules.fetchFromAPI() as any);
+    dispatch(genericInternalActions.scheduleAssignments.fetchFromAPI() as any);
   }, [dispatch]);
 
   // Local order state for drag and drop
@@ -442,7 +454,7 @@ function WorkingSchedules() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>{tt('stats.total', 'Total Schedules')}</CardDescription>
@@ -457,6 +469,14 @@ function WorkingSchedules() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-green-600">{activeCount}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>{tt('stats.assignments', 'Assignments')}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-blue-600">{allAssignments.length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -536,6 +556,7 @@ function WorkingSchedules() {
                               onEdit={openEditDialog}
                               scheduleTypeOptions={scheduleTypeOptions}
                               tt={tt}
+                              assignmentCount={allAssignments.filter(a => a.working_schedule_id === schedule.id).length}
                             />
                           ))}
                         </div>
@@ -544,6 +565,13 @@ function WorkingSchedules() {
                   </div>
                 )}
               </div>
+            )
+          },
+          {
+            value: 'assignments',
+            label: tt('tabs.assignments', 'Assignments'),
+            content: (
+              <AllAssignments tt={tt} />
             )
           },
           {
@@ -695,7 +723,7 @@ function WorkingSchedules() {
 
       {/* Create Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{tt('dialog.createTitle', 'Create Working Schedule')}</DialogTitle>
             <DialogDescription>{tt('dialog.createDescription', 'Define a new working schedule for your team')}</DialogDescription>
@@ -850,7 +878,7 @@ function WorkingSchedules() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{tt('dialog.editTitle', 'Edit Working Schedule')}</DialogTitle>
             <DialogDescription>{tt('dialog.editDescription', 'Update schedule settings')}</DialogDescription>
@@ -911,6 +939,16 @@ function WorkingSchedules() {
                 />
               )}
             </div>
+
+            {/* Schedule Assignments */}
+            {editingSchedule && (
+              <div className="border-t border-border pt-4">
+                <ScheduleAssignments
+                  scheduleId={editingSchedule.id}
+                  tt={tt}
+                />
+              </div>
+            )}
 
             {/* Additional Settings (Collapsible) */}
             <details className="border-t border-border pt-4">

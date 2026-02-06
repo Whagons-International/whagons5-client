@@ -5,6 +5,7 @@ import { faPlus, faSpinner, faTrash, faGripVertical } from "@fortawesome/free-so
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RootState, AppDispatch } from "@/store/store";
 import { genericActions, genericCaches, genericEventNames, genericEvents } from '@/store/genericSlices';
 import { Category } from "@/store/types";
@@ -319,16 +320,16 @@ export function CategoryFieldsManager({ open, onOpenChange, category, variant = 
   const content = (
     <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <select
-              value={newFieldId}
-              onChange={(e) => setNewFieldId(e.target.value)}
-              className="px-3 py-2 border border-input bg-background rounded-md text-sm"
-            >
-              <option value="">{tc('selectPlaceholder', 'Select field to add')}</option>
+          <Select value={newFieldId} onValueChange={(value) => setNewFieldId(value)}>
+            <SelectTrigger className="w-[250px]">
+              <SelectValue placeholder={tc('selectPlaceholder', 'Select field to add')} />
+            </SelectTrigger>
+            <SelectContent>
               {availableFields.map((f: any) => (
-                <option key={f.id} value={f.id}>{f.name}</option>
+                <SelectItem key={f.id} value={String(f.id)}>{f.name}</SelectItem>
               ))}
-            </select>
+            </SelectContent>
+          </Select>
             <Button onClick={addAssignment} disabled={!newFieldId || assignSubmitting} size="sm">
               {assignSubmitting ? <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" /> : <FontAwesomeIcon icon={faPlus} className="mr-2" />}
               {tc('addButton', 'Add Field')}

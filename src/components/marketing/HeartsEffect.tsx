@@ -11,100 +11,137 @@ interface Heart {
   speed: number;
   opacity: number;
   drift: number;
+  rotation: number;
+  rotationSpeed: number;
+  color: string;
+  pulse: number;
+  pulseSpeed: number;
 }
 
-export default function HeartsEffect({ onClose }: HeartsEffectProps) {
+export default function HeartsEffect({ onClose: _onClose }: HeartsEffectProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const heartsRef = useRef<Heart[]>([]);
   const animationFrameRef = useRef<number>();
+  const timeRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Set canvas size to window size
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     };
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener("resize", resizeCanvas);
 
-    // Create hearts
+    const heartColors = [
+      "#FF69B4", "#FF1493", "#FF6B9D", "#E91E63",
+      "#FF4081", "#F06292", "#EC407A", "#D81B60",
+      "#FFB6C1", "#FF8FA3", "#C2185B",
+    ];
+
     const createHearts = () => {
-      const count = 50;
+      const count = 60;
       heartsRef.current = [];
       for (let i = 0; i < count; i++) {
         heartsRef.current.push({
           x: Math.random() * canvas.width,
-          y: canvas.height + Math.random() * 100,
-          size: Math.random() * 20 + 15,
-          speed: Math.random() * 1 + 0.5,
-          opacity: Math.random() * 0.5 + 0.3,
-          drift: (Math.random() - 0.5) * 0.5,
+          y: canvas.height + Math.random() * 200,
+          size: Math.random() * 18 + 12,
+          speed: Math.random() * 0.8 + 0.4,
+          opacity: Math.random() * 0.4 + 0.3,
+          drift: (Math.random() - 0.5) * 0.4,
+          rotation: (Math.random() - 0.5) * 0.4,
+          rotationSpeed: (Math.random() - 0.5) * 0.02,
+          color: heartColors[Math.floor(Math.random() * heartColors.length)],
+          pulse: 0,
+          pulseSpeed: Math.random() * 0.05 + 0.02,
         });
       }
     };
     createHearts();
 
-    // Draw heart shape
-    const drawHeart = (x: number, y: number, size: number, opacity: number) => {
+    const drawHeart = (x: number, y: number, size: number, opacity: number, rotation: number, color: string, pulseScale: number) => {
       ctx.save();
       ctx.translate(x, y);
+      ctx.rotate(rotation);
+      ctx.scale(pulseScale, pulseScale);
+
+      const s = size;
+
+      // Glow
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = color;
+
+      // Heart path using bezier curves
       ctx.beginPath();
-      
-      const topCurveHeight = size * 0.3;
-      ctx.moveTo(0, topCurveHeight);
-      
-      // Left side
+      ctx.moveTo(0, s * 0.3);
+
+      // Left lobe
       ctx.bezierCurveTo(
-        0, 0,
-        -size / 2, 0,
-        -size / 2, topCurveHeight
+        -s * 0.05, s * 0.1,
+        -s * 0.55, s * 0.05,
+        -s * 0.5, -s * 0.2
       );
       ctx.bezierCurveTo(
-        -size / 2, (topCurveHeight + size) / 2,
-        0, (topCurveHeight + size) / 2,
-        0, size
+        -s * 0.45, -s * 0.5,
+        -s * 0.1, -s * 0.5,
+        0, -s * 0.25
       );
-      
-      // Right side
+
+      // Right lobe
       ctx.bezierCurveTo(
-        0, (topCurveHeight + size) / 2,
-        size / 2, (topCurveHeight + size) / 2,
-        size / 2, topCurveHeight
+        s * 0.1, -s * 0.5,
+        s * 0.45, -s * 0.5,
+        s * 0.5, -s * 0.2
       );
       ctx.bezierCurveTo(
-        size / 2, 0,
-        0, 0,
-        0, topCurveHeight
+        s * 0.55, s * 0.05,
+        s * 0.05, s * 0.1,
+        0, s * 0.3
       );
-      
-      ctx.fillStyle = `rgba(255, 105, 180, ${opacity})`;
+
+      ctx.closePath();
+
+      // Gradient fill
+      const grad = ctx.createRadialGradient(-s * 0.15, -s * 0.15, 0, 0, 0, s * 0.6);
+      grad.addColorStop(0, `${color}${Math.round(opacity * 255).toString(16).padStart(2, "0")}`);
+      grad.addColorStop(1, `${color}${Math.round(opacity * 180).toString(16).padStart(2, "0")}`);
+      ctx.fillStyle = grad;
       ctx.fill();
+
+      // Shine highlight
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.ellipse(-s * 0.18, -s * 0.25, s * 0.12, s * 0.08, -0.3, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 255, 255, ${opacity * 0.4})`;
+      ctx.fill();
+
       ctx.restore();
     };
 
-    // Animation loop
     const animate = () => {
+      timeRef.current += 0.016;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       heartsRef.current.forEach((heart) => {
-        // Update position - hearts float up
-        heart.y -= heart.speed;
-        heart.x += heart.drift;
+        heart.pulse += heart.pulseSpeed;
+        const pulseScale = 1 + Math.sin(heart.pulse) * 0.08;
 
-        // Reset if heart goes off screen
+        heart.y -= heart.speed;
+        heart.x += heart.drift + Math.sin(timeRef.current + heart.pulse) * 0.2;
+        heart.rotation += heart.rotationSpeed;
+
         if (heart.y < -50) {
-          heart.y = canvas.height + 20;
+          heart.y = canvas.height + 30;
           heart.x = Math.random() * canvas.width;
+          heart.color = heartColors[Math.floor(Math.random() * heartColors.length)];
         }
 
-        // Draw heart
-        drawHeart(heart.x, heart.y, heart.size, heart.opacity);
+        drawHeart(heart.x, heart.y, heart.size, heart.opacity, heart.rotation, heart.color, pulseScale);
       });
 
       animationFrameRef.current = requestAnimationFrame(animate);
@@ -112,30 +149,14 @@ export default function HeartsEffect({ onClose }: HeartsEffectProps) {
     animate();
 
     return () => {
-      window.removeEventListener('resize', resizeCanvas);
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      window.removeEventListener("resize", resizeCanvas);
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
   }, []);
 
   return (
     <div className="fixed inset-0 pointer-events-none z-[9999]">
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full"
-      />
-      {onClose && (
-        <div className="fixed bottom-4 right-4 pointer-events-auto bg-black/90 dark:bg-white/95 backdrop-blur-md border-2 border-white/30 dark:border-black/30 text-white dark:text-black px-4 py-2 rounded-lg shadow-2xl transition-all hover:scale-105">
-          <button
-            onClick={onClose}
-            className="text-center"
-          >
-            <div className="font-semibold text-sm">Hearts</div>
-            <div className="text-xs font-medium opacity-90">(Ctrl+E)</div>
-          </button>
-        </div>
-      )}
+      <canvas ref={canvasRef} className="w-full h-full" />
     </div>
   );
 }

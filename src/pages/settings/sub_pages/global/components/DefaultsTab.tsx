@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { LANGUAGE_OPTIONS } from "@/config/languages";
 import { celebrateTaskCompletion, type CelebrationType } from "@/utils/confetti";
 import { setFontStyle, type FontStyle } from "@/utils/fontStyle";
-import { MOTIVATIONAL_QUOTES, HERO_IMAGES } from "../utils/constants";
 
 type DefaultsTabProps = {
   language: string;

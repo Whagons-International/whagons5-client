@@ -147,6 +147,7 @@ export interface WorkspaceTableModeParams {
   userMapRef: React.MutableRefObject<any>;
   tagMapRef: React.MutableRefObject<any>;
   taskTagsRef: React.MutableRefObject<any>;
+  spotVisibilityFilterRef?: React.MutableRefObject<(task: any) => boolean>;
 }
 
 /**
@@ -176,6 +177,7 @@ export const useWorkspaceTableMode = (params: WorkspaceTableModeParams) => {
             tagMapRef: params.tagMapRef,
             taskTagsRef: params.taskTagsRef,
             sortModel,
+            spotVisibilityFilterRef: params.spotVisibilityFilterRef,
           });
           setClientRows(rows || []);
           try {

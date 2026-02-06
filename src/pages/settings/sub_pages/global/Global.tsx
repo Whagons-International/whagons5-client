@@ -20,7 +20,7 @@ import { PresetThemesGrid } from "./components/PresetThemesGrid";
 import { CustomDesignerTab } from "./components/CustomDesignerTab";
 import { useBrandingState } from "./hooks/useBrandingState";
 import { useThemeManagement } from "./hooks/useThemeManagement";
-import { CUSTOM_THEME_ID, TOGGLE_CONFIG, ASSET_CONFIG, MOTIVATIONAL_QUOTES, HERO_IMAGES } from "./utils/constants";
+import { CUSTOM_THEME_ID, TOGGLE_CONFIG, ASSET_CONFIG, getMotivationalQuotes, HERO_IMAGES } from "./utils/constants";
 import { previewGradient, darkPreviewGradient } from "./utils/colorHelpers";
 
 function Global() {
@@ -38,9 +38,21 @@ function Global() {
   const [heroImage, _setHeroImage] = useState(() => 
     HERO_IMAGES[Math.floor(Math.random() * HERO_IMAGES.length)]
   );
-  const [motivationalQuote, _setMotivationalQuote] = useState(() =>
-    MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]
+  
+  // Get quotes for current language and select random quote
+  const getRandomQuote = (lang: string) => {
+    const quotes = getMotivationalQuotes(lang);
+    return quotes[Math.floor(Math.random() * quotes.length)];
+  };
+  
+  const [motivationalQuote, setMotivationalQuote] = useState(() =>
+    getRandomQuote(language)
   );
+
+  // Update quote when language changes
+  useEffect(() => {
+    setMotivationalQuote(getRandomQuote(language));
+  }, [language]);
 
   // Initialize font style on mount
   useEffect(() => {

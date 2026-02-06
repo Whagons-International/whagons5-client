@@ -10,239 +10,198 @@ interface Raindrop {
   length: number;
   speed: number;
   opacity: number;
+  thickness: number;
 }
 
-export default function LightningRainEffect({ onClose }: LightningRainEffectProps) {
+interface BoltSegment {
+  x1: number; y1: number; x2: number; y2: number;
+}
+
+export default function LightningRainEffect({ onClose: _onClose }: LightningRainEffectProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const raindropsRef = useRef<Raindrop[]>([]);
   const animationFrameRef = useRef<number>();
   const [flash, setFlash] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(() => 
-    document.documentElement.classList.contains('dark')
+  const boltsRef = useRef<{ segments: BoltSegment[]; life: number; maxLife: number }[]>([]);
+  const [isDarkMode, setIsDarkMode] = useState(() =>
+    document.documentElement.classList.contains("dark")
   );
+
   useEffect(() => {
-    // Detect theme changes
     const updateThemeState = () => {
-      setIsDarkMode(document.documentElement.classList.contains('dark'));
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
     };
-
     const observer = new MutationObserver(updateThemeState);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class']
-    });
-
-    const mql = window.matchMedia('(prefers-color-scheme: dark)');
-    mql.addEventListener('change', updateThemeState);
-
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    const mql = window.matchMedia("(prefers-color-scheme: dark)");
+    mql.addEventListener("change", updateThemeState);
     return () => {
       observer.disconnect();
-      mql.removeEventListener('change', updateThemeState);
+      mql.removeEventListener("change", updateThemeState);
     };
   }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Set canvas size to window size
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     };
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener("resize", resizeCanvas);
 
-    // Create raindrops
-    const createRaindrops = () => {
-      const count = 250; // More rain for stormy effect
+    const windAngle = 0.12; // stronger wind for storm
+
+    // Heavy rain
+    const createRain = () => {
+      const count = 400;
       raindropsRef.current = [];
       for (let i = 0; i < count; i++) {
+        const speed = Math.random() * 8 + 14;
         raindropsRef.current.push({
-          x: Math.random() * canvas.width,
+          x: Math.random() * (canvas.width + 300) - 150,
           y: Math.random() * canvas.height,
-          length: Math.random() * 25 + 15, // Longer rain
-          speed: Math.random() * 7 + 12, // Faster rain
-          opacity: Math.random() * 0.4 + 0.3,
+          length: speed * 1.3 + Math.random() * 10,
+          speed,
+          opacity: Math.random() * 0.35 + 0.25,
+          thickness: Math.random() * 1 + 0.8,
         });
       }
     };
-    createRaindrops();
+    createRain();
 
-    // Draw lightning bolt
-    const drawLightning = (startX: number, startY: number) => {
-      // Lightning color adapts to theme - brighter in light mode
-      const lightningColor = isDarkMode 
-        ? 'rgba(255, 255, 255, 0.95)' 
-        : 'rgba(255, 255, 255, 0.98)'; // Bright white for light mode
-      const glowColor = isDarkMode 
-        ? 'rgba(255, 255, 255, 0.8)' 
-        : 'rgba(200, 220, 255, 0.9)'; // Blue-white glow for light mode
-      
-      // Draw outer glow layer (thicker, more transparent)
-      ctx.strokeStyle = glowColor;
-      ctx.lineWidth = isDarkMode ? 8 : 12; // Thicker in light mode
-      ctx.shadowBlur = isDarkMode ? 30 : 50; // More blur in light mode
-      ctx.shadowColor = isDarkMode ? 'white' : 'rgba(150, 200, 255, 1)';
-      
-      let x = startX;
-      let y = startY;
-      
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      
-      while (y < canvas.height) {
-        const segmentLength = Math.random() * 60 + 40;
-        const angle = (Math.random() - 0.5) * 0.6;
-        
-        x += Math.sin(angle) * segmentLength;
-        y += segmentLength;
-        
-        ctx.lineTo(x, y);
-        
-        // Add branches occasionally
-        if (Math.random() > 0.65) {
-          const branchX = x;
-          const branchY = y;
-          const branchAngle = (Math.random() - 0.5) * 1.8;
-          const branchLength = Math.random() * 120 + 60;
-          
-          ctx.lineTo(
-            branchX + Math.sin(branchAngle) * branchLength,
-            branchY + branchLength * 0.5
-          );
-          ctx.moveTo(x, y);
+    // Generate bolt with branching
+    const generateBolt = (sx: number, sy: number, ey: number, spread: number, depth: number): BoltSegment[] => {
+      const segs: BoltSegment[] = [];
+      const steps = Math.floor((ey - sy) / 30) + 4;
+      let x = sx, y = sy;
+      for (let i = 0; i < steps; i++) {
+        const segLen = (ey - sy) / steps;
+        const jitter = (Math.random() - 0.5) * spread;
+        const nx = x + jitter;
+        const ny = y + segLen;
+        segs.push({ x1: x, y1: y, x2: nx, y2: ny });
+        if (depth > 0 && Math.random() > 0.6) {
+          const ba = (Math.random() - 0.5) * 1.4;
+          const bl = Math.random() * 100 + 50;
+          segs.push({ x1: nx, y1: ny, x2: nx + Math.sin(ba) * bl, y2: ny + bl * 0.4 });
+          if (depth > 1) {
+            const sub = generateBolt(nx, ny, ny + bl * 0.5, spread * 0.4, depth - 1);
+            segs.push(...sub);
+          }
         }
+        x = nx; y = ny;
+        if (y >= ey) break;
       }
-      
-      ctx.stroke();
-      
-      // Draw inner bright core (thinner, more opaque)
-      ctx.strokeStyle = lightningColor;
-      ctx.lineWidth = isDarkMode ? 4 : 6; // Thicker core in light mode
-      ctx.shadowBlur = isDarkMode ? 15 : 25;
-      ctx.shadowColor = isDarkMode ? 'white' : 'rgba(255, 255, 255, 1)';
-      
-      x = startX;
-      y = startY;
-      
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      
-      while (y < canvas.height) {
-        const segmentLength = Math.random() * 60 + 40;
-        const angle = (Math.random() - 0.5) * 0.6;
-        
-        x += Math.sin(angle) * segmentLength;
-        y += segmentLength;
-        
-        ctx.lineTo(x, y);
-        
-        // Add branches occasionally
-        if (Math.random() > 0.65) {
-          const branchX = x;
-          const branchY = y;
-          const branchAngle = (Math.random() - 0.5) * 1.8;
-          const branchLength = Math.random() * 120 + 60;
-          
-          ctx.lineTo(
-            branchX + Math.sin(branchAngle) * branchLength,
-            branchY + branchLength * 0.5
-          );
-          ctx.moveTo(x, y);
-        }
-      }
-      
-      ctx.stroke();
-      ctx.shadowBlur = 0;
+      return segs;
     };
 
-    // Animation loop for rain
+    // Schedule lightning
+    let timeout: ReturnType<typeof setTimeout>;
+    const strike = () => {
+      if (Math.random() > 0.3) {
+        const sx = Math.random() * canvas.width;
+        const segs = generateBolt(sx, 0, canvas.height * (0.6 + Math.random() * 0.4), 60, 2);
+        const ml = 14 + Math.random() * 8;
+        boltsRef.current.push({ segments: segs, life: ml, maxLife: ml });
+
+        if (Math.random() > 0.55) {
+          const s2 = generateBolt(sx + (Math.random() - 0.5) * 100, 0, canvas.height * 0.7, 50, 1);
+          boltsRef.current.push({ segments: s2, life: ml * 0.6, maxLife: ml * 0.6 });
+        }
+
+        setFlash(true);
+        setTimeout(() => setFlash(false), 70 + Math.random() * 60);
+      }
+      timeout = setTimeout(strike, 1200 + Math.random() * 3000);
+    };
+    timeout = setTimeout(strike, 600);
+
+    const windDx = Math.sin(windAngle);
+
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      raindropsRef.current.forEach((drop) => {
-        // Update position
-        drop.y += drop.speed;
+      // Subtle dark atmosphere
+      ctx.fillStyle = isDarkMode ? "rgba(8, 12, 25, 0.04)" : "rgba(40, 50, 70, 0.02)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Reset if raindrop goes off screen
-        if (drop.y > canvas.height) {
-          drop.y = -drop.length;
-          drop.x = Math.random() * canvas.width;
+      // Rain
+      raindropsRef.current.forEach((d) => {
+        d.y += d.speed;
+        d.x += windDx * d.speed * 0.5;
+        if (d.y > canvas.height) {
+          d.y = -d.length - Math.random() * 80;
+          d.x = Math.random() * (canvas.width + 300) - 150;
         }
-
-        // Draw raindrop as a line
-        // Dark mode: light blue, Light mode: darker blue/gray
+        const ex = d.x - windDx * d.length * 0.3;
+        const ey = d.y - d.length;
         ctx.beginPath();
-        ctx.moveTo(drop.x, drop.y);
-        ctx.lineTo(drop.x, drop.y + drop.length);
-        ctx.strokeStyle = isDarkMode 
-          ? `rgba(174, 194, 224, ${drop.opacity})`
-          : `rgba(60, 90, 130, ${drop.opacity})`;
-        ctx.lineWidth = 1.5;
+        ctx.moveTo(d.x, d.y);
+        ctx.lineTo(ex, ey);
+        ctx.strokeStyle = isDarkMode
+          ? `rgba(170, 195, 230, ${d.opacity})`
+          : `rgba(50, 80, 125, ${d.opacity})`;
+        ctx.lineWidth = d.thickness;
         ctx.stroke();
+      });
+
+      // Lightning bolts
+      boltsRef.current = boltsRef.current.filter((bolt) => {
+        bolt.life -= 1;
+        if (bolt.life <= 0) return false;
+        const alpha = bolt.life / bolt.maxLife;
+
+        // Outer glow
+        ctx.save();
+        ctx.shadowBlur = isDarkMode ? 30 : 50;
+        ctx.shadowColor = isDarkMode ? `rgba(200, 220, 255, ${alpha * 0.6})` : `rgba(150, 200, 255, ${alpha * 0.7})`;
+        ctx.strokeStyle = isDarkMode
+          ? `rgba(180, 200, 255, ${alpha * 0.4})`
+          : `rgba(160, 190, 255, ${alpha * 0.5})`;
+        ctx.lineWidth = isDarkMode ? 7 : 10;
+        ctx.beginPath();
+        bolt.segments.forEach((s) => { ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); });
+        ctx.stroke();
+        ctx.restore();
+
+        // Bright core
+        ctx.save();
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = `rgba(255, 255, 255, ${alpha * 0.8})`;
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.9})`;
+        ctx.lineWidth = isDarkMode ? 2.5 : 3.5;
+        ctx.beginPath();
+        bolt.segments.forEach((s) => { ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); });
+        ctx.stroke();
+        ctx.restore();
+
+        return true;
       });
 
       animationFrameRef.current = requestAnimationFrame(animate);
     };
     animate();
 
-    // Lightning strikes at random intervals
-    const createLightningStrike = () => {
-      if (Math.random() > 0.4) { // 60% chance of lightning
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Draw 1-3 lightning bolts
-        const bolts = Math.random() > 0.6 ? (Math.random() > 0.8 ? 3 : 2) : 1;
-        for (let i = 0; i < bolts; i++) {
-          const startX = Math.random() * canvas.width;
-          drawLightning(startX, 0);
-        }
-        
-        // Flash effect
-        setFlash(true);
-        setTimeout(() => {
-          setFlash(false);
-        }, 80);
-      }
-    };
-
-    // Schedule random lightning strikes
-    const scheduleLightning = () => {
-      createLightningStrike();
-      const nextStrike = 1500 + Math.random() * 3500; // Between 1.5-5 seconds
-      setTimeout(scheduleLightning, nextStrike);
-    };
-    
-    // Start lightning after a short delay
-    setTimeout(scheduleLightning, 1000);
-
     return () => {
-      window.removeEventListener('resize', resizeCanvas);
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      window.removeEventListener("resize", resizeCanvas);
+      clearTimeout(timeout);
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
   }, [isDarkMode]);
 
   return (
     <div className="fixed inset-0 pointer-events-none z-[9999]">
-      {/* Flash overlay */}
-      <div 
+      <div
         className={`absolute inset-0 transition-opacity duration-75 ${
-          isDarkMode ? 'bg-white' : 'bg-blue-100'
-        } ${
-          flash ? (isDarkMode ? 'opacity-25' : 'opacity-20') : 'opacity-0'
-        }`}
+          isDarkMode ? "bg-white" : "bg-blue-100"
+        } ${flash ? (isDarkMode ? "opacity-25" : "opacity-20") : "opacity-0"}`}
       />
-      {/* Rain canvas */}
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full"
-      />
+      <canvas ref={canvasRef} className="w-full h-full" />
     </div>
   );
 }

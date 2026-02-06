@@ -55,6 +55,25 @@ const AnalyticsSettings = lazy(() => import('@/pages/settings/sub_pages/analytic
 const MotivationSettings = lazy(() => import('@/pages/settings/sub_pages/motivation/MotivationSettings'));
 const HotelAnalyticsSettings = lazy(() => import('@/pages/settings/sub_pages/HotelAnalyticsSettings'));
 
+// Working Hours (lazy)
+const WorkingHoursSettings = lazy(() => import('@/pages/settings/sub_pages/WorkingHoursSettings'));
+const WorkingSchedules = lazy(() => import('@/pages/settings/sub_pages/working-hours/WorkingSchedules'));
+const TimeOffTypes = lazy(() => import('@/pages/settings/sub_pages/working-hours/TimeOffTypes'));
+const TimeOffRequests = lazy(() => import('@/pages/time-off/TimeOffRequests'));
+const WorkingHoursDashboard = lazy(() => import('@/pages/working-hours').then(m => ({ default: m.WorkingHoursDashboard })));
+
+// Guards
+const WorkingHoursGuard = lazy(() => import('@/components/PluginGuard').then(m => ({ default: m.WorkingHoursGuard })));
+const PluginGuard = lazy(() => import('@/components/PluginGuard').then(m => ({ default: m.PluginGuard })));
+
+// Assets (lazy)
+const AssetsPage = lazy(() => import('@/pages/assets/AssetsPage').then(m => ({ default: m.AssetsPage })));
+const AssetDetail = lazy(() => import('@/pages/assets/AssetDetail').then(m => ({ default: m.AssetDetail })));
+const AssetTypesManager = lazy(() => import('@/pages/assets/AssetTypesManager').then(m => ({ default: m.AssetTypesManager })));
+
+// QR Codes (lazy)
+const QrCodesPage = lazy(() => import('@/pages/qr-codes/QrCodesPage').then(m => ({ default: m.QrCodesPage })));
+
 
 const pages = [
   { path: '/workspace/:id', component: <Workspace /> },
@@ -130,11 +149,24 @@ export const HomeRoutes = () => {
             <Route path="/settings/analytics" element={<AnalyticsSettings />} />
             <Route path="/settings/motivation" element={<MotivationSettings />} />
             <Route path="/settings/hotel-analytics" element={<HotelAnalyticsSettings />} />
+            <Route path="/working-hours" element={<Suspense fallback={null}><WorkingHoursGuard><WorkingHoursDashboard /></WorkingHoursGuard></Suspense>} />
+            <Route path="/settings/working-hours" element={<Suspense fallback={null}><WorkingHoursGuard><WorkingHoursSettings /></WorkingHoursGuard></Suspense>} />
+            <Route path="/settings/working-schedules" element={<Suspense fallback={null}><WorkingHoursGuard><WorkingSchedules /></WorkingHoursGuard></Suspense>} />
+            <Route path="/settings/time-off-types" element={<Suspense fallback={null}><WorkingHoursGuard><TimeOffTypes /></WorkingHoursGuard></Suspense>} />
+            <Route path="/time-off" element={<Suspense fallback={null}><WorkingHoursGuard><TimeOffRequests /></WorkingHoursGuard></Suspense>} />
             <Route path="/settings/test" element={<TestPage />} />
             
             {/* Compliance Routes */}
             <Route path="/compliance/standards" element={<ComplianceStandards />} />
             <Route path="/compliance/standards/:id" element={<ComplianceStandardDetail />} />
+
+            {/* Asset Management Routes */}
+            <Route path="/assets" element={<Suspense fallback={null}><PluginGuard pluginSlug="assets"><AssetsPage /></PluginGuard></Suspense>} />
+            <Route path="/assets/types" element={<Suspense fallback={null}><PluginGuard pluginSlug="assets"><AssetTypesManager /></PluginGuard></Suspense>} />
+            <Route path="/assets/:id" element={<Suspense fallback={null}><PluginGuard pluginSlug="assets"><AssetDetail /></PluginGuard></Suspense>} />
+
+            {/* QR Codes Routes */}
+            <Route path="/qr-codes" element={<Suspense fallback={null}><PluginGuard pluginSlug="qr-codes"><QrCodesPage /></PluginGuard></Suspense>} />
           </Routes>
         </Suspense>
       </MainLayout>

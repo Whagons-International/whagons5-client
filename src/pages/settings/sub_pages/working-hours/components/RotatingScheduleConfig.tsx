@@ -33,11 +33,15 @@ export function RotatingScheduleConfig({ config, onChange }: RotatingScheduleCon
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
   const [shiftForm, setShiftForm] = useState<Partial<Shift>>({});
 
+  // Ensure config.shifts and config.rotation exist to prevent crashes
+  const shifts = config?.shifts ?? [];
+  const rotation = config?.rotation ?? { pattern: [] };
+
   const weeklyHours = calculateRotatingWeeklyHours(config);
-  const cycleLength = config.rotation?.pattern?.reduce((sum, p) => sum + p.weeks, 0) || 0;
+  const cycleLength = rotation.pattern?.reduce((sum, p) => sum + p.weeks, 0) || 0;
 
   const openAddShiftDialog = () => {
-    const usedColors = config.shifts.map(s => s.color);
+    const usedColors = shifts.map(s => s.color);
     const availableColor = SHIFT_COLORS.find(c => !usedColors.includes(c)) || SHIFT_COLORS[0];
     
     setEditingShift(null);
@@ -72,10 +76,10 @@ export function RotatingScheduleConfig({ config, onChange }: RotatingScheduleCon
     };
 
     let newShifts: Shift[];
-    let newPattern = [...(config.rotation?.pattern || [])];
+    let newPattern = [...(rotation.pattern || [])];
 
     if (editingShift) {
-      newShifts = config.shifts.map(s => s.id === editingShift.id ? newShift : s);
+      newShifts = shifts.map(s => s.id === editingShift.id ? newShift : s);
     } else {
       newShifts = [...config.shifts, newShift];
       // Add new shift to rotation pattern with 1 week default
@@ -91,8 +95,8 @@ export function RotatingScheduleConfig({ config, onChange }: RotatingScheduleCon
   };
 
   const handleDeleteShift = (shiftId: string) => {
-    const newShifts = config.shifts.filter(s => s.id !== shiftId);
-    const newPattern = config.rotation?.pattern?.filter(p => p.shiftId !== shiftId) || [];
+    const newShifts = shifts.filter(s => s.id !== shiftId);
+    const newPattern = rotation.pattern?.filter(p => p.shiftId !== shiftId) || [];
     
     onChange({
       ...config,
@@ -102,7 +106,7 @@ export function RotatingScheduleConfig({ config, onChange }: RotatingScheduleCon
   };
 
   const handlePatternWeeksChange = (shiftId: string, weeks: number) => {
-    const newPattern = config.rotation?.pattern?.map(p =>
+    const newPattern = rotation.pattern?.map(p =>
       p.shiftId === shiftId ? { ...p, weeks: Math.max(1, weeks) } : p
     ) || [];
 
@@ -135,7 +139,7 @@ export function RotatingScheduleConfig({ config, onChange }: RotatingScheduleCon
 
       {/* Shifts list */}
       <div className="space-y-2">
-        {config.shifts.map((shift) => (
+        {shifts.map((shift) => (
           <div
             key={shift.id}
             onClick={() => openEditShiftDialog(shift)}
@@ -180,12 +184,12 @@ export function RotatingScheduleConfig({ config, onChange }: RotatingScheduleCon
       </div>
 
       {/* Rotation Pattern */}
-      {config.shifts.length > 0 && (
+      {shifts.length > 0 && (
         <div className="space-y-3">
           <Label className="text-sm font-medium">Rotation Pattern</Label>
           <div className="space-y-2">
-            {config.rotation?.pattern?.map((item, index) => {
-              const shift = config.shifts.find(s => s.id === item.shiftId);
+            {rotation.pattern?.map((item, index) => {
+              const shift = shifts.find(s => s.id === item.shiftId);
               if (!shift) return null;
 
               return (

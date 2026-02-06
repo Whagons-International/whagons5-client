@@ -1,4 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
+import {
+  ComplianceSummaryDialog,
+  BreachAnalysisDialog,
+  EscalationReportDialog,
+  ResponseTimeTrendsDialog,
+} from "./SlaReportViews";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBed,
@@ -651,7 +657,25 @@ function StaffReports({ favoriteIds, onToggleFavorite }: { favoriteIds: string[]
 
 // SLA/Compliance Tab Content
 function SlaReports({ favoriteIds, onToggleFavorite }: { favoriteIds: string[]; onToggleFavorite: (id: string) => void }) {
-  return <ReportsGrid reports={ALL_REPORTS.sla} tab="sla" favoriteIds={favoriteIds} onToggleFavorite={onToggleFavorite} />;
+  const [openReport, setOpenReport] = useState<string | null>(null);
+
+  // Override onClick for SLA reports to open dialog views
+  const slaReportsWithHandlers = useMemo(() => {
+    return ALL_REPORTS.sla.map(report => ({
+      ...report,
+      onClick: () => setOpenReport(report.id),
+    }));
+  }, []);
+
+  return (
+    <>
+      <ReportsGrid reports={slaReportsWithHandlers} tab="sla" favoriteIds={favoriteIds} onToggleFavorite={onToggleFavorite} />
+      <ComplianceSummaryDialog open={openReport === "compliance-summary"} onOpenChange={(v) => !v && setOpenReport(null)} />
+      <BreachAnalysisDialog open={openReport === "breach-analysis"} onOpenChange={(v) => !v && setOpenReport(null)} />
+      <EscalationReportDialog open={openReport === "escalation"} onOpenChange={(v) => !v && setOpenReport(null)} />
+      <ResponseTimeTrendsDialog open={openReport === "response-time-trends"} onOpenChange={(v) => !v && setOpenReport(null)} />
+    </>
+  );
 }
 
 // Executive Tab Content

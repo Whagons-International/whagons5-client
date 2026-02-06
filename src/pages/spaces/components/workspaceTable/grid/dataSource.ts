@@ -12,7 +12,7 @@ const buildParams = (wr: React.MutableRefObject<string>, sm: any, pm: any, spm: 
 };
 
 export function buildGetRows(TasksCache: any, refs: any) {
-  const { rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, externalFilterModelRef, normalizeFilterModelForQuery, setEmptyOverlayVisible } = refs;
+  const { rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, externalFilterModelRef, normalizeFilterModelForQuery, setEmptyOverlayVisible, spotVisibilityFilterRef } = refs;
   return async (params: any) => {
     const sortModel = getSort(params.sortModel);
     const cacheKey = `${workspaceRef.current}-${params.startRow}-${params.endRow}-${JSON.stringify(params.filterModel || {})}-${JSON.stringify(sortModel)}-${searchRef.current}`;
@@ -72,8 +72,12 @@ export function buildGetRows(TasksCache: any, refs: any) {
       };
 
       const result = await TasksCache.queryTasks(queryParams);
-      const rows = result?.rows || [];
-      const total = result?.rowCount || 0;
+      let rows = result?.rows || [];
+      // Apply spot-based visibility filter (belt-and-suspenders with backend filtering)
+      if (spotVisibilityFilterRef?.current) {
+        rows = rows.filter(spotVisibilityFilterRef.current);
+      }
+      const total = spotVisibilityFilterRef?.current ? rows.length : (result?.rowCount || 0);
       try { if (localStorage.getItem('wh-debug-filters') === 'true') console.log('[WT getRows] result rows=', rows.length, 'total=', total); } catch {}
       rowCache.current.set(cacheKey, { rows, rowCount: total });
       try { setEmptyOverlayVisible?.(total === 0); } catch {}
@@ -87,14 +91,18 @@ export function buildGetRows(TasksCache: any, refs: any) {
 }
 
 export async function refreshClientSideGrid(gridApi: any, TasksCache: any, params: any) {
-  const { search, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, sortModel } = params;
+  const { search, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, sortModel, spotVisibilityFilterRef } = params;
   const baseParams: any = { search, ...buildParams(workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef) };
   const effectiveSortModel = getSort(sortModel);
 
   const countResp = await TasksCache.queryTasks({ ...baseParams, sortModel: effectiveSortModel, startRow: 0, endRow: 0 });
   const totalFiltered = countResp?.rowCount ?? 0;
   const rowsResp = await TasksCache.queryTasks({ ...baseParams, sortModel: effectiveSortModel, startRow: 0, endRow: totalFiltered });
-  const rows = rowsResp?.rows || [];
+  let rows = rowsResp?.rows || [];
+  // Apply spot-based visibility filter
+  if (spotVisibilityFilterRef?.current) {
+    rows = rows.filter(spotVisibilityFilterRef.current);
+  }
   try {
     gridApi?.setGridOption?.('rowData', rows);
   } catch {

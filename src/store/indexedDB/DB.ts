@@ -2,7 +2,7 @@ import { auth } from '@/firebase/firebaseConfig';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.18.0';
+const CURRENT_DB_VERSION = '1.21.0';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -261,14 +261,8 @@ export class DB {
             const store = db.createObjectStore('working_schedules', { keyPath: 'id' });
             store.createIndex('is_default', 'is_default', { unique: false });
           }
-          if (!db.objectStoreNames.contains('working_schedule_days')) {
-            const store = db.createObjectStore('working_schedule_days', { keyPath: 'id' });
-            store.createIndex('working_schedule_id', 'working_schedule_id', { unique: false });
-          }
-          if (!db.objectStoreNames.contains('working_schedule_breaks')) {
-            const store = db.createObjectStore('working_schedule_breaks', { keyPath: 'id' });
-            store.createIndex('working_schedule_day_id', 'working_schedule_day_id', { unique: false });
-          }
+          // working_schedule_days and working_schedule_breaks stores removed
+          // Schedule day/break data is now stored in the JSON schedule_config column on working_schedules
           if (!db.objectStoreNames.contains('schedule_assignments')) {
             const store = db.createObjectStore('schedule_assignments', { keyPath: 'id' });
             store.createIndex('working_schedule_id', 'working_schedule_id', { unique: false });
@@ -363,6 +357,68 @@ export class DB {
           // Workflows
           if (!db.objectStoreNames.contains('workflows')) {
             db.createObjectStore('workflows', { keyPath: 'id' });
+          }
+
+          // Documents & Protocols
+          if (!db.objectStoreNames.contains('documents')) {
+            const store = db.createObjectStore('documents', { keyPath: 'id' });
+            store.createIndex('workspace_id', 'workspace_id', { unique: false });
+            store.createIndex('document_type', 'document_type', { unique: false });
+            store.createIndex('uuid', 'uuid', { unique: true });
+          }
+          if (!db.objectStoreNames.contains('document_associations')) {
+            const store = db.createObjectStore('document_associations', { keyPath: 'id' });
+            store.createIndex('document_id', 'document_id', { unique: false });
+            store.createIndex('associable_type', 'associable_type', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('document_acknowledgments')) {
+            const store = db.createObjectStore('document_acknowledgments', { keyPath: 'id' });
+            store.createIndex('document_id', 'document_id', { unique: false });
+            store.createIndex('user_id', 'user_id', { unique: false });
+          }
+
+          // Asset Management Plugin
+          if (!db.objectStoreNames.contains('asset_types')) {
+            db.createObjectStore('asset_types', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('asset_items')) {
+            const store = db.createObjectStore('asset_items', { keyPath: 'id' });
+            store.createIndex('asset_type_id', 'asset_type_id', { unique: false });
+            store.createIndex('spot_id', 'spot_id', { unique: false });
+            store.createIndex('status', 'status', { unique: false });
+            store.createIndex('parent_id', 'parent_id', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('asset_maintenance_schedules')) {
+            const store = db.createObjectStore('asset_maintenance_schedules', { keyPath: 'id' });
+            store.createIndex('asset_item_id', 'asset_item_id', { unique: false });
+            store.createIndex('is_active', 'is_active', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('asset_maintenance_logs')) {
+            const store = db.createObjectStore('asset_maintenance_logs', { keyPath: 'id' });
+            store.createIndex('asset_item_id', 'asset_item_id', { unique: false });
+            store.createIndex('schedule_id', 'schedule_id', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('asset_custom_fields')) {
+            const store = db.createObjectStore('asset_custom_fields', { keyPath: 'id' });
+            store.createIndex('asset_type_id', 'asset_type_id', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('asset_custom_field_values')) {
+            const store = db.createObjectStore('asset_custom_field_values', { keyPath: 'id' });
+            store.createIndex('asset_item_id', 'asset_item_id', { unique: false });
+            store.createIndex('field_id', 'field_id', { unique: false });
+          }
+
+          // QR Code Plugin
+          if (!db.objectStoreNames.contains('qr_codes')) {
+            const store = db.createObjectStore('qr_codes', { keyPath: 'id' });
+            store.createIndex('uuid', 'uuid', { unique: true });
+            store.createIndex('entity_type', 'entity_type', { unique: false });
+            store.createIndex('is_active', 'is_active', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('qr_scan_logs')) {
+            const store = db.createObjectStore('qr_scan_logs', { keyPath: 'id' });
+            store.createIndex('qr_code_id', 'qr_code_id', { unique: false });
+            store.createIndex('user_id', 'user_id', { unique: false });
           }
 
           // Compliance Module

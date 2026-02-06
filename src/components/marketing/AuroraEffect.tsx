@@ -4,7 +4,18 @@ interface AuroraEffectProps {
   onClose?: () => void;
 }
 
-export default function AuroraEffect({ onClose }: AuroraEffectProps) {
+/**
+ * Realistic Aurora Borealis effect.
+ *
+ * Key visual characteristics of real aurora:
+ * - Vertical curtains/veils of light hanging from the sky
+ * - Light is brightest at the top edge and fades downward
+ * - Dominant green with purple/pink at the upper edges and blue at the base
+ * - Curtains sway and ripple horizontally like fabric in wind
+ * - Translucent, overlapping layers
+ * - Occasional bright flare-ups along the curtain edge
+ */
+export default function AuroraEffect({ onClose: _onClose }: AuroraEffectProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number>();
   const timeRef = useRef(0);
@@ -13,113 +24,202 @@ export default function AuroraEffect({ onClose }: AuroraEffectProps) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Set canvas size to window size
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     };
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener("resize", resizeCanvas);
 
-    // Aurora color layers - realistic northern lights colors
-    const auroraLayers = [
-      { hue: 140, saturation: 80, lightness: 65, name: 'green' },    // Primary green
-      { hue: 280, saturation: 70, lightness: 60, name: 'purple' },   // Purple
-      { hue: 200, saturation: 75, lightness: 55, name: 'blue' },     // Blue-green
-      { hue: 330, saturation: 65, lightness: 70, name: 'pink' },     // Pink/magenta
-    ];
+    // Pre-compute random offsets for curtain columns to avoid recalculating
+    const COLS = 300; // number of vertical strips across the screen
+    const colSeeds = Array.from({ length: COLS }, () => ({
+      phase: Math.random() * Math.PI * 2,
+      speed: 0.3 + Math.random() * 0.4,
+      amp: 0.6 + Math.random() * 0.4,
+      brightnessOffset: Math.random() * Math.PI * 2,
+    }));
 
-    // Draw vertical curtain/ray effect
-    const drawVerticalRay = (x: number, baseY: number, height: number, color: { hue: number; saturation: number; lightness: number }, intensity: number) => {
-      const gradient = ctx.createLinearGradient(x, baseY, x, baseY + height);
-      gradient.addColorStop(0, `hsla(${color.hue}, ${color.saturation}%, ${color.lightness}%, ${intensity * 0.6})`);
-      gradient.addColorStop(0.3, `hsla(${color.hue}, ${color.saturation}%, ${color.lightness}%, ${intensity * 0.4})`);
-      gradient.addColorStop(0.7, `hsla(${color.hue}, ${color.saturation}%, ${color.lightness}%, ${intensity * 0.2})`);
-      gradient.addColorStop(1, `hsla(${color.hue}, ${color.saturation}%, ${color.lightness}%, 0)`);
+    // Stars
+    const starCount = Math.min(Math.floor((window.innerWidth * window.innerHeight) / 6000), 400);
+    const stars = Array.from({ length: starCount }, () => ({
+      x: Math.random(),
+      y: Math.random() * 0.55,
+      r: Math.random() * 1.2 + 0.3,
+      bri: Math.random() * 0.5 + 0.3,
+      tw: Math.random() * 2 + 0.5,
+      to: Math.random() * Math.PI * 2,
+    }));
 
-      ctx.fillStyle = gradient;
-      ctx.fillRect(x - 3, baseY, 6, height);
-    };
-
-    // Animation loop
     const animate = () => {
-      timeRef.current += 0.008;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      timeRef.current += 0.003; // slow, graceful movement
+      const t = timeRef.current;
+      const W = canvas.width;
+      const H = canvas.height;
 
-      // Dark atmospheric background
-      ctx.fillStyle = 'rgba(5, 10, 20, 0.1)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // Clear with a very dark blue-black
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = "rgba(4, 6, 18, 0.15)";
+      ctx.fillRect(0, 0, W, H);
 
-      // Draw each aurora layer
-      auroraLayers.forEach((layer, layerIndex) => {
-        const offset = layerIndex * Math.PI / 2;
-        
-        // Draw horizontal flowing waves
+      // Draw stars
+      for (const s of stars) {
+        const twinkle = Math.sin(t * 8 * s.tw + s.to) * 0.25 + 0.75;
+        const a = s.bri * twinkle;
         ctx.beginPath();
-        for (let x = 0; x < canvas.width; x += 3) {
-          const y = canvas.height * 0.25 + 
-                   Math.sin(x * 0.008 + timeRef.current * 1.5 + offset) * 40 +
-                   Math.sin(x * 0.003 + timeRef.current * 0.8 + offset) * 25 +
-                   Math.sin(x * 0.015 + timeRef.current * 2 + offset) * 15;
-          
-          if (x === 0) {
-            ctx.moveTo(x, y);
-          } else {
-            ctx.lineTo(x, y);
-          }
-        }
-        
-        // Gradient for horizontal waves
-        const waveGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        const pulsate = Math.sin(timeRef.current * 3 + offset) * 0.1 + 0.2;
-        waveGradient.addColorStop(0, `hsla(${layer.hue}, ${layer.saturation}%, ${layer.lightness}%, ${pulsate})`);
-        waveGradient.addColorStop(0.4, `hsla(${layer.hue}, ${layer.saturation}%, ${layer.lightness}%, ${pulsate * 0.6})`);
-        waveGradient.addColorStop(1, `hsla(${layer.hue}, ${layer.saturation}%, ${layer.lightness}%, 0)`);
-        
-        ctx.lineTo(canvas.width, canvas.height);
-        ctx.lineTo(0, canvas.height);
-        ctx.closePath();
-        ctx.fillStyle = waveGradient;
+        ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(210, 225, 255, ${a})`;
         ctx.fill();
-
-        // Draw vertical curtains/rays
-        const rayCount = 15 + layerIndex * 5;
-        for (let i = 0; i < rayCount; i++) {
-          const xPos = (i / rayCount) * canvas.width + Math.sin(timeRef.current + i) * 20;
-          const baseY = canvas.height * 0.15 + Math.sin(timeRef.current * 2 + i * 0.5 + offset) * 30;
-          const height = canvas.height * 0.4 + Math.sin(timeRef.current * 1.5 + i * 0.3) * 100;
-          const intensity = Math.sin(timeRef.current * 4 + i * 0.8 + offset) * 0.15 + 0.25;
-
-          drawVerticalRay(xPos, baseY, height, layer, intensity);
-        }
-      });
-
-      // Add shimmer particles
-      const particleCount = 30;
-      for (let i = 0; i < particleCount; i++) {
-        const x = (i / particleCount) * canvas.width + Math.sin(timeRef.current * 3 + i) * 50;
-        const y = canvas.height * 0.2 + Math.sin(timeRef.current * 2 + i * 0.5) * 80;
-        const size = Math.sin(timeRef.current * 5 + i) * 2 + 2;
-        const opacity = Math.sin(timeRef.current * 4 + i * 0.3) * 0.4 + 0.3;
-
-        ctx.beginPath();
-        ctx.arc(x, y, size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(200, 255, 220, ${opacity})`;
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = 'rgba(200, 255, 220, 0.8)';
-        ctx.fill();
-        ctx.shadowBlur = 0;
       }
+
+      // --- Aurora curtains ---
+      // We draw vertical strips across the screen width.
+      // Each strip is a vertical gradient from bright at the curtain edge (top)
+      // fading to transparent at the bottom. The curtain edge undulates.
+
+      const stripW = Math.ceil(W / COLS) + 1;
+
+      // Three overlapping curtain layers: green (dominant), purple-pink, blue-teal
+      const layers = [
+        {
+          // Primary green curtain
+          topHue: 130, topSat: 80, topLit: 65,
+          midHue: 140, midSat: 75, midLit: 50,
+          baseAlpha: 0.35,
+          edgeY: 0.12,    // how high the bright edge sits (fraction of H)
+          curtainH: 0.50,  // how far down the curtain extends
+          swaySpeed: 1.0,
+          swayAmp: 1.0,
+          phaseShift: 0,
+        },
+        {
+          // Purple-pink upper layer
+          topHue: 290, topSat: 70, topLit: 70,
+          midHue: 310, midSat: 65, midLit: 55,
+          baseAlpha: 0.20,
+          edgeY: 0.07,
+          curtainH: 0.35,
+          swaySpeed: 0.8,
+          swayAmp: 1.2,
+          phaseShift: 1.5,
+        },
+        {
+          // Blue-teal lower glow
+          topHue: 180, topSat: 60, topLit: 55,
+          midHue: 200, midSat: 65, midLit: 45,
+          baseAlpha: 0.18,
+          edgeY: 0.20,
+          curtainH: 0.45,
+          swaySpeed: 0.6,
+          swayAmp: 0.8,
+          phaseShift: 3.0,
+        },
+      ];
+
+      for (const layer of layers) {
+        for (let i = 0; i < COLS; i++) {
+          const seed = colSeeds[i];
+          const xNorm = i / COLS; // 0..1
+          const x = xNorm * W;
+
+          // Undulating curtain edge Y position
+          const sway =
+            Math.sin(xNorm * 6 + t * 1.5 * layer.swaySpeed + seed.phase + layer.phaseShift) *
+              20 * seed.amp * layer.swayAmp +
+            Math.sin(xNorm * 14 + t * 2.5 * layer.swaySpeed + seed.phase * 2) *
+              8 * seed.amp +
+            Math.sin(xNorm * 2.5 + t * 0.4 * layer.swaySpeed + layer.phaseShift) *
+              35 * layer.swayAmp;
+
+          const edgeY = H * layer.edgeY + sway;
+          const curtainBottom = edgeY + H * layer.curtainH;
+
+          // Brightness variation along the curtain (some columns brighter)
+          const brightPulse =
+            Math.sin(t * 2 * seed.speed + seed.brightnessOffset + xNorm * 4) * 0.3 + 0.7;
+          // Slow large-scale brightness wave
+          const brightWave =
+            Math.sin(xNorm * 3 + t * 0.5 + layer.phaseShift) * 0.25 + 0.75;
+          const alpha = layer.baseAlpha * brightPulse * brightWave;
+
+          // Draw vertical gradient strip: bright at edgeY, fading to transparent at curtainBottom
+          const grad = ctx.createLinearGradient(x, edgeY - 15, x, curtainBottom);
+          // Very top: slight purple/pink tint (upper edge of real aurora)
+          grad.addColorStop(0, `hsla(${layer.topHue}, ${layer.topSat}%, ${layer.topLit}%, ${alpha * 0.3})`);
+          // Bright edge
+          grad.addColorStop(0.05, `hsla(${layer.topHue}, ${layer.topSat}%, ${layer.topLit}%, ${alpha * 0.9})`);
+          // Main body
+          grad.addColorStop(0.15, `hsla(${layer.midHue}, ${layer.midSat}%, ${layer.midLit}%, ${alpha * 0.7})`);
+          grad.addColorStop(0.4, `hsla(${layer.midHue}, ${layer.midSat}%, ${layer.midLit}%, ${alpha * 0.35})`);
+          grad.addColorStop(0.7, `hsla(${layer.midHue}, ${layer.midSat}%, ${layer.midLit - 10}%, ${alpha * 0.12})`);
+          grad.addColorStop(1, `hsla(${layer.midHue}, ${layer.midSat}%, ${layer.midLit}%, 0)`);
+
+          ctx.fillStyle = grad;
+          ctx.fillRect(x, edgeY - 15, stripW, curtainBottom - edgeY + 15);
+        }
+      }
+
+      // --- Bright edge highlight (the glowing ribbon at the curtain top) ---
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+
+      // Trace the bright edge of the primary green curtain as a glowing line
+      ctx.beginPath();
+      for (let i = 0; i <= COLS; i++) {
+        const seed = colSeeds[Math.min(i, COLS - 1)];
+        const xNorm = i / COLS;
+        const x = xNorm * W;
+
+        const sway =
+          Math.sin(xNorm * 6 + t * 1.5 + seed.phase) * 20 * seed.amp +
+          Math.sin(xNorm * 14 + t * 2.5 + seed.phase * 2) * 8 * seed.amp +
+          Math.sin(xNorm * 2.5 + t * 0.4) * 35;
+
+        const edgeY = H * 0.12 + sway;
+
+        if (i === 0) ctx.moveTo(x, edgeY);
+        else ctx.lineTo(x, edgeY);
+      }
+      ctx.strokeStyle = "rgba(150, 255, 180, 0.12)";
+      ctx.lineWidth = 4;
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = "rgba(100, 255, 150, 0.4)";
+      ctx.stroke();
+
+      // Second brighter, thinner line
+      ctx.strokeStyle = "rgba(200, 255, 210, 0.08)";
+      ctx.lineWidth = 2;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = "rgba(180, 255, 200, 0.3)";
+      ctx.stroke();
+
+      ctx.restore();
+
+      // --- Subtle overall glow bloom ---
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = 0.04;
+      const bloomX = W * (0.4 + Math.sin(t * 0.2) * 0.1);
+      const bloomY = H * (0.15 + Math.sin(t * 0.15) * 0.03);
+      const bloomR = W * 0.35;
+      const bloom = ctx.createRadialGradient(bloomX, bloomY, 0, bloomX, bloomY, bloomR);
+      bloom.addColorStop(0, "hsla(140, 80%, 60%, 0.5)");
+      bloom.addColorStop(0.4, "hsla(160, 70%, 50%, 0.2)");
+      bloom.addColorStop(1, "hsla(140, 60%, 40%, 0)");
+      ctx.fillStyle = bloom;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
 
       animationFrameRef.current = requestAnimationFrame(animate);
     };
+
     animate();
 
     return () => {
-      window.removeEventListener('resize', resizeCanvas);
+      window.removeEventListener("resize", resizeCanvas);
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
@@ -128,10 +228,7 @@ export default function AuroraEffect({ onClose }: AuroraEffectProps) {
 
   return (
     <div className="fixed inset-0 pointer-events-none z-[9999]">
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full bg-black/30"
-      />
+      <canvas ref={canvasRef} className="w-full h-full bg-black/30" />
     </div>
   );
 }

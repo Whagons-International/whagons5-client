@@ -12,6 +12,7 @@ import { BrandingProvider } from './providers/BrandingProvider';
 import { LanguageProvider } from './providers/LanguageProvider';
 import { LaserPointerProvider } from './providers/LaserPointerProvider';
 import { LaserPointer } from './components/LaserPointer';
+import { LaserPointerToggle } from './components/LaserPointerToggle';
 import { Toaster } from 'react-hot-toast';
 import { Provider } from 'react-redux';
 import {store } from './store';
@@ -35,6 +36,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
                 <LaserPointerProvider>
                   <App />
                   <LaserPointer />
+                  <LaserPointerToggle />
                 </LaserPointerProvider>
                 <Toaster
                   position="bottom-right"

@@ -182,6 +182,21 @@ function PluginSettings() {
 					'Ensure tools are maintained and returned on time'
 				]
 			},
+			'qr-codes': {
+				features: [
+					'Generate custom QR codes for any resource or location',
+					'Track scans with detailed analytics and timestamps',
+					'Support for multiple QR code types and formats',
+					'Bulk QR code generation and printing',
+					'Public and private QR code access controls'
+				],
+				benefits: [
+					'Streamline check-ins and asset identification',
+					'Gain insights into physical location traffic',
+					'Reduce manual data entry with instant scanning',
+					'Improve traceability across operations'
+				]
+			},
 		};
 
 		return detailsMap[pluginId] || { features: [], benefits: [] };

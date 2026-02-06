@@ -2,172 +2,71 @@
 
 **Goal**: Reduce TaskDialog.tsx from 2100 lines to ~300 lines by extracting logic into modules.
 
+## Current Status
+
+The refactoring is **substantially complete**. The monolithic TaskDialog has been decomposed into:
+- 9 hooks for state, data, layout, and form logic
+- 8 components for tabs and field rendering
+- 2 utility modules for field parsing and serialization
+
 ## Folder Structure
 
 ```
 taskDialog/
 ├── hooks/
-│   ├── useDialogResize.ts          ✅ DONE - Resize logic (100 lines)
-│   ├── useTaskForm.ts              ⚠️  TODO - Form state management
-│   ├── useCustomFields.ts          ⚠️  TODO - Custom field logic
-│   └── useTaskSubmit.ts            ⚠️  TODO - Submit/validation logic
+│   ├── useDialogResize.ts          DONE - Resize logic
+│   ├── useTaskFormState.ts         DONE - Form state management (all state/setters)
+│   ├── useTaskDialogData.ts        DONE - Redux data selectors
+│   ├── useTaskDialogComputed.ts    DONE - Derived/computed values
+│   ├── useFormInitialization.ts    DONE - Form init logic for create/edit
+│   ├── useCustomFieldSync.ts       DONE - Custom field server sync
+│   ├── useShareHandlers.ts         DONE - Share action handlers
+│   ├── useDialogLayout.ts          DONE - Category-aware dialog layout (295 lines)
+│   └── index.ts                    DONE - Barrel export
 ├── components/
-│   ├── CustomFieldInput.tsx        ✅ DONE - Field rendering (150 lines)
-│   ├── BasicTab.tsx                ⚠️  TODO - Template, name, description, etc
-│   ├── CustomFieldsTab.tsx         ⚠️  TODO - Custom fields tab
-│   ├── AdditionalTab.tsx           ⚠️  TODO - Tags, SLA, approval
-│   └── ShareTab.tsx                ⚠️  TODO - Sharing functionality
+│   ├── BasicTab.tsx                DONE - Template, name, desc, location, users, priority, tags (743 lines)
+│   ├── CustomFieldsTab.tsx         DONE - Custom fields tab (48 lines)
+│   ├── AdditionalTab.tsx           DONE - Date & Timing / Recurrence (exports DateTimingTab, 200 lines)
+│   ├── AdditionalInfoTab.tsx       DONE - SLA + Approval selects (56 lines)
+│   ├── ShareTab.tsx                DONE - Task sharing UI (171 lines)
+│   ├── CustomFieldInput.tsx        DONE - Individual custom field renderer
+│   ├── DynamicTabContent.tsx       DONE - Dynamic layout-driven tab renderer (188 lines)
+│   ├── fields/
+│   │   ├── DynamicFieldRenderer.tsx DONE - Field renderer for dynamic layouts
+│   │   └── index.ts               DONE - Barrel export
+│   └── index.ts                    DONE - Barrel export
 ├── utils/
-│   ├── fieldHelpers.ts             ✅ DONE - Field parsing utilities
-│   ├── customFieldSerialization.ts ✅ DONE - Serialize/deserialize
-│   └── workspaceHelpers.ts         ⚠️  TODO - Workspace derivation logic
-└── README.md                        ✅ THIS FILE
+│   ├── fieldHelpers.ts             DONE - Field parsing utilities
+│   └── customFieldSerialization.ts DONE - Serialize/deserialize
+├── types.ts                        DONE - TaskDialogProps type
+└── README.md                       THIS FILE
 
-TaskDialog.tsx                       ⚠️  TODO - Main component (~300 lines)
+TaskDialogContent.tsx               DONE - Main component (802 lines)
 ```
 
-## What Each Module Should Contain
+## Tab Structure
 
-### hooks/useTaskForm.ts
-```typescript
-export function useTaskForm(mode, task, workspaceId) {
-  // All form state: name, description, categoryId, priorityId, etc
-  // Returns: { formState, setters, resetForm }
-}
-```
+The dialog has 5 tabs:
 
-### hooks/useCustomFields.ts  
-```typescript
-export function useCustomFields(categoryId, task, mode) {
-  // Custom field state and sync logic
-  // Returns: { customFieldValues, handleChange, syncToServer }
-}
-```
+| Tab Value      | Label            | Component          | Condition                    | Contents                                       |
+|----------------|------------------|--------------------|------------------------------|-------------------------------------------------|
+| `basic`        | Basic Details    | BasicTab           | Always shown                 | Template, Name, Description, Location, Users, Priority, Tags |
+| `customFields` | Fields           | CustomFieldsTab    | When category has fields     | Custom field inputs for selected category       |
+| `dateTiming`   | Date & Timing    | DateTimingTab      | Hidden when from scheduler   | Start/due date/time, Recurrence                 |
+| `additional`   | Additional Info  | AdditionalInfoTab  | Always shown                 | SLA dropdown, Approval dropdown                 |
+| `share`        | Share            | ShareTab           | Edit mode only               | Existing shares, share with user/team           |
 
-### hooks/useTaskSubmit.ts
-```typescript
-export function useTaskSubmit(mode, formState, customFieldValues) {
-  // Validation and submit logic
-  // Returns: { handleSubmit, isSubmitting, canSubmit }
-}
-```
+## Notes
 
-### components/BasicTab.tsx
-- Template selection
-- Name/Description
-- Location
-- Responsible users
-- Priority
-
-### components/CustomFieldsTab.tsx
-- Render all custom fields for category
-- Use CustomFieldInput component
-- Show required field indicators
-
-### components/AdditionalTab.tsx
-- Tags (create & edit modes only)
-- SLA selection
-- Approval selection  
-- Due date
-
-### components/ShareTab.tsx
-- TaskShareManager component
-- Share to user/team controls
-- Permission selection
-
-## Migration Steps
-
-1. ✅ Extract resize logic → useDialogResize
-2. ✅ Extract field rendering → CustomFieldInput
-3. ✅ Extract field utilities → fieldHelpers + customFieldSerialization
-4. ⚠️  Extract form state → useTaskForm
-5. ⚠️  Extract custom field logic → useCustomFields
-6. ⚠️  Extract submit logic → useTaskSubmit
-7. ⚠️  Create tab components
-8. ⚠️  Simplify main TaskDialog.tsx
-
-## Expected Final TaskDialog.tsx (~300 lines)
-
-```typescript
-import { useDialogResize } from './taskDialog/hooks/useDialogResize';
-import { useTaskForm } from './taskDialog/hooks/useTaskForm';
-import { useCustomFields } from './taskDialog/hooks/useCustomFields';
-import { useTaskSubmit } from './taskDialog/hooks/useTaskSubmit';
-import { BasicTab, CustomFieldsTab, AdditionalTab, ShareTab } from './taskDialog/components';
-
-export default function TaskDialog({ open, onOpenChange, mode, workspaceId, task }) {
-  const { width, isResizing, resizeRef, sheetContentRef, handleResizeStart, MIN_WIDTH } = useDialogResize(open);
-  const formState = useTaskForm(mode, task, workspaceId);
-  const customFields = useCustomFields(formState.categoryId, task, mode);
-  const { handleSubmit, isSubmitting, canSubmit } = useTaskSubmit(mode, formState, customFields);
-
-  const [activeTab, setActiveTab] = useState('basic');
-
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent ref={sheetContentRef} style={...} className={...}>
-        {/* Resize Handle */}
-        <div ref={resizeRef} onMouseDown={handleResizeStart} {...} />
-        
-        {/* Header */}
-        <SheetHeader>
-          <SheetTitle>{mode === 'edit' ? 'Edit Task' : 'Create New Task'}</SheetTitle>
-        </SheetHeader>
-
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="basic">Basic Details</TabsTrigger>
-            {customFields.categoryFields.length > 0 && (
-              <TabsTrigger value="customFields">Fields</TabsTrigger>
-            )}
-            <TabsTrigger value="additional">Additional Info</TabsTrigger>
-            {mode === 'edit' && <TabsTrigger value="share">Share</TabsTrigger>}
-          </TabsList>
-
-          <TabsContent value="basic">
-            <BasicTab formState={formState} mode={mode} />
-          </TabsContent>
-
-          <TabsContent value="customFields">
-            <CustomFieldsTab customFields={customFields} />
-          </TabsContent>
-
-          <TabsContent value="additional">
-            <AdditionalTab formState={formState} mode={mode} />
-          </TabsContent>
-
-          {mode === 'edit' && (
-            <TabsContent value="share">
-              <ShareTab task={task} />
-            </TabsContent>
-          )}
-        </Tabs>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={!canSubmit || isSubmitting}>
-            {isSubmitting ? (mode === 'edit' ? 'Saving...' : 'Creating...') : (mode === 'edit' ? 'Save Changes' : 'Create Task')}
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-```
+- `AdditionalTab.tsx` exports `DateTimingTab` (handles dates/recurrence). The naming is historical.
+- `AdditionalInfoTab.tsx` contains SLA and Approval selection (separate component).
+- `useDialogLayout.ts` provides a dynamic layout system that can rearrange fields per-category.
+- `DynamicTabContent.tsx` supports categories with custom `dialog_layout` configurations.
 
 ## Benefits
 
-- ✅ Main component reduced from 2100 → ~300 lines
-- ✅ Logic is testable in isolation
-- ✅ Easier to debug specific functionality
-- ✅ Better code organization
-- ✅ Reusable hooks and components
-- ✅ No more "wtf" moments
-
-## Next Steps
-
-Continue extracting remaining pieces. The hard parts (resize, field rendering, serialization) are done!
+- Main component reduced from 2100 to 802 lines
+- Logic is testable in isolation via hooks
+- Easier to debug specific functionality
+- Better code organization
+- Reusable hooks and components

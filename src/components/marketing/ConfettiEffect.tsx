@@ -13,75 +13,112 @@ interface ConfettiPiece {
   rotationSpeed: number;
   color: string;
   drift: number;
+  wobblePhase: number;
+  wobbleSpeed: number;
+  shape: "rect" | "circle" | "ribbon";
+  ribbonWave: number;
 }
 
-export default function ConfettiEffect({ onClose }: ConfettiEffectProps) {
+export default function ConfettiEffect({ onClose: _onClose }: ConfettiEffectProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const confettiRef = useRef<ConfettiPiece[]>([]);
   const animationFrameRef = useRef<number>();
+  const timeRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Set canvas size to window size
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     };
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener("resize", resizeCanvas);
 
-    // Colors for confetti
     const colors = [
-      '#ff0000', '#00ff00', '#0000ff', '#ffff00', 
-      '#ff00ff', '#00ffff', '#ff8800', '#ff0088'
+      "#FF3366", "#FF6633", "#FFCC00", "#33CC66",
+      "#3399FF", "#9933FF", "#FF33CC", "#00CCCC",
+      "#FF5555", "#55FF55", "#5555FF", "#FFAA00",
     ];
 
-    // Create confetti
+    const shapes: ("rect" | "circle" | "ribbon")[] = ["rect", "rect", "circle", "ribbon", "ribbon"];
+
     const createConfetti = () => {
-      const count = 150;
+      const count = 200;
       confettiRef.current = [];
       for (let i = 0; i < count; i++) {
         confettiRef.current.push({
           x: Math.random() * canvas.width,
           y: Math.random() * canvas.height - canvas.height,
-          size: Math.random() * 10 + 5,
-          speed: Math.random() * 2 + 1,
+          size: Math.random() * 8 + 4,
+          speed: Math.random() * 1.5 + 0.8,
           rotation: Math.random() * Math.PI * 2,
-          rotationSpeed: (Math.random() - 0.5) * 0.2,
+          rotationSpeed: (Math.random() - 0.5) * 0.15,
           color: colors[Math.floor(Math.random() * colors.length)],
-          drift: (Math.random() - 0.5) * 1,
+          drift: (Math.random() - 0.5) * 0.8,
+          wobblePhase: Math.random() * Math.PI * 2,
+          wobbleSpeed: Math.random() * 0.04 + 0.02,
+          shape: shapes[Math.floor(Math.random() * shapes.length)],
+          ribbonWave: Math.random() * Math.PI * 2,
         });
       }
     };
     createConfetti();
 
-    // Animation loop
     const animate = () => {
+      timeRef.current += 0.016;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      confettiRef.current.forEach((piece) => {
-        // Update position
-        piece.y += piece.speed;
-        piece.x += piece.drift;
-        piece.rotation += piece.rotationSpeed;
+      confettiRef.current.forEach((p) => {
+        p.wobblePhase += p.wobbleSpeed;
+        p.ribbonWave += 0.08;
+        const wobbleX = Math.sin(p.wobblePhase) * 1.5;
 
-        // Reset if confetti goes off screen
-        if (piece.y > canvas.height) {
-          piece.y = -20;
-          piece.x = Math.random() * canvas.width;
+        p.y += p.speed;
+        p.x += p.drift + wobbleX;
+        p.rotation += p.rotationSpeed;
+
+        if (p.y > canvas.height + 20) {
+          p.y = -20;
+          p.x = Math.random() * canvas.width;
         }
 
-        // Draw confetti piece
         ctx.save();
-        ctx.translate(piece.x, piece.y);
-        ctx.rotate(piece.rotation);
-        ctx.fillStyle = piece.color;
-        ctx.fillRect(-piece.size / 2, -piece.size / 2, piece.size, piece.size);
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+
+        // 3D-like perspective: scale based on rotation for "flipping" effect
+        const scaleX = Math.cos(p.wobblePhase * 2);
+        ctx.scale(scaleX, 1);
+
+        ctx.fillStyle = p.color;
+
+        if (p.shape === "rect") {
+          ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+        } else if (p.shape === "circle") {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.size / 3, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          // Ribbon — wavy strip
+          ctx.beginPath();
+          ctx.moveTo(-p.size / 2, 0);
+          for (let rx = -p.size / 2; rx <= p.size / 2; rx += 2) {
+            const ry = Math.sin(p.ribbonWave + rx * 0.5) * p.size * 0.15;
+            ctx.lineTo(rx, ry);
+          }
+          ctx.lineTo(p.size / 2, p.size * 0.15);
+          for (let rx = p.size / 2; rx >= -p.size / 2; rx -= 2) {
+            const ry = Math.sin(p.ribbonWave + rx * 0.5) * p.size * 0.15 + p.size * 0.15;
+            ctx.lineTo(rx, ry);
+          }
+          ctx.closePath();
+          ctx.fill();
+        }
+
         ctx.restore();
       });
 
@@ -90,30 +127,14 @@ export default function ConfettiEffect({ onClose }: ConfettiEffectProps) {
     animate();
 
     return () => {
-      window.removeEventListener('resize', resizeCanvas);
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      window.removeEventListener("resize", resizeCanvas);
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
   }, []);
 
   return (
     <div className="fixed inset-0 pointer-events-none z-[9999]">
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full"
-      />
-      {onClose && (
-        <div className="fixed bottom-4 right-4 pointer-events-auto bg-black/90 dark:bg-white/95 backdrop-blur-md border-2 border-white/30 dark:border-black/30 text-white dark:text-black px-4 py-2 rounded-lg shadow-2xl transition-all hover:scale-105">
-          <button
-            onClick={onClose}
-            className="text-center"
-          >
-            <div className="font-semibold text-sm">Confetti</div>
-            <div className="text-xs font-medium opacity-90">(Ctrl+E)</div>
-          </button>
-        </div>
-      )}
+      <canvas ref={canvasRef} className="w-full h-full" />
     </div>
   );
 }

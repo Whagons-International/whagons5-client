@@ -10,6 +10,7 @@ import { removeTaskAsync, restoreTaskAsync } from "@/store/reducers/tasksSlice";
 import { DeleteTaskDialog } from "@/components/tasks/DeleteTaskDialog";
 import toast from "react-hot-toast";
 import { useLanguage } from "@/providers/LanguageProvider";
+import { useSpotVisibility } from "@/hooks/useSpotVisibility";
 
 function createStatusMap(statuses: any[]) {
   const m: Record<number, any> = {};
@@ -72,6 +73,9 @@ export default function TaskListTab({
   const spotMap = useMemo(() => createSpotMap(spots || []), [spots]);
   const categoryMap = useMemo(() => createCategoryMap(categories || []), [categories]);
 
+  // Spot-based visibility filtering
+  const { isTaskVisible } = useSpotVisibility();
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -85,13 +89,16 @@ export default function TaskListTab({
         const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
         const total = countResp?.rowCount ?? 0;
         const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: Math.min(500, total) });
-        if (!cancelled) setRows(rowsResp?.rows || []);
+        const allRows = rowsResp?.rows || [];
+        // Apply spot-based visibility filter
+        const visibleRows = allRows.filter(isTaskVisible);
+        if (!cancelled) setRows(visibleRows);
       } catch (e: any) {
         if (!cancelled) setError(e?.message || "Failed to load tasks");
       }
     })();
     return () => { cancelled = true; };
-  }, [workspaceId, searchText]);
+  }, [workspaceId, searchText, isTaskVisible]);
 
   // status icon resolver is provided in WorkspaceTable; here we pass undefined so StatusBadge shows dot by color
   const getStatusIcon = undefined as any;

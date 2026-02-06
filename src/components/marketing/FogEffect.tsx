@@ -4,160 +4,136 @@ interface FogEffectProps {
   onClose?: () => void;
 }
 
-interface FogLayer {
+interface FogPatch {
   x: number;
   y: number;
-  size: number;
+  radiusX: number;
+  radiusY: number;
   speed: number;
   opacity: number;
-  drift: number;
-  verticalSpeed: number;
   baseY: number;
-  waveOffset: number;
+  wavePhase: number;
+  waveAmp: number;
 }
 
-export default function FogEffect({ onClose }: FogEffectProps) {
+export default function FogEffect({ onClose: _onClose }: FogEffectProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fogLayersRef = useRef<FogLayer[]>([]);
+  const fogRef = useRef<FogPatch[]>([]);
   const animationFrameRef = useRef<number>();
-  const [isDarkMode, setIsDarkMode] = useState(() => 
-    document.documentElement.classList.contains('dark')
+  const timeRef = useRef(0);
+  const [isDarkMode, setIsDarkMode] = useState(() =>
+    document.documentElement.classList.contains("dark")
   );
 
   useEffect(() => {
-    // Detect theme changes
     const updateThemeState = () => {
-      setIsDarkMode(document.documentElement.classList.contains('dark'));
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
     };
-
     const observer = new MutationObserver(updateThemeState);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class']
-    });
-
-    const mql = window.matchMedia('(prefers-color-scheme: dark)');
-    mql.addEventListener('change', updateThemeState);
-
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    const mql = window.matchMedia("(prefers-color-scheme: dark)");
+    mql.addEventListener("change", updateThemeState);
     return () => {
       observer.disconnect();
-      mql.removeEventListener('change', updateThemeState);
+      mql.removeEventListener("change", updateThemeState);
     };
   }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Set canvas size to window size
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     };
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener("resize", resizeCanvas);
 
-    // Create fog layers
-    const createFogLayers = () => {
-      const count = 40; // Moderate number of fog layers
-      fogLayersRef.current = [];
+    // Create elongated, overlapping fog patches
+    const createFog = () => {
+      const count = 50;
+      fogRef.current = [];
       for (let i = 0; i < count; i++) {
-        fogLayersRef.current.push({
-          x: Math.random() * (canvas.width + 200) - 100,
-          y: Math.random() * canvas.height,
-          size: Math.random() * 250 + 100, // Moderate fog patch sizes
-          speed: Math.random() * 0.3 + 0.15, // Moderate movement speed
-          opacity: Math.random() * 0.18 + 0.08, // Less opaque
-          drift: (Math.random() - 0.5) * 0.2, // Less horizontal drift
-          verticalSpeed: Math.random() * 0.1 - 0.05, // Slower vertical movement
-          baseY: Math.random() * canvas.height,
-          waveOffset: Math.random() * Math.PI * 2, // Wave phase offset
+        const baseY = Math.random() * canvas.height;
+        fogRef.current.push({
+          x: Math.random() * (canvas.width + 400) - 200,
+          y: baseY,
+          radiusX: Math.random() * 300 + 150, // wide ellipses
+          radiusY: Math.random() * 80 + 40,   // shorter vertically
+          speed: Math.random() * 0.25 + 0.08,
+          opacity: Math.random() * 0.12 + 0.04,
+          baseY,
+          wavePhase: Math.random() * Math.PI * 2,
+          waveAmp: Math.random() * 20 + 5,
         });
       }
     };
-    createFogLayers();
+    createFog();
 
-    // Animation loop
-    let time = 0;
     const animate = () => {
-      time += 0.005; // Slower time progression
+      timeRef.current += 0.004;
+      const t = timeRef.current;
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      fogLayersRef.current.forEach((fog) => {
-        // Update position with multiple movement patterns
-        fog.x += fog.speed + fog.drift;
-        
-        // Add subtle vertical movement with wave effect
-        const waveY = Math.sin(time * 0.3 + fog.waveOffset) * 15;
-        fog.y = fog.baseY + waveY + (fog.verticalSpeed * time * 5);
+      // Global mist overlay — very subtle blanket
+      ctx.fillStyle = isDarkMode ? "rgba(180, 190, 210, 0.015)" : "rgba(140, 155, 175, 0.015)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Reset if fog goes off screen horizontally
-        if (fog.x > canvas.width + fog.size) {
-          fog.x = -fog.size;
+      fogRef.current.forEach((fog) => {
+        fog.x += fog.speed;
+        fog.y = fog.baseY + Math.sin(t * 0.5 + fog.wavePhase) * fog.waveAmp;
+
+        // Wrap around
+        if (fog.x - fog.radiusX > canvas.width) {
+          fog.x = -fog.radiusX;
           fog.baseY = Math.random() * canvas.height;
-          fog.waveOffset = Math.random() * Math.PI * 2;
-        }
-        if (fog.x < -fog.size) {
-          fog.x = canvas.width + fog.size;
-          fog.baseY = Math.random() * canvas.height;
-          fog.waveOffset = Math.random() * Math.PI * 2;
         }
 
-        // Reset if fog goes off screen vertically
-        if (fog.y > canvas.height + fog.size) {
-          fog.baseY = -fog.size;
-          fog.y = fog.baseY;
-        }
-        if (fog.y < -fog.size) {
-          fog.baseY = canvas.height + fog.size;
-          fog.y = fog.baseY;
-        }
+        // Draw fog as an elongated radial gradient (ellipse)
+        ctx.save();
+        ctx.translate(fog.x, fog.y);
+        ctx.scale(fog.radiusX / fog.radiusY, 1); // stretch horizontally
 
-        // Draw fog as gradient circle with multiple layers for depth
-        // Dark mode: light grayish fog, Light mode: darker gray fog
-        const fogColor = isDarkMode 
-          ? `rgba(200, 200, 220, ${fog.opacity})`
-          : `rgba(120, 130, 150, ${fog.opacity})`;
-        const fogColorTransparent = isDarkMode 
-          ? 'rgba(200, 200, 220, 0)'
-          : 'rgba(120, 130, 150, 0)';
-        
-        // Create radial gradient for fog
-        const gradient = ctx.createRadialGradient(
-          fog.x, fog.y, fog.size * 0.3,
-          fog.x, fog.y, fog.size
-        );
-        gradient.addColorStop(0, fogColor);
-        gradient.addColorStop(0.6, isDarkMode 
-          ? `rgba(200, 200, 220, ${fog.opacity * 0.6})`
-          : `rgba(120, 130, 150, ${fog.opacity * 0.6})`);
-        gradient.addColorStop(1, fogColorTransparent);
-        
-        ctx.fillStyle = gradient;
-        ctx.fillRect(fog.x - fog.size, fog.y - fog.size, fog.size * 2, fog.size * 2);
+        const r = fog.radiusY;
+        const grad = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r);
+        const c = isDarkMode ? "190, 200, 220" : "130, 145, 165";
+        grad.addColorStop(0, `rgba(${c}, ${fog.opacity})`);
+        grad.addColorStop(0.5, `rgba(${c}, ${fog.opacity * 0.6})`);
+        grad.addColorStop(1, `rgba(${c}, 0)`);
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       });
+
+      // Thicker ground-level fog band
+      const groundGrad = ctx.createLinearGradient(0, canvas.height * 0.7, 0, canvas.height);
+      const gc = isDarkMode ? "180, 190, 210" : "140, 155, 175";
+      groundGrad.addColorStop(0, `rgba(${gc}, 0)`);
+      groundGrad.addColorStop(0.5, `rgba(${gc}, 0.04)`);
+      groundGrad.addColorStop(1, `rgba(${gc}, 0.08)`);
+      ctx.fillStyle = groundGrad;
+      ctx.fillRect(0, canvas.height * 0.7, canvas.width, canvas.height * 0.3);
 
       animationFrameRef.current = requestAnimationFrame(animate);
     };
     animate();
 
     return () => {
-      window.removeEventListener('resize', resizeCanvas);
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+      window.removeEventListener("resize", resizeCanvas);
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
   }, [isDarkMode]);
 
   return (
     <div className="fixed inset-0 pointer-events-none z-[9999]">
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full"
-      />
+      <canvas ref={canvasRef} className="w-full h-full" />
     </div>
   );
 }

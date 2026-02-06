@@ -19,6 +19,7 @@ import { RealTimeListener, setGlobalRtl } from '@/store/realTimeListener/RTL';
 import { DB } from '@/store/indexedDB/DB';
 import { DataManager } from '@/store/DataManager';
 import { requestNotificationPermission, setupForegroundMessageHandler, unregisterToken } from '@/firebase/fcmHelper';
+import { setSpotVisibilityState } from '@/store/spotVisibilityState';
 
 // Define context types
 interface AuthContextType {
@@ -164,6 +165,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (response.status === 200) {
           const userData = response.data.data || response.data;
           setUser(userData);
+          // Update spot visibility state for non-React contexts (CacheRegistry, etc.)
+          setSpotVisibilityState({
+            userSpots: userData?.spots,
+            isAdmin: !!userData?.is_admin,
+          });
           // console.log('AuthContext: User data loaded successfully');
 
           // Initialize FCM for push notifications BEFORE hydration
@@ -309,7 +315,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Update user state directly without full refetch (for optimistic updates)
   const updateUser = (updates: Partial<User>) => {
     if (user) {
-      setUser({ ...user, ...updates });
+      const updatedUser = { ...user, ...updates };
+      setUser(updatedUser);
+      // Keep spot visibility state in sync for non-React contexts
+      if ('spots' in updates || 'is_admin' in updates) {
+        setSpotVisibilityState({
+          userSpots: updatedUser.spots,
+          isAdmin: !!updatedUser.is_admin,
+        });
+      }
     }
   };
 

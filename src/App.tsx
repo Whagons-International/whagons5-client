@@ -4,11 +4,10 @@ import { useEffect, useState } from 'react';
 import { useAuth } from './providers/AuthProvider';
 import toast from 'react-hot-toast';
 import { showNotificationToast, getNotificationIcon } from './components/ui/NotificationToast';
-import RadiographyEffect from './components/marketing/RadiographyEffect';
+import StarryNightEffect from './components/marketing/StarryNightEffect';
 import SnowEffect from './components/marketing/SnowEffect';
 import RainEffect from './components/marketing/RainEffect';
 import FogEffect from './components/marketing/FogEffect';
-import AuroraEffect from './components/marketing/AuroraEffect';
 import LightningEffect from './components/marketing/LightningEffect';
 import MeteorEffect from './components/marketing/MeteorEffect';
 import LightningRainEffect from './components/marketing/LightningRainEffect';
@@ -18,21 +17,23 @@ import CloudEffect from './components/marketing/CloudEffect';
 import ConfettiEffect from './components/marketing/ConfettiEffect';
 import HeartsEffect from './components/marketing/HeartsEffect';
 import FireworksEffect from './components/marketing/FireworksEffect';
+import SakuraEffect from './components/marketing/SakuraEffect';
+import FirefliesEffect from './components/marketing/FirefliesEffect';
+import ButterfliesEffect from './components/marketing/ButterfliesEffect';
+import BubblesEffect from './components/marketing/BubblesEffect';
 
 // Initialize icon caching
 import './database/iconInit';
 
-type WeatherEffect = 'none' | 'radiography' | 'snow' | 'rain' | 'fog' | 'clouds' | 'aurora' | 'lightning' | 'meteor' | 'storm' | 'bugs' | 'fish';
-type CelebrationEffect = 'none' | 'confetti' | 'hearts' | 'fireworks';
+type VisualEffect = 'none' | 'starrynight' | 'snow' | 'rain' | 'fog' | 'clouds' | 'lightning' | 'meteor' | 'storm' | 'bugs' | 'fish' | 'confetti' | 'hearts' | 'fireworks' | 'sakura' | 'fireflies' | 'butterflies' | 'bubbles';
 
-const getEffectDisplayName = (effect: WeatherEffect | CelebrationEffect): string => {
+const getEffectDisplayName = (effect: VisualEffect): string => {
   const names: Record<string, string> = {
-    'radiography': 'Deep Perspective',
+    'starrynight': 'Starry Night',
     'snow': 'Snow',
     'rain': 'Rain',
     'fog': 'Fog',
     'clouds': 'Clouds',
-    'aurora': 'Aurora',
     'lightning': 'Lightning',
     'meteor': 'Meteor',
     'storm': 'Storm',
@@ -41,18 +42,34 @@ const getEffectDisplayName = (effect: WeatherEffect | CelebrationEffect): string
     'confetti': 'Confetti',
     'hearts': 'Hearts',
     'fireworks': 'Fireworks',
+    'sakura': 'Sakura',
+    'fireflies': 'Fireflies',
+    'butterflies': 'Butterflies',
+    'bubbles': 'Bubbles',
     'none': 'None'
   };
   return names[effect] || effect;
 };
 
 const EffectsLayer = () => {
-  const [weatherEffect, setWeatherEffect] = useState<WeatherEffect>('none');
-  const [celebrationEffect, setCelebrationEffect] = useState<CelebrationEffect>('none');
+  const [activeEffect, setActiveEffect] = useState<VisualEffect>('none');
+  const [isDarkMode, setIsDarkMode] = useState(() =>
+    document.documentElement.classList.contains('dark')
+  );
   const { user } = useAuth();
 
   // Only show effects if user is authenticated
   const effectsEnabled = !!user;
+
+  // Track dark mode changes
+  useEffect(() => {
+    const updateTheme = () => setIsDarkMode(document.documentElement.classList.contains('dark'));
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    mql.addEventListener('change', updateTheme);
+    return () => { observer.disconnect(); mql.removeEventListener('change', updateTheme); };
+  }, []);
 
   useEffect(() => {
     if (!effectsEnabled) return; // Don't attach listeners if not authenticated
@@ -70,45 +87,35 @@ const EffectsLayer = () => {
       // Ctrl+Shift+S - stop all effects
       if (e.ctrlKey && e.shiftKey && (e.key === 'S' || e.key === 's') && !isInputFocused) {
         e.preventDefault();
-        setWeatherEffect('none');
-        setCelebrationEffect('none');
+        setActiveEffect('none');
         return;
       }
       
-      // Ctrl+Shift+M - cycle through weather effects
+      // Ctrl+Shift+M - cycle through all visual effects
+      // Starry Night is first but only available in dark mode
       if (e.ctrlKey && e.shiftKey && (e.key === 'M' || e.key === 'm') && !isInputFocused) {
         e.preventDefault();
-        setWeatherEffect(prev => {
-          let next: WeatherEffect;
-          if (prev === 'none') next = 'radiography';
-          else if (prev === 'radiography') next = 'snow';
+        const dark = document.documentElement.classList.contains('dark');
+        setActiveEffect(prev => {
+          let next: VisualEffect;
+          if (prev === 'none') next = dark ? 'starrynight' : 'snow';
+          else if (prev === 'starrynight') next = 'snow';
           else if (prev === 'snow') next = 'rain';
           else if (prev === 'rain') next = 'fog';
           else if (prev === 'fog') next = 'clouds';
-          else if (prev === 'clouds') next = 'aurora';
-          else if (prev === 'aurora') next = 'lightning';
+          else if (prev === 'clouds') next = 'lightning';
           else if (prev === 'lightning') next = 'meteor';
           else if (prev === 'meteor') next = 'storm';
           else if (prev === 'storm') next = 'bugs';
           else if (prev === 'bugs') next = 'fish';
-          else if (prev === 'fish') next = 'none';
-          else next = 'none';
-          
-          if (next !== 'none') {
-            toast.success(getEffectDisplayName(next));
-          }
-          return next;
-        });
-      }
-
-      // Ctrl+E - cycle through celebration effects
-      if (e.ctrlKey && e.key === 'e') {
-        e.preventDefault();
-        setCelebrationEffect(prev => {
-          let next: CelebrationEffect;
-          if (prev === 'none') next = 'confetti';
+          else if (prev === 'fish') next = 'confetti';
           else if (prev === 'confetti') next = 'hearts';
           else if (prev === 'hearts') next = 'fireworks';
+          else if (prev === 'fireworks') next = 'sakura';
+          else if (prev === 'sakura') next = 'fireflies';
+          else if (prev === 'fireflies') next = 'butterflies';
+          else if (prev === 'butterflies') next = 'bubbles';
+          else if (prev === 'bubbles') next = 'none';
           else next = 'none';
           
           if (next !== 'none') {
@@ -126,22 +133,27 @@ const EffectsLayer = () => {
   // Only render effects if user is authenticated
   if (!effectsEnabled) return null;
 
+  const closeEffect = () => setActiveEffect('none');
+
   return (
     <>
-      {weatherEffect === 'radiography' && <RadiographyEffect onClose={() => setWeatherEffect('none')} />}
-      {weatherEffect === 'snow' && <SnowEffect onClose={() => setWeatherEffect('none')} />}
-      {weatherEffect === 'rain' && <RainEffect onClose={() => setWeatherEffect('none')} />}
-      {weatherEffect === 'fog' && <FogEffect onClose={() => setWeatherEffect('none')} />}
-      {weatherEffect === 'clouds' && <CloudEffect onClose={() => setWeatherEffect('none')} />}
-      {weatherEffect === 'aurora' && <AuroraEffect onClose={() => setWeatherEffect('none')} />}
-      {weatherEffect === 'lightning' && <LightningEffect onClose={() => setWeatherEffect('none')} />}
-      {weatherEffect === 'meteor' && <MeteorEffect onClose={() => setWeatherEffect('none')} />}
-      {weatherEffect === 'storm' && <LightningRainEffect onClose={() => setWeatherEffect('none')} />}
-      {weatherEffect === 'bugs' && <BugEffect onClose={() => setWeatherEffect('none')} />}
-      {weatherEffect === 'fish' && <FishEffect onClose={() => setWeatherEffect('none')} />}
-      {celebrationEffect === 'confetti' && <ConfettiEffect onClose={() => setCelebrationEffect('none')} />}
-      {celebrationEffect === 'hearts' && <HeartsEffect onClose={() => setCelebrationEffect('none')} />}
-      {celebrationEffect === 'fireworks' && <FireworksEffect onClose={() => setCelebrationEffect('none')} />}
+      {activeEffect === 'starrynight' && isDarkMode && <StarryNightEffect onClose={closeEffect} />}
+      {activeEffect === 'snow' && <SnowEffect onClose={closeEffect} />}
+      {activeEffect === 'rain' && <RainEffect onClose={closeEffect} />}
+      {activeEffect === 'fog' && <FogEffect onClose={closeEffect} />}
+      {activeEffect === 'clouds' && <CloudEffect onClose={closeEffect} />}
+      {activeEffect === 'lightning' && <LightningEffect onClose={closeEffect} />}
+      {activeEffect === 'meteor' && <MeteorEffect onClose={closeEffect} />}
+      {activeEffect === 'storm' && <LightningRainEffect onClose={closeEffect} />}
+      {activeEffect === 'bugs' && <BugEffect onClose={closeEffect} />}
+      {activeEffect === 'fish' && <FishEffect onClose={closeEffect} />}
+      {activeEffect === 'confetti' && <ConfettiEffect onClose={closeEffect} />}
+      {activeEffect === 'hearts' && <HeartsEffect onClose={closeEffect} />}
+      {activeEffect === 'fireworks' && <FireworksEffect onClose={closeEffect} />}
+      {activeEffect === 'sakura' && <SakuraEffect onClose={closeEffect} />}
+      {activeEffect === 'fireflies' && <FirefliesEffect onClose={closeEffect} />}
+      {activeEffect === 'butterflies' && <ButterfliesEffect onClose={closeEffect} />}
+      {activeEffect === 'bubbles' && <BubblesEffect onClose={closeEffect} />}
     </>
   );
 };

@@ -9,6 +9,7 @@ interface ChatMessageItemProps {
   isLast: boolean;
   gettingResponse: boolean;
   isLastUser?: boolean;
+  isLastAssistant?: boolean;
 }
 
 const isImageData = (content: any): content is ImageData => {

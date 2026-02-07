@@ -93,3 +93,4 @@ RUN printf 'server {\n\
 EXPOSE 3000
 
 CMD ["nginx", "-g", "daemon off;"]
+# Force rebuild Fri Feb  6 04:42:42 PM PST 2026

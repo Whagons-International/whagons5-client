@@ -36,8 +36,7 @@ import { getVersionInfo } from '@/utils/version';
 import { Info, Trash2, RefreshCw } from 'lucide-react';
 import { DB } from '@/store/indexedDB/DB';
 import { DataManager } from '@/store/DataManager';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { auth } from '@/firebase/firebase';
+import { auth } from '@/firebase/firebaseConfig';
 // Helper functions to get translated arrays
 const getMonths = (t: (key: string, fallback?: string) => string) => [
     { value: 1, label: t('profile.months.january', 'January') },
@@ -195,7 +194,6 @@ function Profile() {
     const [originalFile, setOriginalFile] = useState<File | null>(null);
     
     // Clear cache state
-    const [showClearCacheDialog, setShowClearCacheDialog] = useState(false);
     const [clearingCache, setClearingCache] = useState(false);
     const [newHobby, setNewHobby] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -508,21 +506,11 @@ function Profile() {
                 Logger.info('cache', 'Deleted IndexedDB');
             }
             
-            // 4. Re-initialize and sync
-            await DB.init(uid);
-            const dataManager = new DataManager(dispatch);
-            await dataManager.bootstrapAndSync();
-            await dataManager.hydrateFromCache();
-            
-            Logger.info('cache', 'Cache cleared and resynced successfully');
-            setShowClearCacheDialog(false);
-            
-            // Reload the page to ensure clean state
+            // 4. Reload page - sync will happen automatically on reload
+            Logger.info('cache', 'Cache cleared, reloading page');
             window.location.reload();
         } catch (error) {
             Logger.error('cache', 'Error clearing cache:', error);
-            setError(t('profile.about.clearCacheError', 'Failed to clear cache. Please try again.'));
-        } finally {
             setClearingCache(false);
         }
     };
@@ -1574,49 +1562,24 @@ function Profile() {
                         <CardContent>
                             <Button
                                 variant="destructive"
-                                onClick={() => setShowClearCacheDialog(true)}
+                                onClick={handleClearCache}
+                                disabled={clearingCache}
                                 className="gap-2"
                             >
-                                <Trash2 className="w-4 h-4" />
-                                {t('profile.about.clearCache', 'Clear Cache & Resync')}
+                                {clearingCache ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        {t('profile.about.clearing', 'Clearing...')}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Trash2 className="w-4 h-4" />
+                                        {t('profile.about.clearCache', 'Clear Cache & Resync')}
+                                    </>
+                                )}
                             </Button>
                         </CardContent>
                     </Card>
-
-                    <AlertDialog open={showClearCacheDialog} onOpenChange={setShowClearCacheDialog}>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                    {t('profile.about.clearCacheTitle', 'Clear Cache & Resync')}
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    {t('profile.about.clearCacheWarning', 'This will clear all locally stored data including session storage, local storage, and the IndexedDB cache. The app will then resync all data from the server. The page will reload after completion.')}
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel disabled={clearingCache}>
-                                    {t('common.cancel', 'Cancel')}
-                                </AlertDialogCancel>
-                                <AlertDialogAction
-                                    onClick={handleClearCache}
-                                    disabled={clearingCache}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
-                                >
-                                    {clearingCache ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                            {t('profile.about.clearing', 'Clearing...')}
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Trash2 className="w-4 h-4" />
-                                            {t('profile.about.clearCache', 'Clear Cache & Resync')}
-                                        </>
-                                    )}
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
                 </div>
             )
         }

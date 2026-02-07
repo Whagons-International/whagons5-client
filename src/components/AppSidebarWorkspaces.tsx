@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, useRef, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import { WORKSPACE_TAB_PATHS, type WorkspaceTabKey } from '@/pages/spaces/workspace/constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   Plus,
@@ -103,6 +104,7 @@ interface SortableWorkspaceItemProps {
   collapsed: boolean;
   getWorkspaceIcon: (iconName?: string) => any;
   taskCount?: number;
+  getWorkspacePath: (workspaceId: string | number) => string;
 }
 
 const WorkspaceIconBadge = ({
@@ -207,7 +209,7 @@ const WorkspaceLink = ({
   );
 };
 
-function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIcon, taskCount }: SortableWorkspaceItemProps) {
+function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIcon, taskCount, getWorkspacePath }: SortableWorkspaceItemProps) {
   const {
     attributes,
     listeners,
@@ -227,6 +229,7 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
 
   const workspacePath = `/workspace/${workspace.id}`;
   const isActive = pathname === workspacePath || pathname.startsWith(`${workspacePath}/`);
+  const targetPath = getWorkspacePath(workspace.id);
   const buttonClass = collapsed
     ? `flex justify-center items-center ${isActive
         ? 'text-[var(--sidebar-primary)]'
@@ -259,7 +262,7 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
         }}
       >
         <Link
-          to={`/workspace/${workspace.id}`}
+          to={targetPath}
           data-workspace-id={String(workspace.id)}
           onClick={(e) => {
             if (isDragging) {
@@ -324,6 +327,36 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
   const collapsed = isCollapsedState && !isMobile;
   const { t } = useLanguage();
   const { user } = useAuth();
+  
+  // Get current tab from URL to preserve it when switching workspaces
+  const getCurrentTabFromUrl = useCallback((): WorkspaceTabKey | null => {
+    // Check if we're on a workspace page
+    const workspaceMatch = pathname.match(/^\/workspace\/[^/]+(.*)$/);
+    if (!workspaceMatch) return null;
+    
+    const tabPath = workspaceMatch[1] || '';
+    
+    // Find which tab matches the current path
+    for (const [tab, path] of Object.entries(WORKSPACE_TAB_PATHS)) {
+      if (path === tabPath) {
+        return tab as WorkspaceTabKey;
+      }
+    }
+    return 'grid'; // Default tab
+  }, [pathname]);
+  
+  // Build workspace path preserving current tab
+  const getWorkspacePath = useCallback((workspaceId: string | number): string => {
+    const currentTab = getCurrentTabFromUrl();
+    const basePath = `/workspace/${workspaceId}`;
+    
+    // If we're on a workspace page, preserve the current tab
+    if (currentTab && currentTab !== 'grid') {
+      return `${basePath}${WORKSPACE_TAB_PATHS[currentTab]}`;
+    }
+    
+    return basePath;
+  }, [getCurrentTabFromUrl]);
   
   // Filter out hidden workspaces
   const visibleWorkspaces = useMemo(() => {
@@ -655,6 +688,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                       collapsed={collapsed}
                       getWorkspaceIcon={getWorkspaceIcon}
                       taskCount={taskCounts[String(workspace.id)]}
+                      getWorkspacePath={getWorkspacePath}
                     />
                   ))}
                 </div>

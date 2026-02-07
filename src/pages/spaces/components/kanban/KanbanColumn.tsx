@@ -1,20 +1,26 @@
 import { useDroppable } from '@dnd-kit/core';
-import { memo, useMemo, useCallback } from 'react';
+import { memo, useMemo, useCallback, useRef } from 'react';
 import { useSelector } from 'react-redux';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import type { RootState } from '@/store/store';
 import type { KanbanColumnProps } from './types/kanban.types';
 import DraggableCard from './DraggableCard';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 // Stable selectors - computed once per column, not per card
 const selectPriorities = (state: RootState) => (state.priorities as any)?.value ?? [];
 const selectUsers = (state: RootState) => (state.users as any)?.value ?? [];
 
+// Estimated card height (padding + content)
+const CARD_HEIGHT = 140;
+const CARD_GAP = 12;
+
 const KanbanColumn = memo(function KanbanColumn({ status, tasks, onTaskClick, hiddenTaskId, columnRef }: KanbanColumnProps & { hiddenTaskId?: number; columnRef?: (el: HTMLDivElement | null) => void }) {
   const { setNodeRef, isOver } = useDroppable({
     id: status.id,
   });
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Get data once at column level
   const priorities = useSelector(selectPriorities);
@@ -31,14 +37,25 @@ const KanbanColumn = memo(function KanbanColumn({ status, tasks, onTaskClick, hi
     }));
   }, [tasks, priorities, users]);
 
+  // Virtualizer for large lists
+  const virtualizer = useVirtualizer({
+    count: tasksWithData.length,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => CARD_HEIGHT + CARD_GAP,
+    overscan: 5, // Render 5 extra items above/below viewport
+  });
+
   const handleTaskClick = useCallback((task: any) => {
     onTaskClick(task);
   }, [onTaskClick]);
 
+  const virtualItems = virtualizer.getVirtualItems();
+  const totalHeight = virtualizer.getTotalSize();
+
   return (
     <div
       ref={columnRef}
-      className={`flex flex-col w-80 min-w-80 bg-muted/30 backdrop-blur-sm rounded-xl border transition-all duration-200 ${
+      className={`flex flex-col w-80 min-w-80 max-w-80 bg-muted/30 backdrop-blur-sm rounded-xl border transition-all duration-200 overflow-hidden ${
         isOver 
           ? 'border-primary/50 shadow-xl bg-primary/5' 
           : 'border-border/40 shadow-md'
@@ -82,27 +99,45 @@ const KanbanColumn = memo(function KanbanColumn({ status, tasks, onTaskClick, hi
         )}
       </div>
 
-      {/* Column Content - Droppable area */}
-      <ScrollArea className="flex-1 p-3">
+      {/* Column Content - Droppable area with virtualization */}
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto overflow-x-hidden p-3 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent"
+      >
         <div
           ref={setNodeRef}
-          className={`space-y-3 min-h-[300px] rounded-lg transition-colors duration-200 ${
+          className={`relative min-h-[300px] rounded-lg transition-colors duration-200 ${
             isOver ? 'bg-primary/5' : ''
           }`}
+          style={{ height: Math.max(totalHeight, 300) }}
         >
-          {tasksWithData.map(({ task, priority, assignedUsers }) => (
-            <DraggableCard
-              key={task.id}
-              task={task}
-              priority={priority}
-              assignedUsers={assignedUsers}
-              onClick={() => handleTaskClick(task)}
-              isHidden={hiddenTaskId === task.id}
-            />
-          ))}
-
-          {/* Empty state */}
-          {tasks.length === 0 && !isOver && (
+          {tasksWithData.length > 0 ? (
+            virtualItems.map((virtualItem) => {
+              const { task, priority, assignedUsers } = tasksWithData[virtualItem.index];
+              return (
+                <div
+                  key={task.id}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    transform: `translateY(${virtualItem.start}px)`,
+                    paddingBottom: CARD_GAP,
+                  }}
+                >
+                  <DraggableCard
+                    task={task}
+                    priority={priority}
+                    assignedUsers={assignedUsers}
+                    onClick={() => handleTaskClick(task)}
+                    isHidden={hiddenTaskId === task.id}
+                  />
+                </div>
+              );
+            })
+          ) : !isOver ? (
+            /* Empty state */
             <div className="flex flex-col items-center justify-center h-40 text-center px-4">
               <div 
                 className="w-12 h-12 rounded-full mb-3 flex items-center justify-center opacity-20"
@@ -115,12 +150,12 @@ const KanbanColumn = memo(function KanbanColumn({ status, tasks, onTaskClick, hi
               <p className="text-xs text-muted-foreground font-medium">No tasks yet</p>
               <p className="text-xs text-muted-foreground/60 mt-1">Drag tasks here</p>
             </div>
-          )}
+          ) : null}
 
           {/* Drop zone indicator */}
           {isOver && (
             <div
-              className="flex items-center justify-center h-20 border-2 border-dashed rounded-lg transition-opacity duration-200"
+              className="absolute bottom-0 left-0 right-0 flex items-center justify-center h-20 border-2 border-dashed rounded-lg transition-opacity duration-200"
               style={{ borderColor: status.color || '#888' }}
             >
               <p className="text-sm font-medium" style={{ color: status.color || '#888' }}>
@@ -129,7 +164,7 @@ const KanbanColumn = memo(function KanbanColumn({ status, tasks, onTaskClick, hi
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 });

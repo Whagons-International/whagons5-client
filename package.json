@@ -57,6 +57,7 @@
     "@radix-ui/react-tooltip": "^1.2.4",
     "@reduxjs/toolkit": "^2.7.0",
     "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.13.18",
     "@types/canvas-confetti": "^1.9.0",
     "@types/d3": "^7.4.3",
     "@types/d3-drag": "^3.0.7",

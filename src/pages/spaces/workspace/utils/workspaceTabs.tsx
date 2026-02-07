@@ -149,8 +149,15 @@ export function createWorkspaceTabs(props: TabContentProps) {
           <span className="tab-label-text">{t('workspace.tabs.board', 'Board')}</span>
         </div>
       ),
+      forceMount: true, // Keep DnD context alive to avoid expensive remount
       content: (
-        <motion.div className='flex-1 h-full min-h-0' key='board' initial={{ x: getDynamicTabInitialX(prevActiveTab, 'board') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+        <motion.div
+          className='flex-1 h-full min-h-0'
+          key='board'
+          initial={false}
+          animate={{ x: activeTab === 'board' ? 0 : getDynamicTabInitialX(activeTab, 'board') }}
+          transition={activeTab === 'board' ? TAB_ANIMATION.transition : { duration: 0 }}
+        >
           <TaskBoardTab workspaceId={workspaceId} />
         </motion.div>
       )

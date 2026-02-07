@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, startTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   DndContext,
@@ -99,10 +99,13 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
   }, [statuses]);
 
   // Listen for task changes - but skip if we have a pending move to avoid flicker
+  // Use startTransition to mark these as non-urgent updates
   useEffect(() => {
     const refresh = () => {
       if (pendingMoveRef.current) return; // Skip refresh during pending move
-      dispatch(getTasksFromIndexedDB());
+      startTransition(() => {
+        dispatch(getTasksFromIndexedDB());
+      });
     };
     const unsubs = [
       TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, refresh),
@@ -229,13 +232,13 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-background via-muted/5 to-background">
+    <div className="flex flex-col h-full bg-gradient-to-br from-background via-muted/5 to-background overflow-hidden">
       <DndContext
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-5 overflow-x-auto flex-1 px-6 py-6">
+        <div className="flex gap-5 overflow-x-auto overflow-y-hidden flex-1 px-6 py-6">
           {sortedStatuses.map((status: any) => (
             <KanbanColumn
               key={status.id}
@@ -251,9 +254,9 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
           ))}
         </div>
 
-        <DragOverlay>
+        <DragOverlay dropAnimation={null}>
           {activeTask && (
-            <div className="rotate-2 scale-105">
+            <div className="rotate-2 scale-105 w-72">
               <div className="group relative bg-card rounded-lg border border-border/40 shadow-2xl ring-2 ring-primary/20 overflow-hidden">
                 <KanbanCardContent 
                   task={activeTask} 

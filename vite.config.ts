@@ -13,12 +13,17 @@ import { execSync } from 'child_process';
 // Get version info for build-time injection
 function getVersionInfo() {
   const packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
-  let gitCommit = 'unknown';
-  try {
-    gitCommit = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
-  } catch {
-    // Git not available or not a git repo
+  
+  // Priority: VITE_GIT_COMMIT env var (for Docker) > git command > 'unknown'
+  let gitCommit = process.env.VITE_GIT_COMMIT || '';
+  if (!gitCommit) {
+    try {
+      gitCommit = execSync('git rev-parse --short HEAD', { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+    } catch {
+      gitCommit = 'unknown';
+    }
   }
+  
   return {
     version: packageJson.version,
     commit: gitCommit,

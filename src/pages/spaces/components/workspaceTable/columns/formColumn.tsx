@@ -12,9 +12,9 @@ export function createFormColumn(opts: ColumnBuilderOptions) {
   return {
     colId: 'form',
     headerName: t('workspace.columns.form', 'Form'),
-    width: 160,
-    minWidth: 140,
-    maxWidth: 220,
+    width: 80,
+    minWidth: 60,
+    maxWidth: 160,
     sortable: true,
     filter: false,
     valueGetter: (p: any) => {

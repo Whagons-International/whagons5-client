@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef, startTransition } from 'react';
-import { useDispatch, useSelector, shallowEqual } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   DndContext,
   DragOverlay,

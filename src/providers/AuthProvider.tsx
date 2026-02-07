@@ -264,6 +264,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               );
               setGlobalRtl(rtl);
               rtl.connectAndHold();
+
+              // Enable error telemetry after RTL is connected
+              rtl.on('connection:status', (data: { status: string }) => {
+                if (data.status === 'authenticated') {
+                  Logger.enableTelemetry().catch(() => {
+                    // Ignore telemetry init failures
+                  });
+                }
+              });
             } catch (err) {
               Logger.warn('auth', 'AuthProvider: background hydration failed', err);
             } finally {

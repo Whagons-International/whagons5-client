@@ -28,6 +28,7 @@ import {
   HeartPulse, // Add HeartPulse icon for real-time status
   Package, // Add Package icon for assets
   QrCode, // Add QrCode icon for QR codes
+  Bug, // Add Bug icon for tech support
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -54,6 +55,7 @@ import AppSidebarBoards from './AppSidebarBoards';
 import { genericCaches } from '@/store/genericSlices';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { getRtlConnected, subscribeRtlConnected } from '@/store/realTimeListener/RTL';
+import { useSuperAdmin } from '@/hooks/useSuperAdmin';
 import {
   DndContext,
   closestCenter,
@@ -532,6 +534,9 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   
   // Subscribe to RTL connection status
   const rtlConnected = useSyncExternalStore(subscribeRtlConnected, getRtlConnected);
+  
+  // Check if user is super admin (for tech support access)
+  const { isSuperAdmin } = useSuperAdmin();
 
   const hoverOpenTimerRef = useRef<number | null>(null);
   const hoverCloseTimerRef = useRef<number | null>(null);
@@ -1100,6 +1105,38 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
+
+                  {/* Tech Support - Only visible to super admins */}
+                  {isSuperAdmin && (
+                    <>
+                      <SidebarSeparator className="my-1 border-[var(--sidebar-border)]" />
+                      <SidebarMenuItem>
+                        <SidebarMenuButton
+                          asChild
+                          tooltip={isCollapsed && !isMobile ? t('sidebar.techSupport', 'Tech Support') : undefined}
+                          className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
+                          style={{
+                            height: '30px',
+                            padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
+                            gap: '8px',
+                            fontWeight: pathname === '/tech-support' ? 600 : 400,
+                            fontSize: '12px',
+                            boxShadow: pathname === '/tech-support' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                          }}
+                        >
+                          <Link
+                            to="/tech-support"
+                            className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
+                          >
+                            <IconBadge color="#ef4444" size={18}>
+                              <Bug size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                            </IconBadge>
+                            {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.techSupport', 'Tech Support')}</span>}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </>
+                  )}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>

@@ -7,7 +7,7 @@ import { syncReduxForTable } from "@/store/indexedDB/CacheRegistry";
 
 import { Logger } from '@/utils/logger';
 interface RTLMessage {
-  type: 'ping' | 'system' | 'error' | 'echo' | 'database';
+  type: 'ping' | 'system' | 'error' | 'echo' | 'database' | 'telemetry';
   operation?: string;
   message?: string;
   data?: any;
@@ -18,6 +18,7 @@ interface RTLMessage {
   db_timestamp?: number;
   client_timestamp?: string;
   sessionId?: string;
+  error_ids?: string[];  // For telemetry ACK responses
 }
 
 interface ConnectionOptions {
@@ -413,10 +414,26 @@ export class RealTimeListener {
         this.handlePublicationMessage(data);
         break;
 
+      case 'telemetry':
+        this.handleTelemetryMessage(data);
+        break;
+
       default:
         // Handle unknown message types
         this.emit('message:unknown', data);
         break;
+    }
+  }
+
+  /**
+   * Handle telemetry messages (ACKs from server)
+   */
+  private handleTelemetryMessage(data: RTLMessage): void {
+    if (data.operation === 'ack' && data.error_ids) {
+      this.debugLog('Telemetry ACK received:', { error_ids: data.error_ids });
+      this.emit('telemetry:ack', { error_ids: data.error_ids });
+    } else {
+      this.emit('telemetry:message', data);
     }
   }
 

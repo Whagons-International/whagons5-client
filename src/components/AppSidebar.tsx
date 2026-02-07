@@ -1124,7 +1124,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   {rtlConnected ? 'Real-time connected' : 'Real-time disconnected'}
                 </TooltipContent>
               </Tooltip>
-              <span>v{getDisplayVersion()}</span>
+              <span>Version {getDisplayVersion()}</span>
             </div>
             <AssistantWidget
               floating={false}

@@ -1,6 +1,9 @@
 # Stage 1: Build
 FROM oven/bun:latest AS builder
 
+# Install git for version detection
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Accept build arguments for environment variables

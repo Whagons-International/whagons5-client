@@ -57,6 +57,15 @@ COPY . .
 # Increase Node.js memory limit for large builds
 ENV NODE_OPTIONS="--max-old-space-size=8192"
 
+# Detect git commit and write to file for vite to read
+RUN if [ -d .git ]; then \
+      git rev-parse --short HEAD > .git-commit; \
+      echo "Git commit: $(cat .git-commit)"; \
+    else \
+      echo "No .git directory found - listing directory:"; \
+      ls -la; \
+    fi
+
 # Build the application
 RUN bun run build
 

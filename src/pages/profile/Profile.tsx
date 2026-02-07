@@ -32,6 +32,8 @@ import {
 import { isFCMReady, isTokenRegistered } from '@/firebase/fcmHelper';
 
 import { Logger } from '@/utils/logger';
+import { getVersionInfo } from '@/utils/version';
+import { Info } from 'lucide-react';
 // Helper functions to get translated arrays
 const getMonths = (t: (key: string, fallback?: string) => string) => [
     { value: 1, label: t('profile.months.january', 'January') },
@@ -1456,6 +1458,53 @@ function Profile() {
                             </Button>
                         </div>
                     )}
+                </div>
+            )
+        },
+        {
+            value: 'about',
+            label: t('profile.tabs.about', 'About'),
+            content: (
+                <div className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Info className="w-5 h-5" />
+                                {t('profile.about.appInfo', 'Application Info')}
+                            </CardTitle>
+                            <CardDescription>
+                                {t('profile.about.description', 'Version and build information for Whagons')}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-sm text-muted-foreground">
+                                        {t('profile.about.version', 'Version')}
+                                    </Label>
+                                    <p className="text-lg font-semibold">{getVersionInfo().version}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-sm text-muted-foreground">
+                                        {t('profile.about.build', 'Build')}
+                                    </Label>
+                                    <p className="font-mono text-sm">{getVersionInfo().commit}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-sm text-muted-foreground">
+                                        {t('profile.about.buildTime', 'Build Time')}
+                                    </Label>
+                                    <p className="text-sm">{new Date(getVersionInfo().buildTime).toLocaleString()}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-sm text-muted-foreground">
+                                        {t('profile.about.fullVersion', 'Full Version')}
+                                    </Label>
+                                    <p className="font-mono text-sm">{getVersionInfo().fullVersion}</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
             )
         }

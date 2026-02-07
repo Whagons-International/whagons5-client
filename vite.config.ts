@@ -8,6 +8,23 @@ import JavaScriptObfuscator from 'javascript-obfuscator';
 // import { VitePWA } from 'vite-plugin-pwa';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
+import { execSync } from 'child_process';
+
+// Get version info for build-time injection
+function getVersionInfo() {
+  const packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
+  let gitCommit = 'unknown';
+  try {
+    gitCommit = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
+  } catch {
+    // Git not available or not a git repo
+  }
+  return {
+    version: packageJson.version,
+    commit: gitCommit,
+    buildTime: new Date().toISOString(),
+  };
+}
 
 // https://vitejs.dev/config/
 
@@ -66,6 +83,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const isDevFlag = env.VITE_DEVELOPMENT === 'true';
   const enableHttps = env.VITE_ENABLE_HTTPS === 'true';
+  const versionInfo = getVersionInfo();
 
   // Check if mkcert certificates exist
   const certPath = path.resolve(__dirname, 'localhost+3.pem');
@@ -176,6 +194,10 @@ export default defineConfig(({ mode }) => {
       global: 'globalThis',
       'process.env.NODE_ENV': JSON.stringify(mode),
       'process.env.IS_PREACT': JSON.stringify('false'),
+      // Version info injected at build time
+      __APP_VERSION__: JSON.stringify(versionInfo.version),
+      __GIT_COMMIT__: JSON.stringify(versionInfo.commit),
+      __BUILD_TIME__: JSON.stringify(versionInfo.buildTime),
     },
     preview: {
       allowedHosts: ['whagons5.whagons.com'],

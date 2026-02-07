@@ -47,6 +47,7 @@ import WhagonsCheck from '@/assets/WhagonsCheck';
 
 import { iconService } from '@/database/iconService';
 import { Workspace } from '@/store/types';
+import { getDisplayVersion } from '@/utils/version';
 // Removed Messages feature
 import AppSidebarWorkspaces from './AppSidebarWorkspaces';
 import AppSidebarBoards from './AppSidebarBoards';
@@ -1123,7 +1124,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   {rtlConnected ? 'Real-time connected' : 'Real-time disconnected'}
                 </TooltipContent>
               </Tooltip>
-              <span>Version 5.0.0 <i>(beta)</i></span>
+              <span>v{getDisplayVersion()}</span>
             </div>
             <AssistantWidget
               floating={false}

@@ -33,7 +33,11 @@ import { isFCMReady, isTokenRegistered } from '@/firebase/fcmHelper';
 
 import { Logger } from '@/utils/logger';
 import { getVersionInfo } from '@/utils/version';
-import { Info } from 'lucide-react';
+import { Info, Trash2, RefreshCw } from 'lucide-react';
+import { DB } from '@/store/indexedDB/DB';
+import { DataManager } from '@/store/DataManager';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { auth } from '@/firebase/firebase';
 // Helper functions to get translated arrays
 const getMonths = (t: (key: string, fallback?: string) => string) => [
     { value: 1, label: t('profile.months.january', 'January') },
@@ -189,6 +193,10 @@ function Profile() {
     const [showCropper, setShowCropper] = useState(false);
     const [imageToCrop, setImageToCrop] = useState<string | null>(null);
     const [originalFile, setOriginalFile] = useState<File | null>(null);
+    
+    // Clear cache state
+    const [showClearCacheDialog, setShowClearCacheDialog] = useState(false);
+    const [clearingCache, setClearingCache] = useState(false);
     const [newHobby, setNewHobby] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -469,6 +477,53 @@ function Profile() {
         }));
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
+        }
+    };
+
+    // Handle clear cache and resync
+    const handleClearCache = async () => {
+        setClearingCache(true);
+        try {
+            const uid = auth.currentUser?.uid;
+            
+            // 1. Clear sessionStorage
+            sessionStorage.clear();
+            Logger.info('cache', 'Cleared sessionStorage');
+            
+            // 2. Clear localStorage (except auth-critical keys)
+            const keysToKeep = ['whagons-subdomain', 'firebase:'];
+            const keysToRemove: string[] = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && !keysToKeep.some(keep => key.startsWith(keep))) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+            Logger.info('cache', `Cleared ${keysToRemove.length} localStorage keys`);
+            
+            // 3. Delete IndexedDB
+            if (uid) {
+                await DB.deleteDatabase(uid);
+                Logger.info('cache', 'Deleted IndexedDB');
+            }
+            
+            // 4. Re-initialize and sync
+            await DB.init(uid);
+            const dataManager = new DataManager(dispatch);
+            await dataManager.bootstrapAndSync();
+            await dataManager.hydrateFromCache();
+            
+            Logger.info('cache', 'Cache cleared and resynced successfully');
+            setShowClearCacheDialog(false);
+            
+            // Reload the page to ensure clean state
+            window.location.reload();
+        } catch (error) {
+            Logger.error('cache', 'Error clearing cache:', error);
+            setError(t('profile.about.clearCacheError', 'Failed to clear cache. Please try again.'));
+        } finally {
+            setClearingCache(false);
         }
     };
 
@@ -1505,6 +1560,63 @@ function Profile() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <RefreshCw className="w-5 h-5" />
+                                {t('profile.about.cacheManagement', 'Cache Management')}
+                            </CardTitle>
+                            <CardDescription>
+                                {t('profile.about.cacheDescription', 'Clear local data and resync from server. Use this if you experience data issues.')}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Button
+                                variant="destructive"
+                                onClick={() => setShowClearCacheDialog(true)}
+                                className="gap-2"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                {t('profile.about.clearCache', 'Clear Cache & Resync')}
+                            </Button>
+                        </CardContent>
+                    </Card>
+
+                    <AlertDialog open={showClearCacheDialog} onOpenChange={setShowClearCacheDialog}>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                    {t('profile.about.clearCacheTitle', 'Clear Cache & Resync')}
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    {t('profile.about.clearCacheWarning', 'This will clear all locally stored data including session storage, local storage, and the IndexedDB cache. The app will then resync all data from the server. The page will reload after completion.')}
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel disabled={clearingCache}>
+                                    {t('common.cancel', 'Cancel')}
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={handleClearCache}
+                                    disabled={clearingCache}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
+                                >
+                                    {clearingCache ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            {t('profile.about.clearing', 'Clearing...')}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Trash2 className="w-4 h-4" />
+                                            {t('profile.about.clearCache', 'Clear Cache & Resync')}
+                                        </>
+                                    )}
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 </div>
             )
         }

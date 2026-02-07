@@ -22,9 +22,8 @@ import {store } from './store';
 // import * as CryptoAPI from './crypto/crypto';
 // import { genericActions } from './store/genericSlices';
 import { initFontStyle } from './utils/fontStyle';
-import { Logger } from './utils/logger';
-
 import { Logger } from '@/utils/logger';
+
 // Install global error handlers first to catch any initialization errors
 Logger.installGlobalErrorHandlers();
 

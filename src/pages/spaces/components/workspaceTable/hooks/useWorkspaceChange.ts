@@ -28,7 +28,10 @@ export function useWorkspaceChange(opts: {
       setError(null);
       
       // Exit edit mode when workspace changes
-      exitEditMode(gridRef.current?.api);
+      const api = gridRef.current?.api;
+      if (api && !api.isDestroyed?.()) {
+        exitEditMode(api);
+      }
       
       try {
         // Ensure cache is initialized
@@ -48,7 +51,8 @@ export function useWorkspaceChange(opts: {
 
         // Refresh grid after checking
         // Note: Sync stream (DataManager) handles task cache updates automatically
-        if (gridRef.current?.api) {
+        const currentApi = gridRef.current?.api;
+        if (currentApi && !currentApi.isDestroyed?.()) {
           refreshGrid();
         }
       } catch (error: any) {
@@ -65,7 +69,8 @@ export function useWorkspaceChange(opts: {
         setError(errorMessage);
         
         // Still try to refresh grid even if check failed
-        if (gridRef.current?.api) {
+        const currentApi = gridRef.current?.api;
+        if (currentApi && !currentApi.isDestroyed?.()) {
           refreshGrid();
         }
       }

@@ -1449,14 +1449,16 @@
   background-color: hsl(var(--background));
   border: none;
   border-bottom: 1px solid rgba(0,0,0,0.06);
+  /* Reserve space for hover border to prevent layout shift */
+  border-left: 3px solid transparent;
   /* Remove all inset/left shadows to avoid glow on selection */
   box-shadow: none !important;
   /* GPU acceleration for smooth scrolling */
   will-change: auto;
   transform: translateZ(0);
   backface-visibility: hidden;
-  /* Allow AG Grid row animations (transform) while keeping other transitions minimal */
-  transition: transform 0.4s ease;
+  /* Smooth transitions for hover effects including border-color */
+  transition: transform 0.4s ease, background-color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   /* Optimize row rendering - use contain for better performance */
   contain: layout style paint;
 }
@@ -1466,13 +1468,15 @@
   background-color: hsl(var(--background));
   border: none;
   border-bottom: 1px solid rgba(255,255,255,0.08);
+  /* Reserve space for hover border to prevent layout shift */
+  border-left: 3px solid transparent;
   box-shadow: none !important;
   /* GPU acceleration for smooth scrolling */
   will-change: auto;
   transform: translateZ(0);
   backface-visibility: hidden;
-  /* Allow AG Grid row animations (transform) */
-  transition: transform 0.4s ease;
+  /* Smooth transitions for hover effects including border-color */
+  transition: transform 0.4s ease, background-color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .starwars .wh-modern-grid .ag-center-cols-container .ag-row {
@@ -1694,14 +1698,13 @@ html.starwars [data-radix-popper-content-wrapper] .border-border,
   border-color: rgba(74, 144, 226, 0.3) !important;
 }
 
-/* Hover and selection polish - only transition on hover */
+/* Hover and selection polish */
 .wh-modern-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {
   background-color: rgba(245, 245, 245, 0.6) !important;
   backdrop-filter: blur(8px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
   transform: translateY(-1px) translateZ(0);
-  transition: all 0.2s ease;
-  border-left: 3px solid var(--primary);
+  border-left-color: var(--primary);
 }
 
 .wh-modern-grid .ag-center-cols-container .ag-row.ag-row-selected {
@@ -1888,10 +1891,10 @@ html.starwars [data-radix-popper-content-wrapper] .border-border,
 }
 
 /* Density controls */
-.wh-modern-grid.wh-density-compact .ag-center-cols-container .ag-row { margin: 0 6px; }
+.wh-modern-grid.wh-density-compact .ag-center-cols-container .ag-row { margin: 0 6px 0 0; }
 .wh-modern-grid.wh-density-compact .ag-cell { padding-block: 4px; }
 
-.wh-modern-grid.wh-density-comfortable .ag-center-cols-container .ag-row { margin: 0 12px; }
+.wh-modern-grid.wh-density-comfortable .ag-center-cols-container .ag-row { margin: 0 12px 0 0; }
 .wh-modern-grid.wh-density-comfortable .ag-cell { padding-block: 10px; }
 
 .wh-modern-grid.wh-density-spacious .ag-cell { padding-block: 16px; }
@@ -1968,6 +1971,35 @@ html.starwars [data-radix-popper-content-wrapper] .border-border,
     box-shadow: none;
   }
 }
+
+/* Workspace switch row fade-in animation */
+@keyframes whRowFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Container-based animation - applies to all rows when class is present */
+.wh-rows-fade-in .ag-center-cols-container .ag-row {
+  animation: whRowFadeIn 200ms ease-out both;
+}
+
+/* Staggered delays using nth-child */
+.wh-rows-fade-in .ag-center-cols-container .ag-row:nth-child(1) { animation-delay: 0ms; }
+.wh-rows-fade-in .ag-center-cols-container .ag-row:nth-child(2) { animation-delay: 20ms; }
+.wh-rows-fade-in .ag-center-cols-container .ag-row:nth-child(3) { animation-delay: 40ms; }
+.wh-rows-fade-in .ag-center-cols-container .ag-row:nth-child(4) { animation-delay: 60ms; }
+.wh-rows-fade-in .ag-center-cols-container .ag-row:nth-child(5) { animation-delay: 80ms; }
+.wh-rows-fade-in .ag-center-cols-container .ag-row:nth-child(6) { animation-delay: 100ms; }
+.wh-rows-fade-in .ag-center-cols-container .ag-row:nth-child(7) { animation-delay: 120ms; }
+.wh-rows-fade-in .ag-center-cols-container .ag-row:nth-child(8) { animation-delay: 140ms; }
+.wh-rows-fade-in .ag-center-cols-container .ag-row:nth-child(9) { animation-delay: 160ms; }
+.wh-rows-fade-in .ag-center-cols-container .ag-row:nth-child(10) { animation-delay: 180ms; }
+.wh-rows-fade-in .ag-center-cols-container .ag-row:nth-child(11) { animation-delay: 200ms; }
+.wh-rows-fade-in .ag-center-cols-container .ag-row:nth-child(12) { animation-delay: 220ms; }
+.wh-rows-fade-in .ag-center-cols-container .ag-row:nth-child(13) { animation-delay: 240ms; }
+.wh-rows-fade-in .ag-center-cols-container .ag-row:nth-child(14) { animation-delay: 260ms; }
+.wh-rows-fade-in .ag-center-cols-container .ag-row:nth-child(15) { animation-delay: 280ms; }
+.wh-rows-fade-in .ag-center-cols-container .ag-row:nth-child(n+16) { animation-delay: 300ms; }
 
 /* Filter buttons now use shadcn Button component with proper dark mode support */
 /* Removed forced white background - buttons now respect theme */

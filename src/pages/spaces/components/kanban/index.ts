@@ -1,7 +1,8 @@
 // Main exports
 export { default as KanbanBoard } from './KanbanBoard';
 export { default as KanbanColumn } from './KanbanColumn';
-export { default as KanbanCard } from './KanbanCard';
+export { default as KanbanCardContent } from './KanbanCardContent';
+export { default as DraggableCard } from './DraggableCard';
 export { default as KanbanControls } from './KanbanControls';
 export { default as KanbanSwimLane } from './KanbanSwimLane';
 

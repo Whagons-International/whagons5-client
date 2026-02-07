@@ -8,7 +8,7 @@ export interface KanbanColumnProps {
 
 export interface KanbanCardProps {
   task: Task;
-  onClick: () => void;
+  onClick: (task: Task) => void;
 }
 
 export interface KanbanBoardProps {

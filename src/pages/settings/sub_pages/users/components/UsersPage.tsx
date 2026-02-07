@@ -337,7 +337,7 @@ function Users() {
         pinned: 'left',
         lockPosition: true,
         headerName: '',
-        suppressMenu: true,
+        suppressHeaderMenuButton: true,
         sortable: false,
         filter: false,
         resizable: false

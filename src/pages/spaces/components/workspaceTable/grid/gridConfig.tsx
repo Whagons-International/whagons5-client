@@ -50,7 +50,7 @@ export const createLoadingSpinner = () => (
   </div>
 );
 
-export const createGridContainer = (children: React.ReactNode) => {
+export const createGridContainer = (children: React.ReactNode, extraClass?: string) => {
   let densityClass = 'wh-density-comfortable';
   try {
     const v = (localStorage.getItem('wh_workspace_density') as any) || 'comfortable';
@@ -61,7 +61,7 @@ export const createGridContainer = (children: React.ReactNode) => {
   return (
     <div
       style={GRID_STYLES.container}
-      className={`ag-theme-quartz wh-workspace-grid wh-modern-grid wh-starwars-light-panel ${densityClass} h-full w-full`}
+      className={`ag-theme-quartz wh-workspace-grid wh-modern-grid wh-starwars-light-panel ${densityClass} h-full w-full ${extraClass || ''}`}
     >
       <div style={GRID_STYLES.grid}>
         {children}

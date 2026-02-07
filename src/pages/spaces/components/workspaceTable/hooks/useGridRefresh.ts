@@ -45,19 +45,24 @@ export function useGridRefresh(opts: {
   } = opts;
 
   const refreshGrid = useCallback(async () => {
-    if (!modulesLoaded || !gridRef.current?.api) return;
+    const api = gridRef.current?.api;
+    if (!modulesLoaded || !api || api.isDestroyed?.()) return;
 
     if (suppressPersistRef.current) {
       return;
     }
 
+    // Check actual row model type at runtime to avoid calling wrong API methods
+    const isInfiniteModel = api.getGridOption?.('rowModelType') === 'infinite';
+
     suppressPersistRef.current = true;
 
-    if (useClientSide) {
+    if (!isInfiniteModel) {
+      // Client-side row model
       try {
         if (!TasksCache.initialized) await TasksCache.init();
-        const sortModel = gridRef.current.api.getSortModel?.() || [{ colId: 'id', sort: 'desc' }];
-        const { rows, totalFiltered } = await refreshClientSideGrid(gridRef.current.api, TasksCache, {
+        const sortModel = api.getSortModel?.() || [{ colId: 'id', sort: 'desc' }];
+        const { rows, totalFiltered } = await refreshClientSideGrid(api, TasksCache, {
           search: searchRef.current,
           workspaceRef,
           statusMapRef,
@@ -71,17 +76,18 @@ export function useGridRefresh(opts: {
         });
 
         setClientRows(rows);
-        gridRef.current.api.refreshClientSideRowModel?.('everything');
+        api.refreshClientSideRowModel?.('everything');
       } catch (e) {
         Logger.warn('workspaces', 'refreshGrid (client-side) failed', e);
       }
     } else {
+      // Infinite row model
       rowCache.current.clear();
       // Use purgeInfiniteCache() instead of refreshInfiniteCache() to completely
       // clear all cached blocks and force a full reload. This prevents visual
       // artifacts like duplicate/overlapping rows when tasks are created or deleted,
       // as refreshInfiniteCache() can leave stale row nodes in the DOM during refresh.
-      gridRef.current.api.purgeInfiniteCache?.() ?? gridRef.current.api.refreshInfiniteCache();
+      api.purgeInfiniteCache?.() ?? api.refreshInfiniteCache?.();
     }
 
     setTimeout(() => {

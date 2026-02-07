@@ -136,7 +136,7 @@ export const useFilterPersistence = (workspaceId: string) => {
   }) => {
     if (suppressPersistRef.current) return;
     const api = params.api;
-    if (!api) return;
+    if (!api || api.isDestroyed?.()) return;
 
     try {
       const gm = api.getFilterModel?.() || {};

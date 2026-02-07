@@ -21,11 +21,14 @@ export const loadAgGridModules = async (): Promise<boolean> => {
       'ExternalFilterModule',
       'QuickFilterModule',
       'ClientSideRowModelModule',
+      'ClientSideRowModelApiModule',
       'InfiniteRowModelModule',
       'RowStyleModule',
       'CellStyleModule',
       'RenderApiModule',
       'ValidationModule',
+      'RowSelectionModule', // Required for row selection API
+      'RowApiModule', // Required for forEachNode API
       // enterprise
       'RowGroupingModule',
       'SetFilterModule',
@@ -71,8 +74,6 @@ export const createGridOptions = (useClientSide: boolean, clientRows: any[] = []
     getRowId: (params: any) => String(params?.data?.id ?? params?.data?.ID ?? params?.node?.id ?? ''),
     groupDisplayType: 'groupRows',
     groupDefaultExpanded: collapseGroups ? 0 : 1,
-    // Allow AG Grid to handle client-side filtering when rowData is fully loaded
-    suppressClientSideFiltering: false,
   } : {
     // Infinite Row Model
     rowModelType: 'infinite' as const,

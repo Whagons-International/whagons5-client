@@ -34,7 +34,7 @@ export function useGridGrouping(opts: {
   useEffect(() => {
     const api = gridRef.current?.api;
     const colApi = gridRef.current?.columnApi;
-    if (!api) return;
+    if (!api || api.isDestroyed?.()) return;
 
     const currentFilterModel = api.getFilterModel?.() || {};
 

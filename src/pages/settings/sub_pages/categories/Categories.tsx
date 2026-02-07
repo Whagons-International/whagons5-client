@@ -465,7 +465,7 @@ function Categories() {
       rowDrag: true,
       width: 50,
       maxWidth: 50,
-      suppressMenu: true,
+      suppressHeaderMenuButton: true,
       sortable: false,
       filter: false,
       cellRenderer: () => (

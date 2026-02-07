@@ -33,10 +33,12 @@ import { isFCMReady, isTokenRegistered } from '@/firebase/fcmHelper';
 
 import { Logger } from '@/utils/logger';
 import { getVersionInfo } from '@/utils/version';
-import { Info, Trash2, RefreshCw } from 'lucide-react';
+import { Info, Trash2, RefreshCw, Terminal } from 'lucide-react';
 import { DB } from '@/store/indexedDB/DB';
 import { DataManager } from '@/store/DataManager';
 import { auth } from '@/firebase/firebaseConfig';
+import { activateTempAdmin, isTempAdminActive, getTempAdminRemainingMs } from '@/hooks/useSuperAdmin';
+import toast from 'react-hot-toast';
 // Helper functions to get translated arrays
 const getMonths = (t: (key: string, fallback?: string) => string) => [
     { value: 1, label: t('profile.months.january', 'January') },
@@ -197,6 +199,16 @@ function Profile() {
     const [clearingCache, setClearingCache] = useState(false);
     const [newHobby, setNewHobby] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
+    
+    // Dev mode / Super admin activation state
+    const [hashClickCount, setHashClickCount] = useState(0);
+    const [devModeActive, setDevModeActive] = useState(false);
+    const [devModeExpiry, setDevModeExpiry] = useState<number | null>(null);
+    const [keySequence, setKeySequence] = useState('');
+    const [showSecretInput, setShowSecretInput] = useState(false);
+    const [secretInput, setSecretInput] = useState('');
+    const [secretError, setSecretError] = useState<string | null>(null);
+    const lastClickTime = useRef<number>(0);
 
     // DataManager handles data loading, no need to call internal functions here
 
@@ -216,6 +228,90 @@ function Profile() {
         const isReady = await isFCMReady();
         const isRegistered = isTokenRegistered();
         setFcmEnabled(isReady && isRegistered);
+    };
+
+    // Dev mode activation - Step 1: Click hash 10 times quickly
+    const handleHashClick = () => {
+        const now = Date.now();
+        // Reset if more than 500ms between clicks
+        if (now - lastClickTime.current > 500) {
+            setHashClickCount(1);
+        } else {
+            setHashClickCount(prev => prev + 1);
+        }
+        lastClickTime.current = now;
+        
+        if (hashClickCount + 1 >= 10) {
+            // Activate dev mode for 15 minutes
+            const expiry = Date.now() + 15 * 60 * 1000;
+            setDevModeActive(true);
+            setDevModeExpiry(expiry);
+            setHashClickCount(0);
+            toast.success('Dev mode on for 15 minutes. Ctrl+Alt+T then type "techsupport"', { duration: 5000 });
+            
+            // Auto-deactivate after 15 minutes
+            setTimeout(() => {
+                setDevModeActive(false);
+                setDevModeExpiry(null);
+                toast('Dev mode expired', { icon: 'ℹ️' });
+            }, 15 * 60 * 1000);
+        }
+    };
+    
+    // Dev mode activation - Step 2: Keyboard shortcut Ctrl+Shift+K then type "techsupport"
+    useEffect(() => {
+        if (!devModeActive) {
+            setKeySequence('');
+            return;
+        }
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Check for Ctrl+Alt+T to start the sequence
+            if (e.ctrlKey && e.altKey && e.key === 't') {
+                e.preventDefault();
+                setKeySequence('');
+                toast('Enter sequence...', { duration: 2000, icon: '🔑' });
+                return;
+            }
+            
+            // If we're in typing mode, capture letters
+            if (keySequence !== null && e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+                const newSequence = keySequence + e.key.toLowerCase();
+                setKeySequence(newSequence);
+                
+                // Check if sequence matches
+                if (newSequence === 'techsupport') {
+                    setShowSecretInput(true);
+                    setKeySequence('');
+                    toast.dismiss();
+                } else if (!'techsupport'.startsWith(newSequence)) {
+                    // Wrong sequence, reset
+                    setKeySequence('');
+                }
+            }
+        };
+        
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [devModeActive, keySequence]);
+    
+    // Handle secret submission
+    const handleSecretSubmit = async () => {
+        if (!secretInput.trim()) {
+            setSecretError('Please enter the secret');
+            return;
+        }
+        
+        const success = await activateTempAdmin(secretInput);
+        if (success) {
+            setShowSecretInput(false);
+            setSecretInput('');
+            setSecretError(null);
+            setDevModeActive(false);
+            toast.success('Super admin mode activated for 15 minutes', { duration: 5000 });
+        } else {
+            setSecretError('Invalid secret');
+        }
     };
 
     const handleNotificationToggle = (key: keyof NotificationPreferences) => {
@@ -1543,7 +1639,12 @@ function Profile() {
                                     <Label className="text-sm text-muted-foreground">
                                         {t('profile.about.fullVersion', 'Full Version')}
                                     </Label>
-                                    <p className="font-mono text-sm">{getVersionInfo().fullVersion}</p>
+                                    <p 
+                                        className="font-mono text-sm cursor-default select-none"
+                                        onClick={handleHashClick}
+                                    >
+                                        {getVersionInfo().fullVersion}
+                                    </p>
                                 </div>
                             </div>
                         </CardContent>
@@ -1592,6 +1693,63 @@ function Profile() {
                 defaultValue="profile"
                 basePath="/profile"
             />
+            
+            {/* Secret Admin Activation Dialog */}
+            <Dialog open={showSecretInput} onOpenChange={(open) => {
+                if (!open) {
+                    setShowSecretInput(false);
+                    setSecretInput('');
+                    setSecretError(null);
+                }
+            }}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Terminal className="h-5 w-5" />
+                            Tech Support Access
+                        </DialogTitle>
+                        <DialogDescription>
+                            Enter the tech support secret to activate super admin mode for 15 minutes.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="secret">Secret</Label>
+                            <Input
+                                id="secret"
+                                type="password"
+                                value={secretInput}
+                                onChange={(e) => {
+                                    setSecretInput(e.target.value);
+                                    setSecretError(null);
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        handleSecretSubmit();
+                                    }
+                                }}
+                                placeholder="Enter tech support secret"
+                                autoFocus
+                            />
+                            {secretError && (
+                                <p className="text-sm text-destructive">{secretError}</p>
+                            )}
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => {
+                            setShowSecretInput(false);
+                            setSecretInput('');
+                            setSecretError(null);
+                        }}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSecretSubmit}>
+                            Activate
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

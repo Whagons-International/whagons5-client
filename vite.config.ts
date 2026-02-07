@@ -14,8 +14,21 @@ import { execSync } from 'child_process';
 function getVersionInfo() {
   const packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
   
-  // Priority: VITE_GIT_COMMIT env var (for Docker) > git command > 'unknown'
-  let gitCommit = process.env.VITE_GIT_COMMIT || '';
+  // Priority: .git-commit file (Docker) > VITE_GIT_COMMIT env > git command > 'unknown'
+  let gitCommit = '';
+  
+  // 1. Try reading from .git-commit file (created by Dockerfile)
+  const gitCommitFile = path.resolve(__dirname, '.git-commit');
+  if (fs.existsSync(gitCommitFile)) {
+    gitCommit = fs.readFileSync(gitCommitFile, 'utf-8').trim();
+  }
+  
+  // 2. Try env var
+  if (!gitCommit) {
+    gitCommit = process.env.VITE_GIT_COMMIT || '';
+  }
+  
+  // 3. Try git command
   if (!gitCommit) {
     try {
       gitCommit = execSync('git rev-parse --short HEAD', { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();

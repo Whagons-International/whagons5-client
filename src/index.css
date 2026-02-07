@@ -1445,8 +1445,8 @@
 .wh-modern-grid .ag-center-cols-container .ag-row {
   /* Use horizontal margins only to avoid AG Grid row stacking issues */
   border-radius: 0;
-  background-color: transparent;
-  backdrop-filter: blur(4px);
+  /* Solid background required for row animations to avoid ghosting */
+  background-color: hsl(var(--background));
   border: none;
   border-bottom: 1px solid rgba(0,0,0,0.06);
   /* Remove all inset/left shadows to avoid glow on selection */
@@ -1455,15 +1455,15 @@
   will-change: auto;
   transform: translateZ(0);
   backface-visibility: hidden;
-  /* Only transition on hover, not during scroll */
-  transition: none;
+  /* Allow AG Grid row animations (transform) while keeping other transitions minimal */
+  transition: transform 0.4s ease;
   /* Optimize row rendering - use contain for better performance */
   contain: layout style paint;
 }
 
 .dark .wh-modern-grid .ag-center-cols-container .ag-row {
-  background-color: transparent;
-  backdrop-filter: blur(4px);
+  /* Solid background required for row animations to avoid ghosting */
+  background-color: hsl(var(--background));
   border: none;
   border-bottom: 1px solid rgba(255,255,255,0.08);
   box-shadow: none !important;
@@ -1471,6 +1471,8 @@
   will-change: auto;
   transform: translateZ(0);
   backface-visibility: hidden;
+  /* Allow AG Grid row animations (transform) */
+  transition: transform 0.4s ease;
 }
 
 .starwars .wh-modern-grid .ag-center-cols-container .ag-row {
@@ -1484,6 +1486,8 @@
   transform: translateZ(0);
   backface-visibility: hidden;
   letter-spacing: 0.3px;
+  /* Allow AG Grid row animations (transform) */
+  transition: transform 0.4s ease;
 }
 
 .starwars .wh-modern-grid .ag-center-cols-container .ag-row:hover:not(.ag-row-selected) {

@@ -86,7 +86,7 @@ export const createGridOptions = (useClientSide: boolean, clientRows: any[] = []
     getRowId: (params: any) => String(params?.data?.id ?? params?.data?.ID ?? params?.node?.id ?? ''),
   }),
   // Note: Default sort is set via applyColumnState in WorkspaceTable
-  animateRows: false, // Disabled for scroll performance
+  animateRows: true, // Enable row animations for sorting/filtering
   suppressColumnVirtualisation: false,
   suppressNoRowsOverlay: false,
   loading: false,

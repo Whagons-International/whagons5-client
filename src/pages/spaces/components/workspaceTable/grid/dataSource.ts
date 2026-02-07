@@ -78,7 +78,8 @@ export function buildGetRows(TasksCache: any, refs: any) {
       if (spotVisibilityFilterRef?.current) {
         rows = rows.filter(spotVisibilityFilterRef.current);
       }
-      const total = spotVisibilityFilterRef?.current ? rows.length : (result?.rowCount || 0);
+      // Use the total row count from the query result, not the filtered page length
+      const total = result?.rowCount || 0;
       try { if (localStorage.getItem('wh-debug-filters') === 'true') Logger.info('workspaces', '[WT getRows] result rows=', rows.length, 'total=', total); } catch {}
       rowCache.current.set(cacheKey, { rows, rowCount: total });
       try { setEmptyOverlayVisible?.(total === 0); } catch {}

@@ -14,8 +14,6 @@ ARG VITE_DOMAIN
 ARG VITE_CACHE_ENCRYPTION
 ARG VITE_ALLOW_UNVERIFIED_LOGIN
 ARG VITE_ALLOW_UNVERIFIED_EMAIL_REGEX
-# SOURCE_COMMIT is injected by Coolify when "Include Source Commit in Build" is enabled
-ARG SOURCE_COMMIT=unknown
 
 # Set environment variables for build
 ENV FONTAWESOME_PACKAGE_TOKEN=$FONTAWESOME_PACKAGE_TOKEN
@@ -26,8 +24,8 @@ ENV VITE_DOMAIN=$VITE_DOMAIN
 ENV VITE_CACHE_ENCRYPTION=$VITE_CACHE_ENCRYPTION
 ENV VITE_ALLOW_UNVERIFIED_LOGIN=$VITE_ALLOW_UNVERIFIED_LOGIN
 ENV VITE_ALLOW_UNVERIFIED_EMAIL_REGEX=$VITE_ALLOW_UNVERIFIED_EMAIL_REGEX
-# Pass SOURCE_COMMIT to vite as VITE_GIT_COMMIT
-ENV VITE_GIT_COMMIT=$SOURCE_COMMIT
+# Use placeholder - will be replaced at runtime with SOURCE_COMMIT
+ENV VITE_GIT_COMMIT=__RUNTIME_COMMIT__
 
 # Copy package files
 COPY package.json bun.lock* bun.lockb* package-lock.json* pnpm-lock.yaml* ./
@@ -89,7 +87,15 @@ RUN printf 'server {\n\
     }\n\
 }\n' > /etc/nginx/conf.d/default.conf
 
+# Create startup script to inject SOURCE_COMMIT at runtime
+RUN printf '#!/bin/sh\n\
+COMMIT=${SOURCE_COMMIT:-unknown}\n\
+# Shorten to 7 chars if full hash\n\
+COMMIT=$(echo "$COMMIT" | cut -c1-7)\n\
+# Replace placeholder in all JS files\n\
+find /usr/share/nginx/html/assets -name "*.js" -exec sed -i "s/__RUNTIME_COMMIT__/$COMMIT/g" {} \\;\n\
+exec nginx -g "daemon off;"\n' > /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
+
 EXPOSE 3000
 
-CMD ["nginx", "-g", "daemon off;"]
-# Force rebuild Fri Feb  6 04:42:42 PM PST 2026
+CMD ["/docker-entrypoint.sh"]

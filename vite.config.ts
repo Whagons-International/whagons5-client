@@ -14,20 +14,20 @@ import { execSync } from 'child_process';
 function getVersionInfo() {
   const packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
   
-  // Priority: VITE_GIT_COMMIT env (from Coolify SOURCE_COMMIT) > git command > 'unknown'
   let gitCommit = process.env.VITE_GIT_COMMIT || '';
   
-  // Fallback to git command for local dev
-  if (!gitCommit || gitCommit === 'unknown') {
+  // If it's the runtime placeholder, keep it (will be replaced by Docker entrypoint)
+  if (gitCommit === '__RUNTIME_COMMIT__') {
+    // Keep placeholder - Docker will replace at container start
+  } else if (!gitCommit || gitCommit === 'unknown') {
+    // Local dev: use git command
     try {
       gitCommit = execSync('git rev-parse --short HEAD', { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
     } catch {
       gitCommit = 'unknown';
     }
-  }
-  
-  // SOURCE_COMMIT from Coolify is full hash, shorten it
-  if (gitCommit.length > 7) {
+  } else if (gitCommit.length > 7) {
+    // Shorten full hash
     gitCommit = gitCommit.substring(0, 7);
   }
   

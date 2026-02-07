@@ -232,7 +232,7 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-background via-muted/5 to-background overflow-hidden">
+    <div className="absolute inset-0 flex flex-col bg-gradient-to-br from-background via-muted/5 to-background overflow-hidden">
       <DndContext
         sensors={sensors}
         onDragStart={handleDragStart}

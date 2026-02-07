@@ -158,7 +158,7 @@ export interface WorkspaceTableModeParams {
  * - Row count > CLIENT_THRESHOLD => infinite row model (better for very large datasets)
  */
 export const useWorkspaceTableMode = (params: WorkspaceTableModeParams) => {
-  const [useClientSide, setUseClientSide] = useState(false);
+  const [useClientSide, setUseClientSide] = useState(true);
   const [clientRows, setClientRows] = useState<any[]>([]);
 
   useEffect(() => {

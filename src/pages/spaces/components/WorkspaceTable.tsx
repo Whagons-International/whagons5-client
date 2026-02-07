@@ -27,6 +27,7 @@ import {
   useDoneStatusId,
   useLatestRef,
   useNewTaskAnimation,
+  useWorkspaceSwitchAnimation,
 } from './workspaceTable/hooks';
 import {
   loadAgGridModules,
@@ -108,6 +109,11 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       // ignore
     }
   }, []);
+
+  // Workspace switch animation - staggered fade-in effect
+  const { animationClass } = useWorkspaceSwitchAnimation({
+    workspaceId,
+  });
 
   const handleSelectionChanged = useCallback(
     (e: any, onSelectionChangedCb?: (selectedIds: number[]) => void) => {
@@ -414,6 +420,13 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     setEmptyOverlayVisible(false);
   }, [workspaceId, searchText]);
 
+  // In client-side mode, set empty overlay based on clientRows length
+  useEffect(() => {
+    if (useClientSide) {
+      setEmptyOverlayVisible(clientRows.length === 0);
+    }
+  }, [useClientSide, clientRows]);
+
   // Grid refresh hook
   const refreshGrid = useGridRefresh({
     modulesLoaded,
@@ -654,6 +667,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           rowSelection={{ 
             mode: 'multiRow', 
             enableClickSelection: false,
+            enableSelectionWithoutKeys: true, // Allow programmatic selection via node.setSelected()
             checkboxes: false, // Disabled - using custom checkbox in ID column
             headerCheckbox: false,
           }}
@@ -661,8 +675,9 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           getRowClass={getRowClass}
           onGridReady={onGridReady}
           onFirstDataRendered={() => {
-            if (!gridRef.current?.api) return;
-            onFiltersChanged?.(!!gridRef.current.api.isAnyFilterPresent?.());
+            const api = gridRef.current?.api;
+            if (!api || api.isDestroyed?.()) return;
+            onFiltersChanged?.(!!api.isAnyFilterPresent?.());
             onRowDataUpdated();
           }}
           onRowDataUpdated={onRowDataUpdated}
@@ -710,7 +725,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         existingTaskFormId={formDialogState.existingTaskFormId}
         existingData={formDialogState.existingData}
       />
-    </Suspense>
+    </Suspense>,
+    animationClass
   );
 });
 

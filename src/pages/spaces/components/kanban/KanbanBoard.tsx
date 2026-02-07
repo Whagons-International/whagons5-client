@@ -1,9 +1,8 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   DndContext,
   DragOverlay,
-  closestCenter,
   PointerSensor,
   useSensor,
   useSensors,
@@ -11,91 +10,62 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import type { AppDispatch, RootState } from '@/store/store';
-import type { KanbanBoardProps, KanbanFilters } from './types/kanban.types';
+import type { KanbanBoardProps } from './types/kanban.types';
 import type { Task } from '@/store/types';
 import KanbanColumn from './KanbanColumn';
-import KanbanCard from './KanbanCard';
-import KanbanControls from './KanbanControls';
-import KanbanSwimLane from './KanbanSwimLane';
+import KanbanCardContent from './KanbanCardContent';
 import TaskDialog from '../TaskDialog';
-import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
-import { getTasksFromIndexedDB, moveTaskThunk } from '@/store/reducers/tasksSlice';
-import { useKanbanFilters } from './hooks/useKanbanFilters';
-import { useKanbanGrouping } from './hooks/useKanbanGrouping';
-import { exportToExcel } from './utils/exportUtils';
+import { getTasksFromIndexedDB } from '@/store/reducers/tasksSlice';
 import { useSpotVisibility } from '@/hooks/useSpotVisibility';
+import { api } from '@/store/api/internalApi';
+import { TasksCache } from '@/store/indexedDB/TasksCache';
 import toast from 'react-hot-toast';
-
 import { Logger } from '@/utils/logger';
+
+// Stable selectors
+const selectTasks = (state: RootState) => (state.tasks as any)?.value ?? [];
+const selectStatuses = (state: RootState) => (state.statuses as any)?.value ?? [];
+const selectPriorities = (state: RootState) => (state.priorities as any)?.value ?? [];
+const selectUsers = (state: RootState) => (state.users as any)?.value ?? [];
+const selectTasksLoading = (state: RootState) => (state.tasks as any)?.loading ?? false;
+
 export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
   const dispatch = useDispatch<AppDispatch>();
   
-  // Get data from Redux
-  const tasks = useSelector((state: RootState) => (state.tasks as any)?.value ?? []);
-  const statuses = useSelector((state: RootState) => (state.statuses as any)?.value ?? []);
-  const categories = useSelector((state: RootState) => (state.categories as any)?.value ?? []);
-  const priorities = useSelector((state: RootState) => (state.priorities as any)?.value ?? []);
-  const teams = useSelector((state: RootState) => (state.teams as any)?.value ?? []);
-  const users = useSelector((state: RootState) => (state.users as any)?.value ?? []);
-  const loading = useSelector((state: RootState) => (state.tasks as any)?.loading ?? false);
+  const tasks = useSelector(selectTasks);
+  const statuses = useSelector(selectStatuses);
+  const priorities = useSelector(selectPriorities);
+  const users = useSelector(selectUsers);
+  const loading = useSelector(selectTasksLoading);
 
-  // Preferences key
-  const KANBAN_PREFS_KEY = `wh_kanban_prefs_${workspaceId || 'all'}`;
-
-  // Load preferences from localStorage
-  const loadPreferences = () => {
-    try {
-      const saved = localStorage.getItem(KANBAN_PREFS_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (error) {
-      Logger.error('ui', '[Kanban] Error loading preferences:', error);
-    }
-    return {
-      viewMode: 'compact',
-      filters: { categories: [], statuses: [], priorities: [], teams: [], search: '' },
-      groupBy: 'none',
-    };
-  };
-
-  // Local state
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
-  const [taskDialogMode, setTaskDialogMode] = useState<'create' | 'edit'>('edit');
-  const [preferences, setPreferences] = useState(loadPreferences);
-  const [filters, setFilters] = useState<KanbanFilters>(preferences.filters);
-  const [viewMode, setViewMode] = useState<'compact' | 'detailed'>(preferences.viewMode);
-  const [groupBy, setGroupBy] = useState<'none' | 'priority' | 'team' | 'assignee'>(preferences.groupBy);
+  
+  // Local optimistic state for task positions - avoids Redux re-renders during drag
+  const [localTaskOverrides, setLocalTaskOverrides] = useState<Record<number, number>>({});
+  const pendingMoveRef = useRef<number | null>(null);
+  
+  // For animating failed drops back - stores the card rect positions
+  const [returnAnimation, setReturnAnimation] = useState<{
+    task: Task;
+    currentRect: { left: number; top: number; width: number; height: number };
+    targetRect: { left: number; top: number; width: number; height: number };
+    animating: boolean;
+  } | null>(null);
+  const columnRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
-  // Configure drag sensors
+  // Pointer sensor with distance constraint
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8, // 8px movement required before drag starts
-      },
+      activationConstraint: { distance: 8 },
     })
   );
 
-  // Save preferences to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(KANBAN_PREFS_KEY, JSON.stringify({
-        viewMode,
-        filters,
-        groupBy,
-      }));
-    } catch (error) {
-      Logger.error('ui', '[Kanban] Error saving preferences:', error);
-    }
-  }, [viewMode, filters, groupBy, KANBAN_PREFS_KEY]);
-
-  // Spot-based visibility filtering
   const { isTaskVisible } = useSpotVisibility();
 
-  // Filter tasks by workspace and spot visibility
+  // Filter tasks for this workspace
   const workspaceTasks = useMemo(() => {
     let filtered = tasks;
     if (workspaceId) {
@@ -104,154 +74,141 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
     return filtered.filter(isTaskVisible);
   }, [tasks, workspaceId, isTaskVisible]);
 
-  // Apply filters using the hook
-  const filteredTasks = useKanbanFilters(workspaceTasks, filters);
-
-  // Group tasks by selected grouping (for swim lanes)
-  const taskGroups = useKanbanGrouping(filteredTasks, groupBy, priorities, teams, users);
-
-  // Group filtered tasks by status (for regular columns)
+  // Group by status - apply local overrides for optimistic updates
   const tasksByStatus = useMemo(() => {
     const grouped: Record<number, Task[]> = {};
-    
-    // Initialize all status groups
-    statuses.forEach((status: any) => {
-      grouped[status.id] = [];
-    });
-
-    // Group filtered tasks
-    filteredTasks.forEach((task: Task) => {
-      if (grouped[task.status_id]) {
-        grouped[task.status_id].push(task);
+    statuses.forEach((s: any) => { grouped[s.id] = []; });
+    workspaceTasks.forEach((task: Task) => {
+      // Use local override if exists, otherwise use actual status
+      const effectiveStatusId = localTaskOverrides[task.id] ?? task.status_id;
+      if (grouped[effectiveStatusId]) {
+        grouped[effectiveStatusId].push(task);
       }
     });
-
     return grouped;
-  }, [filteredTasks, statuses]);
+  }, [workspaceTasks, statuses, localTaskOverrides]);
 
-  // Sort statuses by a logical order (initial -> working -> paused -> finished)
+  // Sort statuses
   const sortedStatuses = useMemo(() => {
     return [...statuses].sort((a: any, b: any) => {
-      // Initial statuses first
       if (a.initial && !b.initial) return -1;
       if (!a.initial && b.initial) return 1;
-      
-      // Then by action type
-      const actionOrder: Record<string, number> = {
-        'NONE': 1,
-        'WORKING': 2,
-        'PAUSED': 3,
-        'FINISHED': 4,
-      };
-      
-      const orderA = actionOrder[a.action] || 0;
-      const orderB = actionOrder[b.action] || 0;
-      
-      return orderA - orderB;
+      const order: Record<string, number> = { 'NONE': 1, 'WORKING': 2, 'PAUSED': 3, 'FINISHED': 4 };
+      return (order[a.action] || 0) - (order[b.action] || 0);
     });
   }, [statuses]);
 
-  // Listen for task changes to refresh the board
+  // Listen for task changes - but skip if we have a pending move to avoid flicker
   useEffect(() => {
-    const handleTaskChange = () => {
+    const refresh = () => {
+      if (pendingMoveRef.current) return; // Skip refresh during pending move
       dispatch(getTasksFromIndexedDB());
     };
-
-    const unsubscribers = [
-      TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, handleTaskChange),
-      TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, handleTaskChange),
-      TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, handleTaskChange),
-      TaskEvents.on(TaskEvents.EVENTS.TASKS_BULK_UPDATE, handleTaskChange),
+    const unsubs = [
+      TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, refresh),
+      TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, refresh),
+      TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, refresh),
     ];
-
-    return () => {
-      unsubscribers.forEach((unsub) => {
-        try {
-          unsub();
-        } catch (error) {
-          Logger.error('ui', '[Kanban] Error unsubscribing from task event:', error);
-        }
-      });
-    };
+    return () => unsubs.forEach(u => u());
   }, [dispatch]);
 
-  // Drag start handler
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const taskId = Number(event.active.id);
-    const task = tasks.find((t: Task) => t.id === taskId);
-    setActiveTask(task || null);
-  }, [tasks]);
+    setActiveTask(workspaceTasks.find((t: Task) => t.id === taskId) || null);
+  }, [workspaceTasks]);
 
-  // Drag end handler with optimistic updates via Redux thunk
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event;
-    
     setActiveTask(null);
 
-    if (!over || active.id === over.id) return;
+    if (!over) return;
 
     const taskId = Number(active.id);
     const newStatusId = Number(over.id);
+    const task = workspaceTasks.find((t: Task) => t.id === taskId);
+    
+    if (!task || task.status_id === newStatusId) return;
 
-    // Get current task from Redux store or TasksCache for previousStatusId
-    let task = tasks.find((t: Task) => t.id === taskId);
-    if (!task) {
-      // Fallback to TasksCache if not in Redux store
-      task = await TasksCache.getTask(taskId.toString());
-    }
-    if (!task) {
-      toast.error('Task not found');
-      return;
-    }
+    // Optimistic update - just update local state, no Redux
+    pendingMoveRef.current = taskId;
+    setLocalTaskOverrides(prev => ({ ...prev, [taskId]: newStatusId }));
 
-    const previousStatusId = task.status_id;
-
-    // Don't update if status hasn't changed
-    if (previousStatusId === newStatusId) return;
-
-    // Dispatch Redux thunk to handle optimistic update, API call, and rollback
     try {
-      const result = await dispatch(moveTaskThunk({ taskId, newStatusId, previousStatusId }));
-      if (moveTaskThunk.fulfilled.match(result)) {
-        toast.success('Task moved successfully');
+      // Call API directly
+      await api.patch(`/tasks/${taskId}`, { status_id: newStatusId });
+      
+      // Update cache silently
+      const cachedTask = await TasksCache.getTask(taskId.toString());
+      if (cachedTask) {
+        await TasksCache.updateTask(taskId.toString(), { ...cachedTask, status_id: newStatusId });
       }
-      // Note: 403 errors are handled by the API interceptor which shows a toast
-      // Other errors are silently rolled back (optimistic update reverted)
-    } catch (error) {
-      Logger.error('ui', 'Unexpected error in handleDragEnd:', error);
+      
+      // Clear override - the next Redux sync will have the correct data
+      setLocalTaskOverrides(prev => {
+        const next = { ...prev };
+        delete next[taskId];
+        return next;
+      });
+      
+    } catch (error: any) {
+      Logger.error('ui', 'Failed to move task:', error);
+      
+      // Get column positions for animation
+      const fromColumn = columnRefs.current.get(newStatusId);
+      const toColumn = columnRefs.current.get(task.status_id);
+      
+      if (fromColumn && toColumn) {
+        const fromRect = fromColumn.getBoundingClientRect();
+        const toRect = toColumn.getBoundingClientRect();
+        
+        // Start at current position
+        setReturnAnimation({
+          task,
+          currentRect: { left: fromRect.left + 12, top: fromRect.top + 80, width: 288, height: 100 },
+          targetRect: { left: toRect.left + 12, top: toRect.top + 80, width: 288, height: 100 },
+          animating: false,
+        });
+        
+        // Trigger animation on next frame
+        requestAnimationFrame(() => {
+          setReturnAnimation(prev => prev ? { ...prev, animating: true } : null);
+        });
+        
+        // After animation, revert and clear
+        setTimeout(() => {
+          setLocalTaskOverrides(prev => {
+            const next = { ...prev };
+            delete next[taskId];
+            return next;
+          });
+          setReturnAnimation(null);
+        }, 220);
+      } else {
+        // No animation, just revert
+        setLocalTaskOverrides(prev => {
+          const next = { ...prev };
+          delete next[taskId];
+          return next;
+        });
+      }
+      
+      if (error.response?.status !== 403) {
+        toast.error('Failed to move task');
+      }
+    } finally {
+      pendingMoveRef.current = null;
     }
-  }, [dispatch, tasks]);
+  }, [workspaceTasks]);
 
-  // Handle task click
   const handleTaskClick = useCallback((task: Task) => {
     setSelectedTask(task);
-    setTaskDialogMode('edit');
     setIsTaskDialogOpen(true);
   }, []);
 
-  // Handle dialog close
   const handleDialogClose = useCallback((open: boolean) => {
     setIsTaskDialogOpen(open);
-    if (!open) {
-      setSelectedTask(null);
-      // Refresh tasks after dialog closes
-      setTimeout(() => {
-        dispatch(getTasksFromIndexedDB());
-      }, 100);
-    }
-  }, [dispatch]);
-
-  // Handle export
-  const handleExport = useCallback(async () => {
-    try {
-      const filename = `kanban-board-${new Date().toISOString().split('T')[0]}.xlsx`;
-      await exportToExcel(filteredTasks, statuses, filename);
-      toast.success('Board exported successfully');
-    } catch (error) {
-      Logger.error('ui', 'Failed to export board:', error);
-      toast.error('Failed to export board');
-    }
-  }, [filteredTasks, statuses]);
+    if (!open) setSelectedTask(null);
+  }, []);
 
   if (loading) {
     return (
@@ -273,77 +230,67 @@ export default function KanbanBoard({ workspaceId }: KanbanBoardProps) {
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-background via-muted/5 to-background">
-      {/* Controls - Modern floating style */}
-      <div className="px-6 pt-6 pb-4">
-        <div className="bg-card/80 backdrop-blur-md rounded-xl border border-border/40 shadow-lg p-4">
-          <KanbanControls
-            filters={filters}
-            onFilterChange={setFilters}
-            availableCategories={categories}
-            availableStatuses={statuses}
-            availablePriorities={priorities}
-            availableTeams={teams}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
-            groupBy={groupBy}
-            onGroupByChange={setGroupBy}
-            onExport={handleExport}
-          />
-        </div>
-      </div>
-
-      {/* Kanban Board */}
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        {/* Render swim lanes if grouping is enabled */}
-        {groupBy !== 'none' ? (
-          <div className="flex-1 overflow-y-auto px-6 pb-6">
-            <div className="space-y-4">
-              {taskGroups.map((group) => (
-                <KanbanSwimLane
-                  key={group.id}
-                  group={group}
-                  statuses={sortedStatuses}
-                  onTaskClick={handleTaskClick}
-                />
-              ))}
-            </div>
-          </div>
-        ) : (
-          /* Regular column view - Modern spacing */
-          <div className="flex gap-5 overflow-x-auto flex-1 px-6 pb-6">
-            {sortedStatuses.map((status: any) => (
-              <KanbanColumn
-                key={status.id}
-                status={status}
-                tasks={tasksByStatus[status.id] || []}
-                onTaskClick={handleTaskClick}
-              />
-            ))}
-          </div>
-        )}
+        <div className="flex gap-5 overflow-x-auto flex-1 px-6 py-6">
+          {sortedStatuses.map((status: any) => (
+            <KanbanColumn
+              key={status.id}
+              status={status}
+              tasks={tasksByStatus[status.id] || []}
+              onTaskClick={handleTaskClick}
+              hiddenTaskId={returnAnimation?.task.id}
+              columnRef={(el) => {
+                if (el) columnRefs.current.set(status.id, el);
+                else columnRefs.current.delete(status.id);
+              }}
+            />
+          ))}
+        </div>
 
-        {/* Drag overlay with modern shadow effect */}
         <DragOverlay>
           {activeTask && (
-            <div className="rotate-2 scale-105 opacity-90">
-              <div className="shadow-2xl ring-2 ring-primary/20 rounded-lg">
-                <KanbanCard task={activeTask} onClick={() => {}} />
+            <div className="rotate-2 scale-105">
+              <div className="group relative bg-card rounded-lg border border-border/40 shadow-2xl ring-2 ring-primary/20 overflow-hidden">
+                <KanbanCardContent 
+                  task={activeTask} 
+                  priority={activeTask.priority_id ? priorities.find((p: any) => p.id === activeTask.priority_id) : null}
+                  assignedUsers={activeTask.user_ids?.length ? users.filter((u: any) => activeTask.user_ids?.includes(u.id)).slice(0, 3) : []}
+                />
               </div>
             </div>
           )}
         </DragOverlay>
+        
+        {/* Return animation overlay */}
+        {returnAnimation && (
+          <div
+            className="fixed z-50 pointer-events-none"
+            style={{
+              left: returnAnimation.animating ? returnAnimation.targetRect.left : returnAnimation.currentRect.left,
+              top: returnAnimation.animating ? returnAnimation.targetRect.top : returnAnimation.currentRect.top,
+              width: returnAnimation.currentRect.width,
+              transition: returnAnimation.animating ? 'left 180ms ease-out, top 180ms ease-out' : 'none',
+            }}
+          >
+            <div className="group relative bg-card rounded-lg border border-destructive/50 shadow-2xl overflow-hidden">
+              <KanbanCardContent 
+                task={returnAnimation.task} 
+                priority={returnAnimation.task.priority_id ? priorities.find((p: any) => p.id === returnAnimation.task.priority_id) : null}
+                assignedUsers={returnAnimation.task.user_ids?.length ? users.filter((u: any) => returnAnimation.task.user_ids?.includes(u.id)).slice(0, 3) : []}
+              />
+            </div>
+          </div>
+        )}
       </DndContext>
 
-      {/* Task Dialog */}
       <TaskDialog
         open={isTaskDialogOpen}
         onOpenChange={handleDialogClose}
-        mode={taskDialogMode}
+        mode="edit"
         workspaceId={workspaceId ? parseInt(workspaceId) : undefined}
         task={selectedTask}
       />

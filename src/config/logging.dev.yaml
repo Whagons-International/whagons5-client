@@ -2,10 +2,11 @@
 # All categories enabled by default for debugging
 
 # Set to 'all' to enable all categories, 'none' to disable all
-mode: all
+mode: categories
 
 # Or specify individual categories (only used if mode is not 'all' or 'none')
-# categories:
+categories:
+  - ui
 #   - auth
 #   - api
 #   - cache
@@ -17,7 +18,6 @@ mode: all
 #   - forms
 #   - notifications
 #   - integrity
-#   - ui
 #   - perf
 #   - navigation
 #   - icons

@@ -12,8 +12,13 @@ export function useApprovalRefresh(gridRef: React.RefObject<any>, refreshGrid: (
     const handler = () => {
       // Refresh grid so pivot-driven approval instances reflect latest decision
       refreshGrid();
-      try { gridRef.current?.api?.refreshCells({ force: true }); } catch {}
-      try { gridRef.current?.api?.refreshInfiniteCache(); } catch {}
+      try { 
+        const api = gridRef.current?.api;
+        if (api && !api.isDestroyed?.()) {
+          api.refreshCells?.({ force: true });
+          api.refreshInfiniteCache?.();
+        }
+      } catch {}
     };
     window.addEventListener('wh:approvalDecision:success' as any, handler as any);
     return () => window.removeEventListener('wh:approvalDecision:success' as any, handler as any);

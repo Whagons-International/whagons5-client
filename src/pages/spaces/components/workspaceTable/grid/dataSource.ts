@@ -106,7 +106,9 @@ export async function refreshClientSideGrid(gridApi: any, TasksCache: any, param
     rows = rows.filter(spotVisibilityFilterRef.current);
   }
   try {
-    gridApi?.setGridOption?.('rowData', rows);
+    if (gridApi && !gridApi.isDestroyed?.()) {
+      gridApi.setGridOption?.('rowData', rows);
+    }
   } catch {
     // ignore
   }

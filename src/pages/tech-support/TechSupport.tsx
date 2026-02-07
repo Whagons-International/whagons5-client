@@ -922,7 +922,7 @@ function DatabaseTab() {
     resizable: true,
     sortable: true,
     filter: true,
-    suppressMenu: false,
+    suppressHeaderMenuButton: false,
     minWidth: 80,
     wrapHeaderText: true,
     autoHeaderHeight: true,

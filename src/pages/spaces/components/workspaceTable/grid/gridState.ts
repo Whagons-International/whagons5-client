@@ -152,9 +152,10 @@ export interface WorkspaceTableModeParams {
 }
 
 /**
- * Enforces current mode behavior:
- * - Grouping => client-side row model (load all rows)
- * - No grouping => infinite row model (do not load all rows)
+ * Decides row model based on task count and grouping:
+ * - Grouping enabled => client-side row model (required for AG Grid grouping)
+ * - Row count <= CLIENT_THRESHOLD => client-side row model (faster for local IndexedDB data)
+ * - Row count > CLIENT_THRESHOLD => infinite row model (better for very large datasets)
  */
 export const useWorkspaceTableMode = (params: WorkspaceTableModeParams) => {
   const [useClientSide, setUseClientSide] = useState(false);
@@ -162,13 +163,28 @@ export const useWorkspaceTableMode = (params: WorkspaceTableModeParams) => {
 
   useEffect(() => {
     const run = async () => {
-      // When grouping is enabled we must use client-side row model
-      if (params.groupBy && params.groupBy !== 'none') {
-        setUseClientSide(true);
-        try {
-          if (!TasksCache.initialized) await TasksCache.init();
+      try {
+        if (!TasksCache.initialized) await TasksCache.init();
+
+        // First, get the total count for this workspace/search
+        const baseParams: any = { search: params.searchText };
+        if (params.workspaceRef.current === 'shared') {
+          baseParams.shared_with_me = true;
+        } else if (params.workspaceRef.current !== 'all') {
+          baseParams.workspace_id = params.workspaceRef.current;
+        }
+
+        const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+        const totalFiltered = countResp?.rowCount ?? 0;
+
+        // Use client-side mode if grouping is enabled OR row count is under threshold
+        const shouldUseClientSide = (params.groupBy && params.groupBy !== 'none') || 
+                                     totalFiltered <= GRID_CONSTANTS.CLIENT_THRESHOLD;
+
+        if (shouldUseClientSide) {
+          setUseClientSide(true);
           const sortModel = [{ colId: 'id', sort: 'desc' }];
-          const { rows, totalFiltered } = await refreshClientSideGrid(params.gridApi, TasksCache, {
+          const { rows } = await refreshClientSideGrid(params.gridApi, TasksCache, {
             search: params.searchText,
             workspaceRef: params.workspaceRef,
             statusMapRef: params.statusMapRef,
@@ -181,25 +197,18 @@ export const useWorkspaceTableMode = (params: WorkspaceTableModeParams) => {
             spotVisibilityFilterRef: params.spotVisibilityFilterRef,
           });
           setClientRows(rows || []);
-          try {
-            params.onModeChange?.({ useClientSide: true, totalFiltered });
-          } catch {
-            // ignore
-          }
-        } catch (e) {
-          Logger.warn('workspaces', 'Failed to load client-side rows for grouping', e);
+          params.onModeChange?.({ useClientSide: true, totalFiltered });
+        } else {
+          // Large dataset: use infinite row model
+          setUseClientSide(false);
           setClientRows([]);
+          params.onModeChange?.({ useClientSide: false, totalFiltered });
         }
-        return;
-      }
-
-      // No grouping: always use infinite row model to avoid client-side filter quirks
-      setUseClientSide(false);
-      setClientRows([]);
-      try {
-        params.onModeChange?.({ useClientSide: false, totalFiltered: 0 });
-      } catch {
-        // ignore
+      } catch (e) {
+        Logger.warn('workspaces', 'Failed to determine row model mode', e);
+        // Fallback to infinite mode on error
+        setUseClientSide(false);
+        setClientRows([]);
       }
     };
 
@@ -217,6 +226,7 @@ export const useWorkspaceTableMode = (params: WorkspaceTableModeParams) => {
     params.userMapRef,
     params.workspaceId,
     params.workspaceRef,
+    params.spotVisibilityFilterRef,
   ]);
 
   return { useClientSide, clientRows, setClientRows, setUseClientSide };

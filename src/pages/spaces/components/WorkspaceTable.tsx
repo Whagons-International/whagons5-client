@@ -684,7 +684,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           onColumnVisible={(e: any) => {
             handleColumnOrderChanged(e?.columnApi);
           }}
-          animateRows={false}
+          animateRows={true}
           suppressColumnVirtualisation={false}
           suppressNoRowsOverlay={false}
           loading={false}

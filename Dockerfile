@@ -1,9 +1,6 @@
 # Stage 1: Build
 FROM oven/bun:latest AS builder
 
-# Install git for version detection
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
 # Accept build arguments for environment variables
@@ -17,7 +14,8 @@ ARG VITE_DOMAIN
 ARG VITE_CACHE_ENCRYPTION
 ARG VITE_ALLOW_UNVERIFIED_LOGIN
 ARG VITE_ALLOW_UNVERIFIED_EMAIL_REGEX
-ARG VITE_GIT_COMMIT=unknown
+# SOURCE_COMMIT is injected by Coolify when "Include Source Commit in Build" is enabled
+ARG SOURCE_COMMIT=unknown
 
 # Set environment variables for build
 ENV FONTAWESOME_PACKAGE_TOKEN=$FONTAWESOME_PACKAGE_TOKEN
@@ -28,7 +26,8 @@ ENV VITE_DOMAIN=$VITE_DOMAIN
 ENV VITE_CACHE_ENCRYPTION=$VITE_CACHE_ENCRYPTION
 ENV VITE_ALLOW_UNVERIFIED_LOGIN=$VITE_ALLOW_UNVERIFIED_LOGIN
 ENV VITE_ALLOW_UNVERIFIED_EMAIL_REGEX=$VITE_ALLOW_UNVERIFIED_EMAIL_REGEX
-ENV VITE_GIT_COMMIT=$VITE_GIT_COMMIT
+# Pass SOURCE_COMMIT to vite as VITE_GIT_COMMIT
+ENV VITE_GIT_COMMIT=$SOURCE_COMMIT
 
 # Copy package files
 COPY package.json bun.lock* bun.lockb* package-lock.json* pnpm-lock.yaml* ./
@@ -56,15 +55,6 @@ COPY . .
 
 # Increase Node.js memory limit for large builds
 ENV NODE_OPTIONS="--max-old-space-size=8192"
-
-# Detect git commit and write to file for vite to read
-RUN if [ -d .git ]; then \
-      git rev-parse --short HEAD > .git-commit; \
-      echo "Git commit: $(cat .git-commit)"; \
-    else \
-      echo "No .git directory found - listing directory:"; \
-      ls -la; \
-    fi
 
 # Build the application
 RUN bun run build

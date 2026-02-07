@@ -1,5 +1,5 @@
 /**
- * Centralized logging utility with category-based filtering.
+ * Centralized logging utility with category-based filtering and error telemetry.
  * 
  * Configuration is loaded from YAML files:
  * - src/config/logging.dev.yaml (development)
@@ -13,6 +13,7 @@
  *     - cache
  * 
  * Errors are always logged regardless of settings.
+ * Errors and traces are automatically sent to RTL for telemetry.
  * 
  * Example usage:
  *   Logger.info('auth', 'User authenticated:', userId);
@@ -27,6 +28,15 @@
 import devConfig from '@/config/logging.dev.yaml?raw';
 import prodConfig from '@/config/logging.prod.yaml?raw';
 import { parse as parseYaml } from 'yaml';
+
+// Lazy import to avoid circular dependency
+let errorTelemetryModule: typeof import('./errorTelemetry') | null = null;
+const getErrorTelemetry = async () => {
+  if (!errorTelemetryModule) {
+    errorTelemetryModule = await import('./errorTelemetry');
+  }
+  return errorTelemetryModule.ErrorTelemetry;
+};
 
 // Log categories matching the app's main features
 export type LogCategory =
@@ -78,11 +88,36 @@ class LoggerClass {
   private enabledCategories: Set<LogCategory> = new Set();
   private globalErrorsInstalled = false;
   private isDevelopment: boolean;
+  private telemetryEnabled = false;
 
   constructor() {
     // Check if we're in development mode
     this.isDevelopment = import.meta.env.VITE_DEVELOPMENT === 'true' || import.meta.env.DEV;
     this.loadConfig();
+  }
+
+  /**
+   * Enable error telemetry - sends errors to RTL server
+   * Should be called after app initialization
+   */
+  async enableTelemetry(): Promise<void> {
+    if (this.telemetryEnabled) return;
+    
+    try {
+      const telemetry = await getErrorTelemetry();
+      await telemetry.init();
+      this.telemetryEnabled = true;
+      this.info('ui', 'Error telemetry enabled');
+    } catch (e) {
+      console.error('Failed to enable error telemetry:', e);
+    }
+  }
+
+  /**
+   * Check if telemetry is enabled
+   */
+  isTelemetryEnabled(): boolean {
+    return this.telemetryEnabled;
   }
 
   /**
@@ -188,10 +223,42 @@ class LoggerClass {
 
   /**
    * Error level log - errors (ALWAYS logged regardless of category settings)
+   * Also sends to telemetry for server-side tracking
    */
   error(category: LogCategory, ...args: unknown[]): void {
     // Errors are ALWAYS logged regardless of category settings
     console.error(this.formatPrefix(category, 'error'), ...args);
+
+    // Send to telemetry if enabled
+    if (this.telemetryEnabled) {
+      this.sendToTelemetry(category, args);
+    }
+  }
+
+  /**
+   * Send error to telemetry system
+   */
+  private async sendToTelemetry(category: LogCategory, args: unknown[]): Promise<void> {
+    try {
+      const telemetry = await getErrorTelemetry();
+      
+      // Extract message and error from args
+      const message = args
+        .filter(arg => typeof arg === 'string')
+        .join(' ') || 'Error';
+      
+      // Find Error object in args
+      const errorObj = args.find(arg => arg instanceof Error) as Error | undefined;
+      
+      // Find additional context object
+      const contextObj = args.find(
+        arg => arg !== null && typeof arg === 'object' && !(arg instanceof Error)
+      ) as Record<string, unknown> | undefined;
+
+      await telemetry.captureError(category, message, errorObj, contextObj);
+    } catch {
+      // Fail silently - don't let telemetry errors cause more errors
+    }
   }
 
   /**
@@ -244,6 +311,14 @@ class LoggerClass {
         colno,
         error: error?.stack || error?.message || error,
       });
+
+      // Also send directly to telemetry for uncaught errors
+      if (this.telemetryEnabled) {
+        getErrorTelemetry().then(telemetry => {
+          telemetry.captureUncaughtError(message, source, lineno, colno, error);
+        }).catch(() => {});
+      }
+
       // Return false to allow default error handling to continue
       return false;
     };
@@ -253,6 +328,13 @@ class LoggerClass {
       this.error('ui', 'Unhandled promise rejection:', {
         reason: event.reason?.stack || event.reason?.message || event.reason,
       });
+
+      // Also send directly to telemetry for unhandled rejections
+      if (this.telemetryEnabled) {
+        getErrorTelemetry().then(telemetry => {
+          telemetry.captureUnhandledRejection(event);
+        }).catch(() => {});
+      }
     };
 
     // Override console.error to also capture through our logging system
@@ -268,6 +350,26 @@ class LoggerClass {
       
       // Pass to original console.error
       originalConsoleError.apply(console, args);
+    };
+
+    // Override console.trace to capture stack traces
+    const originalConsoleTrace = console.trace;
+    console.trace = (...args: unknown[]) => {
+      // Call original trace
+      originalConsoleTrace.apply(console, args);
+
+      // Send to telemetry if enabled
+      if (this.telemetryEnabled) {
+        const message = args
+          .filter(arg => typeof arg === 'string')
+          .join(' ') || 'Trace';
+        
+        getErrorTelemetry().then(telemetry => {
+          telemetry.captureError('ui', `[Trace] ${message}`, new Error('Trace'), {
+            traceArgs: args.filter(arg => typeof arg !== 'string'),
+          });
+        }).catch(() => {});
+      }
     };
 
     this.globalErrorsInstalled = true;

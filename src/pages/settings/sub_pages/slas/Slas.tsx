@@ -26,10 +26,13 @@ type SlaRow = {
   id: number;
   name: string;
   description: string | null;
+  runbook: string | null;
   color: string | null;
   enabled: boolean;
-  response_time: number | null; // minutes
-  resolution_time: number | null; // minutes
+  response_time_target: number | null;
+  response_time: number | null;
+  resolution_time_target: number | null;
+  resolution_time: number | null;
   sla_policy_id?: number | null;
 };
 
@@ -54,6 +57,22 @@ type SlaPolicyRow = {
   trigger_value_number?: number | null;
   trigger_value_boolean?: boolean | null;
   grace_seconds: number; // simple seconds for now
+};
+
+type SlaEscalationLevelRow = {
+  id: number;
+  sla_id: number;
+  phase: 'response' | 'resolution';
+  level: 1 | 2 | 3;
+  delay_seconds: number;
+  action: 'reassign' | 'change_priority' | 'notify' | 'add_tag' | 'change_status';
+  target_type: 'user' | 'team' | 'job_position' | 'team_lead' | null;
+  target_id: number | null;
+  priority_id: number | null;
+  status_id: number | null;
+  tag_id: number | null;
+  notify_to: 'RESPONSIBLE' | 'CREATED_BY' | 'MANAGER' | 'TEAM' | 'TARGET' | null;
+  instructions: string | null;
 };
 
 // React cell renderer: small centered color swatch
@@ -85,7 +104,7 @@ function Slas() {
   const dispatch = useDispatch<AppDispatch>();
   const { t } = useLanguage();
   const ta = useCallback((key: string, fallback: string) => t(`settings.slas.${key}`, fallback), [t]);
-  const [activeTab, setActiveTab] = useState<'slas' | 'alerts' | 'policies' | 'help'>('slas');
+  const [activeTab, setActiveTab] = useState<'slas' | 'alerts' | 'policies' | 'escalation' | 'help'>('slas');
   const [selectedSlaId, setSelectedSlaId] = useState<number | ''>('');
   const [createPolicyTriggerType, setCreatePolicyTriggerType] = useState<'on_create' | 'on_status_change' | 'on_field_value'>('on_create');
   const [editPolicyTriggerType, setEditPolicyTriggerType] = useState<'on_create' | 'on_status_change' | 'on_field_value'>('on_create');
@@ -182,6 +201,32 @@ function Slas() {
     searchFields: ["name", "trigger_type"] as (keyof SlaPolicyRow)[]
   });
 
+  // Escalation levels state
+  const {
+    items: escalationLevels,
+    filteredItems: filteredEscalationLevels,
+    loading: escalationLoading,
+    createItem: createEscalationLevel,
+    updateItem: updateEscalationLevel,
+    deleteItem: deleteEscalationLevel,
+    isCreateDialogOpen: isCreateEscalationOpen,
+    setIsCreateDialogOpen: setIsCreateEscalationOpen,
+    editingItem: editingEscalation,
+    handleEdit: handleEditEscalation,
+    isEditDialogOpen: isEditEscalationOpen,
+    setIsEditDialogOpen: setIsEditEscalationOpen,
+    deletingItem: deletingEscalation,
+    handleDelete: handleDeleteEscalation,
+    isDeleteDialogOpen: isDeleteEscalationOpen,
+    handleCloseDeleteDialog: closeDeleteEscalationDialog,
+    isSubmitting: escalationSubmitting,
+    formError: escalationFormError,
+    setFormError: setEscalationFormError,
+  } = useSettingsState<SlaEscalationLevelRow>({
+    entityName: 'slaEscalationLevels',
+    searchFields: ['instructions'],
+  });
+
   const { value: statuses = [] } = useSelector((s: RootState) => (s as any).statuses || { value: [] });
   const { value: categories = [] } = useSelector((s: RootState) => (s as any).categories || { value: [] });
 
@@ -232,17 +277,23 @@ function Slas() {
       headerClass: 'whitespace-nowrap'
     },
     {
-      field: "response_time",
       headerName: ta("grid.columns.response", "Response (min)"),
       width: 170,
-      valueFormatter: (p) => (p.value == null ? "-" : String(p.value)),
+      valueGetter: (p) => {
+        const t = p.data?.response_time_target;
+        const m = p.data?.response_time;
+        return t && m ? `${t} / ${m}` : m ? String(m) : '-';
+      },
       headerClass: 'whitespace-nowrap'
     },
     {
-      field: "resolution_time",
       headerName: ta("grid.columns.resolution", "Resolution (min)"),
       width: 190,
-      valueFormatter: (p) => (p.value == null ? "-" : String(p.value)),
+      valueGetter: (p) => {
+        const t = p.data?.resolution_time_target;
+        const m = p.data?.resolution_time;
+        return t && m ? `${t} / ${m}` : m ? String(m) : '-';
+      },
       headerClass: 'whitespace-nowrap'
     },
     {
@@ -287,6 +338,20 @@ function Slas() {
     }
   ], [handleEditPolicy, handleDeletePolicy, ta]);
 
+  const escalationColumns = useMemo<ColDef[]>(() => [
+    { field: "phase", headerName: "Phase", width: 120 },
+    { field: "level", headerName: "Level", width: 80 },
+    { field: "delay_seconds", headerName: "Delay (sec)", width: 120, valueFormatter: (p: any) => p.value === 0 ? 'Immediate' : `${p.value}s` },
+    { field: "action", headerName: "Action", width: 140 },
+    { field: "target_type", headerName: "Target Type", width: 130, valueFormatter: (p: any) => p.value || '-' },
+    { field: "notify_to", headerName: "Notify", width: 120, valueFormatter: (p: any) => p.value || '-' },
+    {
+      field: 'actions', headerName: 'Actions', width: 140,
+      cellRenderer: createActionsCellRenderer({ onEdit: handleEditEscalation, onDelete: handleDeleteEscalation }),
+      sortable: false, filter: false, resizable: false, pinned: 'right'
+    }
+  ], [handleEditEscalation, handleDeleteEscalation]);
+
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const form = new FormData(e.target as HTMLFormElement);
@@ -304,9 +369,12 @@ function Slas() {
     const payload: Omit<SlaRow, 'id'> = {
       name,
       description,
+      runbook: null,
       color,
       enabled,
+      response_time_target: form.get('response_time_target') ? Number(form.get('response_time_target')) : null,
       response_time: responseNum,
+      resolution_time_target: form.get('resolution_time_target') ? Number(form.get('resolution_time_target')) : null,
       resolution_time: resolutionNum,
       sla_policy_id: form.get('sla_policy_id') ? Number(form.get('sla_policy_id')) : null
     } as any;
@@ -320,9 +388,12 @@ function Slas() {
     const updates: Partial<SlaRow> = {
       name: String(form.get("name") || editingItem.name).trim(),
       description: form.get("description") !== null ? String(form.get("description") || '').trim() : editingItem.description,
+      runbook: String(form.get('runbook') ?? '').trim() || null,
       color: form.get("color") !== null ? String(form.get("color") || '').trim() : editingItem.color,
       enabled: form.get("enabled") === "on",
+      response_time_target: form.get('response_time_target') ? Number(form.get('response_time_target')) : null,
       response_time: form.get("response_time") ? Math.max(1, Number(form.get("response_time"))) : editingItem.response_time,
+      resolution_time_target: form.get('resolution_time_target') ? Number(form.get('resolution_time_target')) : null,
       resolution_time: form.get("resolution_time") ? Math.max(1, Number(form.get("resolution_time"))) : editingItem.resolution_time,
       sla_policy_id: form.get('sla_policy_id') ? Number(form.get('sla_policy_id')) : null
     };
@@ -352,6 +423,53 @@ function Slas() {
     if (!selectedSlaId) return [] as SlaAlertRow[];
     return base.filter((a) => Number(a.sla_id) === Number(selectedSlaId));
   }, [filteredAlerts, selectedSlaId]);
+
+  const visibleEscalationLevels = useMemo(() => {
+    if (!selectedSlaId) return [] as SlaEscalationLevelRow[];
+    return (filteredEscalationLevels as SlaEscalationLevelRow[]).filter((e) => Number(e.sla_id) === Number(selectedSlaId));
+  }, [filteredEscalationLevels, selectedSlaId]);
+
+  // Escalation handlers
+  const handleCreateEscalationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSlaId) { setEscalationFormError('Select an SLA first'); return; }
+    const form = new FormData(e.target as HTMLFormElement);
+    const payload = {
+      sla_id: Number(selectedSlaId),
+      phase: String(form.get('phase') || 'response'),
+      level: Number(form.get('level') || 1),
+      delay_seconds: Number(form.get('delay_seconds') || 0),
+      action: String(form.get('action') || 'notify'),
+      target_type: form.get('target_type') ? String(form.get('target_type')) : null,
+      target_id: form.get('target_id') ? Number(form.get('target_id')) : null,
+      priority_id: form.get('priority_id') ? Number(form.get('priority_id')) : null,
+      status_id: form.get('status_id') ? Number(form.get('status_id')) : null,
+      tag_id: form.get('tag_id') ? Number(form.get('tag_id')) : null,
+      notify_to: form.get('notify_to') ? String(form.get('notify_to')) : null,
+      instructions: String(form.get('instructions') || '').trim() || null,
+    };
+    await createEscalationLevel(payload as any);
+  };
+
+  const handleEditEscalationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEscalation) return;
+    const form = new FormData(e.target as HTMLFormElement);
+    const updates: Partial<SlaEscalationLevelRow> = {
+      phase: (form.get('phase') as any) || (editingEscalation as any).phase,
+      level: form.get('level') ? Number(form.get('level')) : (editingEscalation as any).level,
+      delay_seconds: form.get('delay_seconds') ? Number(form.get('delay_seconds')) : (editingEscalation as any).delay_seconds,
+      action: (form.get('action') as any) || (editingEscalation as any).action,
+      target_type: form.get('target_type') ? String(form.get('target_type')) : (editingEscalation as any).target_type,
+      target_id: form.get('target_id') ? Number(form.get('target_id')) : (editingEscalation as any).target_id,
+      priority_id: form.get('priority_id') ? Number(form.get('priority_id')) : (editingEscalation as any).priority_id,
+      status_id: form.get('status_id') ? Number(form.get('status_id')) : (editingEscalation as any).status_id,
+      tag_id: form.get('tag_id') ? Number(form.get('tag_id')) : (editingEscalation as any).tag_id,
+      notify_to: form.get('notify_to') ? String(form.get('notify_to')) as any : (editingEscalation as any).notify_to,
+      instructions: String(form.get('instructions') ?? '').trim() || null,
+    };
+    await updateEscalationLevel((editingEscalation as any).id, updates as any);
+  };
 
   // Policy handlers
   const handleCreatePolicySubmit = async (e: React.FormEvent) => {
@@ -438,6 +556,7 @@ function Slas() {
           <TabsTrigger value="slas">{ta("tabs.slas", "SLAs")}</TabsTrigger>
           <TabsTrigger value="alerts">{ta("tabs.alerts", "Alerts")}</TabsTrigger>
           <TabsTrigger value="policies">{ta("tabs.policies", "Policies")}</TabsTrigger>
+          <TabsTrigger value="escalation">Escalation</TabsTrigger>
           <TabsTrigger value="help">{ta("tabs.help", "Help")}</TabsTrigger>
         </TabsList>
 
@@ -511,6 +630,25 @@ function Slas() {
             zebraRows
             onRowDoubleClicked={handleEditPolicy as any}
           />
+        </TabsContent>
+
+        <TabsContent value="escalation" className="h-full flex-1 overflow-hidden">
+          <div className="flex items-center gap-3 mb-3 flex-wrap">
+            <Select value={selectedSlaId ? String(selectedSlaId) : ''} onValueChange={(v) => setSelectedSlaId(v ? Number(v) : '')}>
+              <SelectTrigger className="w-[240px]">
+                <SelectValue placeholder="Select SLA..." />
+              </SelectTrigger>
+              <SelectContent>
+                {items.map((s: any) => (
+                  <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button size="sm" onClick={() => setIsCreateEscalationOpen(true)} disabled={!selectedSlaId}>
+              <FontAwesomeIcon icon={faPlus} className="mr-1" /> Add Level
+            </Button>
+          </div>
+          <SettingsGrid rowData={visibleEscalationLevels} columnDefs={escalationColumns} onRowDoubleClicked={handleEditEscalation as any} />
         </TabsContent>
 
         <TabsContent value="help" className="flex-1 min-h-0 flex flex-col overflow-y-auto">
@@ -704,20 +842,34 @@ function Slas() {
             name="enabled"
           />
           <TextField
+            id="response_time_target"
+            label="Response Target (min)"
+            name="response_time_target"
+            type="number"
+            placeholder="e.g. 30"
+          />
+          <TextField
             id="response_time"
-            label={ta("dialogs.fields.responseTime", "Response (min)")}
+            label="Response Max (min)"
             name="response_time"
             type="number"
             required
-            placeholder={ta("dialogs.fields.placeholder.responseTime", "e.g. 30")}
+            placeholder="e.g. 60"
+          />
+          <TextField
+            id="resolution_time_target"
+            label="Resolution Target (min)"
+            name="resolution_time_target"
+            type="number"
+            placeholder="e.g. 120"
           />
           <TextField
             id="resolution_time"
-            label={ta("dialogs.fields.resolutionTime", "Resolution (min)")}
+            label="Resolution Max (min)"
             name="resolution_time"
             type="number"
             required
-            placeholder={ta("dialogs.fields.placeholder.resolutionTime", "e.g. 240")}
+            placeholder="e.g. 240"
           />
         </div>
       </SettingsDialog>
@@ -779,15 +931,29 @@ function Slas() {
               defaultChecked={!!editingItem.enabled}
             />
             <TextField
+              id="edit-response_time_target"
+              label="Response Target (min)"
+              name="response_time_target"
+              type="number"
+              defaultValue={editingItem.response_time_target ?? ''}
+            />
+            <TextField
               id="edit-response_time"
-              label={ta("dialogs.fields.responseTime", "Response (min)")}
+              label="Response Max (min)"
               name="response_time"
               type="number"
               defaultValue={editingItem.response_time ?? ''}
             />
             <TextField
+              id="edit-resolution_time_target"
+              label="Resolution Target (min)"
+              name="resolution_time_target"
+              type="number"
+              defaultValue={editingItem.resolution_time_target ?? ''}
+            />
+            <TextField
               id="edit-resolution_time"
-              label={ta("dialogs.fields.resolutionTime", "Resolution (min)")}
+              label="Resolution Max (min)"
               name="resolution_time"
               type="number"
               defaultValue={editingItem.resolution_time ?? ''}
@@ -800,6 +966,16 @@ function Slas() {
               placeholder={ta("dialogs.fields.none", "None")}
               options={policies.map(p => ({ value: p.id, label: p.name }))}
             />
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="edit-runbook" className="text-right pt-2">Runbook</Label>
+              <textarea
+                id="edit-runbook"
+                name="runbook"
+                defaultValue={editingItem.runbook ?? ''}
+                className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm min-h-[120px] resize-y"
+                placeholder="Instructions for handling SLA breaches..."
+              />
+            </div>
           </div>
         )}
       </SettingsDialog>
@@ -1201,6 +1377,162 @@ function Slas() {
         entityName="SLA Policy"
         entityData={deletingPolicy as any}
         onConfirm={() => deletingPolicy ? deletePolicy((deletingPolicy as any).id) : undefined}
+      />
+
+      {/* Escalation: Create */}
+      <SettingsDialog
+        open={isCreateEscalationOpen}
+        onOpenChange={setIsCreateEscalationOpen}
+        type="create"
+        title="Add Escalation Level"
+        onSubmit={handleCreateEscalationSubmit}
+        isSubmitting={escalationSubmitting}
+        error={escalationFormError}
+        submitDisabled={!selectedSlaId}
+      >
+        <div className="grid gap-4">
+          <SelectField id="esc-phase" label="Phase" name="phase" defaultValue="response" options={[
+            { value: 'response', label: 'Response' },
+            { value: 'resolution', label: 'Resolution' }
+          ]} required />
+          <SelectField id="esc-level" label="Level" name="level" defaultValue="1" options={[
+            { value: '1', label: 'Level 1' },
+            { value: '2', label: 'Level 2' },
+            { value: '3', label: 'Level 3' }
+          ]} required />
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="esc-delay" className="text-right">Delay (sec)</Label>
+            <input id="esc-delay" name="delay_seconds" type="number" min="0" defaultValue="0" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
+          </div>
+          <SelectField id="esc-action" label="Action" name="action" defaultValue="notify" options={[
+            { value: 'reassign', label: 'Reassign' },
+            { value: 'change_priority', label: 'Change Priority' },
+            { value: 'notify', label: 'Notify' },
+            { value: 'add_tag', label: 'Add Tag' },
+            { value: 'change_status', label: 'Change Status' }
+          ]} required />
+          <SelectField id="esc-target_type" label="Target Type" name="target_type" placeholder="None" options={[
+            { value: 'user', label: 'User' },
+            { value: 'team', label: 'Team' },
+            { value: 'job_position', label: 'Job Position' },
+            { value: 'team_lead', label: 'Team Lead' }
+          ]} />
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="esc-target_id" className="text-right">Target ID</Label>
+            <input id="esc-target_id" name="target_id" type="number" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" placeholder="User/Team/Position ID" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="esc-priority_id" className="text-right">Priority ID</Label>
+            <input id="esc-priority_id" name="priority_id" type="number" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="esc-status_id" className="text-right">Status ID</Label>
+            <input id="esc-status_id" name="status_id" type="number" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="esc-tag_id" className="text-right">Tag ID</Label>
+            <input id="esc-tag_id" name="tag_id" type="number" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
+          </div>
+          <SelectField id="esc-notify_to" label="Notify To" name="notify_to" placeholder="None" options={[
+            { value: 'RESPONSIBLE', label: 'RESPONSIBLE' },
+            { value: 'CREATED_BY', label: 'CREATED_BY' },
+            { value: 'MANAGER', label: 'MANAGER' },
+            { value: 'TEAM', label: 'TEAM' },
+            { value: 'TARGET', label: 'TARGET' }
+          ]} />
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="esc-instructions" className="text-right pt-2">Instructions</Label>
+            <textarea id="esc-instructions" name="instructions" className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm min-h-[80px] resize-y" placeholder="What should be done at this escalation level..." />
+          </div>
+        </div>
+      </SettingsDialog>
+
+      {/* Escalation: Edit */}
+      <SettingsDialog
+        open={isEditEscalationOpen}
+        onOpenChange={setIsEditEscalationOpen}
+        type="edit"
+        title="Edit Escalation Level"
+        onSubmit={handleEditEscalationSubmit}
+        isSubmitting={escalationSubmitting}
+        error={escalationFormError}
+        submitDisabled={!editingEscalation}
+        footerActions={
+          editingEscalation ? (
+            <Button type="button" variant="destructive" size="icon" onClick={() => { setIsEditEscalationOpen(false); handleDeleteEscalation(editingEscalation); }} disabled={escalationSubmitting} title="Delete" aria-label="Delete">
+              <FontAwesomeIcon icon={faTrash} />
+            </Button>
+          ) : null
+        }
+      >
+        {editingEscalation && (
+          <div className="grid gap-4">
+            <SelectField id="esc-edit-phase" label="Phase" name="phase" defaultValue={(editingEscalation as any).phase} options={[
+              { value: 'response', label: 'Response' },
+              { value: 'resolution', label: 'Resolution' }
+            ]} required />
+            <SelectField id="esc-edit-level" label="Level" name="level" defaultValue={String((editingEscalation as any).level)} options={[
+              { value: '1', label: 'Level 1' },
+              { value: '2', label: 'Level 2' },
+              { value: '3', label: 'Level 3' }
+            ]} required />
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="esc-edit-delay" className="text-right">Delay (sec)</Label>
+              <input id="esc-edit-delay" name="delay_seconds" type="number" min="0" defaultValue={(editingEscalation as any).delay_seconds} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
+            </div>
+            <SelectField id="esc-edit-action" label="Action" name="action" defaultValue={(editingEscalation as any).action} options={[
+              { value: 'reassign', label: 'Reassign' },
+              { value: 'change_priority', label: 'Change Priority' },
+              { value: 'notify', label: 'Notify' },
+              { value: 'add_tag', label: 'Add Tag' },
+              { value: 'change_status', label: 'Change Status' }
+            ]} required />
+            <SelectField id="esc-edit-target_type" label="Target Type" name="target_type" defaultValue={(editingEscalation as any).target_type || undefined} placeholder="None" options={[
+              { value: 'user', label: 'User' },
+              { value: 'team', label: 'Team' },
+              { value: 'job_position', label: 'Job Position' },
+              { value: 'team_lead', label: 'Team Lead' }
+            ]} />
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="esc-edit-target_id" className="text-right">Target ID</Label>
+              <input id="esc-edit-target_id" name="target_id" type="number" defaultValue={(editingEscalation as any).target_id ?? ''} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="esc-edit-priority_id" className="text-right">Priority ID</Label>
+              <input id="esc-edit-priority_id" name="priority_id" type="number" defaultValue={(editingEscalation as any).priority_id ?? ''} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="esc-edit-status_id" className="text-right">Status ID</Label>
+              <input id="esc-edit-status_id" name="status_id" type="number" defaultValue={(editingEscalation as any).status_id ?? ''} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="esc-edit-tag_id" className="text-right">Tag ID</Label>
+              <input id="esc-edit-tag_id" name="tag_id" type="number" defaultValue={(editingEscalation as any).tag_id ?? ''} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm" />
+            </div>
+            <SelectField id="esc-edit-notify_to" label="Notify To" name="notify_to" defaultValue={(editingEscalation as any).notify_to || undefined} placeholder="None" options={[
+              { value: 'RESPONSIBLE', label: 'RESPONSIBLE' },
+              { value: 'CREATED_BY', label: 'CREATED_BY' },
+              { value: 'MANAGER', label: 'MANAGER' },
+              { value: 'TEAM', label: 'TEAM' },
+              { value: 'TARGET', label: 'TARGET' }
+            ]} />
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="esc-edit-instructions" className="text-right pt-2">Instructions</Label>
+              <textarea id="esc-edit-instructions" name="instructions" defaultValue={(editingEscalation as any).instructions ?? ''} className="col-span-3 px-3 py-2 border border-input bg-background rounded-md text-sm min-h-[80px] resize-y" placeholder="What should be done at this escalation level..." />
+            </div>
+          </div>
+        )}
+      </SettingsDialog>
+
+      {/* Escalation: Delete */}
+      <SettingsDialog
+        open={isDeleteEscalationOpen}
+        onOpenChange={closeDeleteEscalationDialog}
+        type="delete"
+        title="Delete Escalation Level"
+        entityName="Escalation Level"
+        entityData={deletingEscalation as any}
+        onConfirm={() => deletingEscalation ? deleteEscalationLevel((deletingEscalation as any).id) : undefined}
       />
     </SettingsLayout>
   );

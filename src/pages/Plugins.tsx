@@ -964,7 +964,15 @@ function Plugins() {
 			return;
 		}
 		if (pluginId === 'assets') {
-			navigate('/assets');
+			if (isEnabled) {
+				navigate('/plugins/assets/settings');
+			} else {
+				const details = getPluginDetails(pluginId);
+				if (details) {
+					setSelectedPlugin(details);
+					setIsModalOpen(true);
+				}
+			}
 			return;
 		}
 		if (pluginId === 'qr-codes') {

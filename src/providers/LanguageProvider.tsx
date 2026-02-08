@@ -11,13 +11,15 @@ import {
 import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS } from "@/config/languages";
 import { esTranslations } from "@/locales/es";
 import { enTranslations } from "@/locales/en";
-import { boardsTranslations, boardsTranslationsES } from "@/locales/boards";
+import { ptTranslations } from "@/locales/pt";
+import { boardsTranslations, boardsTranslationsES, boardsTranslationsPT } from "@/locales/boards";
 
 type TranslationDictionary = Record<string, string>;
 
 const TRANSLATION_REGISTRY: Record<string, TranslationDictionary> = {
   en: { ...enTranslations, ...boardsTranslations },
   es: { ...esTranslations, ...boardsTranslationsES },
+  pt: { ...ptTranslations, ...boardsTranslationsPT },
 };
 
 const STORAGE_KEY = "whagons-preferred-language";

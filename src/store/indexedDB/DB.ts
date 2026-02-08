@@ -2,7 +2,7 @@ import { auth } from '@/firebase/firebaseConfig';
 
 
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.21.0';
+const CURRENT_DB_VERSION = '1.22.0';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -165,6 +165,9 @@ export class DB {
           }
           if (!db.objectStoreNames.contains('sla_alerts')) {
             db.createObjectStore('sla_alerts', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('sla_escalation_levels')) {
+            db.createObjectStore('sla_escalation_levels', { keyPath: 'id' });
           }
           if (!db.objectStoreNames.contains('category_priorities')) {
             db.createObjectStore('category_priorities', { keyPath: 'id' });

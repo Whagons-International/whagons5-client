@@ -9,31 +9,31 @@ interface CustomFieldsTabProps {
     values: AssetCustomFieldValue[];
 }
 
-const formatValue = (cfv: AssetCustomFieldValue): string => {
-    switch (cfv.type) {
-        case 'CHECKBOX':
-            return cfv.value === '1' || cfv.value === 'true' ? 'Yes' : 'No';
-        case 'DATE':
-            return cfv.value_date ? new Date(cfv.value_date).toLocaleDateString() : cfv.value || '-';
-        case 'TIME':
-            return cfv.value || '-';
-        case 'DATETIME':
-            return cfv.value_date ? new Date(cfv.value_date).toLocaleString() : cfv.value || '-';
-        case 'NUMBER':
-            return cfv.value_numeric != null ? String(cfv.value_numeric) : cfv.value || '-';
-        case 'MULTI_SELECT':
-        case 'LIST':
-            if (cfv.value_json && Array.isArray(cfv.value_json)) {
-                return cfv.value_json.join(', ');
-            }
-            return cfv.value || '-';
-        default:
-            return cfv.value || '-';
-    }
-};
-
 export const CustomFieldsTab = ({ fields, values }: CustomFieldsTabProps) => {
     const { t } = useLanguage();
+
+    const formatValue = (cfv: AssetCustomFieldValue): string => {
+        switch (cfv.type) {
+            case 'CHECKBOX':
+                return cfv.value === '1' || cfv.value === 'true' ? t('assets.customFields.yes', 'Yes') : t('assets.customFields.no', 'No');
+            case 'DATE':
+                return cfv.value_date ? new Date(cfv.value_date).toLocaleDateString() : cfv.value || '-';
+            case 'TIME':
+                return cfv.value || '-';
+            case 'DATETIME':
+                return cfv.value_date ? new Date(cfv.value_date).toLocaleString() : cfv.value || '-';
+            case 'NUMBER':
+                return cfv.value_numeric != null ? String(cfv.value_numeric) : cfv.value || '-';
+            case 'MULTI_SELECT':
+            case 'LIST':
+                if (cfv.value_json && Array.isArray(cfv.value_json)) {
+                    return cfv.value_json.join(', ');
+                }
+                return cfv.value || '-';
+            default:
+                return cfv.value || '-';
+        }
+    };
 
     if (fields.length === 0) {
         return (

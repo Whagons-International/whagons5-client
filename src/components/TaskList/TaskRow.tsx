@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import StatusBadge from "./StatusBadge";
 import PriorityBadge from "./PriorityBadge";
 import DueDateCell from "./DueDateCell";
-import { MapPin, NotebookPen, Trash2, MoreVertical, Share2 } from "lucide-react";
+import { MapPin, NotebookPen, Trash2, MoreVertical, Share2, Package } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTags } from "@fortawesome/free-solid-svg-icons";
 import { iconService } from "@/database/iconService";
@@ -20,6 +20,7 @@ import {
 type StatusMeta = { id: number; name: string; color?: string; icon?: string };
 type PriorityMeta = { id: number; name: string; color?: string };
 type SpotMeta = { id: number; name: string };
+type AssetMeta = { id: number; name: string };
 
 export const taskVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -36,6 +37,7 @@ export function TaskRow({
   priorityMap,
   spotMap,
   categoryMap,
+  assetMap,
   getStatusIcon,
   onClick,
   onDelete,
@@ -48,6 +50,7 @@ export function TaskRow({
   priorityMap: Record<number, PriorityMeta>;
   spotMap: Record<number, SpotMeta>;
   categoryMap?: Record<number, { id: number; name: string; color?: string; icon?: string }>;
+  assetMap?: Record<number, AssetMeta>;
   getStatusIcon?: (iconName?: string) => any;
   onClick?: () => void;
   onDelete?: () => void;
@@ -204,6 +207,15 @@ export function TaskRow({
                 <MapPin className="h-3.5 w-3.5" />
                 <span className="truncate max-w-[160px]" title={spotMap[Number(task.spot_id)]?.name || `#${task.spot_id}`}>
                   {spotMap[Number(task.spot_id)]?.name || `#${task.spot_id}`}
+                </span>
+              </span>
+            )}
+
+            {task?.asset_id != null && assetMap && (
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] bg-blue-50 text-blue-700 border border-blue-200">
+                <Package className="h-3.5 w-3.5" />
+                <span className="truncate max-w-[160px]" title={assetMap[Number(task.asset_id)]?.name || `Asset #${task.asset_id}`}>
+                  {assetMap[Number(task.asset_id)]?.name || `Asset #${task.asset_id}`}
                 </span>
               </span>
             )}

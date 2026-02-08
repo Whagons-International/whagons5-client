@@ -30,6 +30,7 @@ export interface WorkspaceTableLookupsParams {
   approvals: any[];
   taskApprovalInstances: any[];
   roles: any[];
+  assetItems: any[];
   defaultCategoryId: number | null;
   workspaceNumericId: number | null;
   isAllWorkspaces: boolean;
@@ -50,6 +51,15 @@ export const useWorkspaceTableLookups = (p: WorkspaceTableLookupsParams) => {
   const priorityMap = useMemo(() => createPriorityMap(p.priorities), [p.priorities]);
   const spotMap = useMemo(() => createSpotMap(p.spots), [p.spots]);
   const userMap = useMemo(() => createUserMap(p.users), [p.users]);
+  
+  const assetMap = useMemo(() => {
+    const m: Record<number, any> = {};
+    for (const a of p.assetItems || []) {
+      const id = Number(a?.id);
+      if (Number.isFinite(id)) m[id] = a;
+    }
+    return m;
+  }, [p.assetItems]);
   const filteredPriorities = useMemo(
     () => createFilteredPriorities(p.priorities, p.defaultCategoryId),
     [p.priorities, p.defaultCategoryId]
@@ -205,6 +215,7 @@ export const useWorkspaceTableLookups = (p: WorkspaceTableLookupsParams) => {
     priorityMap,
     spotMap,
     userMap,
+    assetMap,
     filteredPriorities,
     tagMap,
     templateMap,

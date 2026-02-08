@@ -17,6 +17,7 @@ export function useFormInitialization(params: any) {
     setCategoryId,
     setPriorityId,
     setSpotId,
+    setAssetId,
     setStatusId,
     setTemplateId,
     setStartDate,
@@ -76,6 +77,7 @@ export function useFormInitialization(params: any) {
       setCategoryId(task.category_id ? Number(task.category_id) : null);
       setPriorityId(task.priority_id ? Number(task.priority_id) : null);
       setSpotId(task.spot_id ? Number(task.spot_id) : null);
+      setAssetId?.(task.asset_id ? Number(task.asset_id) : null);
       setStatusId(task.status_id ? Number(task.status_id) : null);
       setTemplateId(task.template_id ? Number(task.template_id) : null);
       
@@ -161,7 +163,12 @@ export function useFormInitialization(params: any) {
       setSelectedTagIds(currentTaskTagIds);
     } else if (mode === 'create') {
       setDescription('');
-      setSpotId(null);
+      setSpotId(task?.spot_id ? Number(task.spot_id) : null);
+      setAssetId?.(task?.asset_id ? Number(task.asset_id) : null);
+      // Also initialize name from task prop if provided
+      if (task?.name) {
+        setName(task.name);
+      }
       // Use initial values from task prop if provided (e.g., from scheduler)
       let initialStartDate = '';
       let initialStartTime = '';

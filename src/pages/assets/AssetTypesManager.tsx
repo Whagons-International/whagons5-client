@@ -4,13 +4,15 @@ import { useNavigate } from 'react-router-dom';
 import { genericInternalActions, genericActions } from '@/store/genericSlices';
 import { RootState, AppDispatch } from '@/store/store';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Edit, Trash2, ArrowLeft, GripVertical } from 'lucide-react';
+import { Plus, Edit, Trash2, ArrowLeft, GripVertical, Package, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { AssetTypeForm } from './components/AssetTypeForm';
+import { getAssetTypeIcon } from './components/assetTypeIcons';
 import type { AssetType, AssetItem, AssetCustomField } from '@/store/types';
 
 export const AssetTypesManager = () => {
@@ -31,6 +33,7 @@ export const AssetTypesManager = () => {
     const [typeFormOpen, setTypeFormOpen] = useState(false);
     const [editingType, setEditingType] = useState<AssetType | null>(null);
     const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         dispatch(genericInternalActions.assetTypes.getFromIndexedDB());
@@ -44,6 +47,15 @@ export const AssetTypesManager = () => {
     const activeTypes = useMemo(() =>
         (assetTypes as AssetType[]).filter(t => !t.deleted_at),
     [assetTypes]);
+
+    const filteredTypes = useMemo(() => {
+        if (!searchQuery.trim()) return activeTypes;
+        const query = searchQuery.toLowerCase();
+        return activeTypes.filter(t => 
+            t.name.toLowerCase().includes(query) ||
+            (t.description && t.description.toLowerCase().includes(query))
+        );
+    }, [activeTypes, searchQuery]);
 
     const getItemCount = (typeId: number) => {
         return (assetItems as AssetItem[]).filter(i => i.asset_type_id === typeId && !i.deleted_at).length;
@@ -93,45 +105,82 @@ export const AssetTypesManager = () => {
                 </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left panel: Asset Types list */}
-                <div className="md:col-span-1">
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                            <CardTitle className="text-base">{t('assets.types.types', 'Types')}</CardTitle>
-                            <Button size="sm" onClick={() => { setEditingType(null); setTypeFormOpen(true); }}>
-                                <Plus className="h-4 w-4 mr-1" />
-                                {t('assets.types.add', 'Add')}
-                            </Button>
+                <div className="lg:col-span-1">
+                    <Card className="h-fit">
+                        <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-base">{t('assets.types.types', 'Types')}</CardTitle>
+                                <Button size="sm" onClick={() => { setEditingType(null); setTypeFormOpen(true); }}>
+                                    <Plus className="h-4 w-4 mr-1" />
+                                    {t('assets.types.add', 'Add')}
+                                </Button>
+                            </div>
+                            {/* Search */}
+                            <div className="relative mt-3">
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder={t('assets.types.searchPlaceholder', 'Search types...')}
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="pl-8 h-9"
+                                />
+                            </div>
                         </CardHeader>
-                        <CardContent>
-                            {activeTypes.length === 0 ? (
-                                <p className="text-sm text-muted-foreground text-center py-4">
-                                    {t('assets.types.noTypes', 'No asset types yet.')}
-                                </p>
+                        <CardContent className="pt-0">
+                            {filteredTypes.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <Package className="h-10 w-10 mx-auto text-muted-foreground/50 mb-2" />
+                                    <p className="text-sm text-muted-foreground">
+                                        {searchQuery 
+                                            ? t('assets.types.noSearchResults', 'No types match your search.')
+                                            : t('assets.types.noTypes', 'No asset types yet.')}
+                                    </p>
+                                    {!searchQuery && (
+                                        <Button 
+                                            variant="link" 
+                                            size="sm" 
+                                            className="mt-2"
+                                            onClick={() => { setEditingType(null); setTypeFormOpen(true); }}
+                                        >
+                                            {t('assets.types.createFirst', 'Create your first type')}
+                                        </Button>
+                                    )}
+                                </div>
                             ) : (
                                 <div className="space-y-1">
-                                    {activeTypes.map((type) => {
+                                    {filteredTypes.map((type) => {
                                         const count = getItemCount(type.id);
                                         const isSelected = selectedTypeId === type.id;
+                                        const IconComponent = getAssetTypeIcon(type.icon);
                                         return (
                                             <div
                                                 key={type.id}
-                                                className={`flex items-center justify-between p-2.5 rounded-md cursor-pointer transition-colors ${
+                                                className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
                                                     isSelected
-                                                        ? 'bg-primary/10 border border-primary/20'
-                                                        : 'hover:bg-muted/50'
+                                                        ? 'bg-primary/10 border border-primary/20 shadow-sm'
+                                                        : 'hover:bg-muted/50 border border-transparent'
                                                 }`}
                                                 onClick={() => setSelectedTypeId(type.id)}
                                             >
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    <span
-                                                        className="w-3 h-3 rounded-full shrink-0"
-                                                        style={{ backgroundColor: type.color || '#94a3b8' }}
-                                                    />
-                                                    <span className="text-sm font-medium truncate">{type.name}</span>
+                                                <div
+                                                    className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                                                    style={{ backgroundColor: type.color || '#6366f1' }}
+                                                >
+                                                    <IconComponent className="h-4 w-4 text-white" />
                                                 </div>
-                                                <Badge variant="secondary" className="text-xs shrink-0 ml-2">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-medium truncate">{type.name}</span>
+                                                    </div>
+                                                    {type.description && (
+                                                        <p className="text-xs text-muted-foreground truncate">
+                                                            {type.description}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <Badge variant="secondary" className="text-xs shrink-0">
                                                     {count}
                                                 </Badge>
                                             </div>
@@ -144,68 +193,127 @@ export const AssetTypesManager = () => {
                 </div>
 
                 {/* Right panel: Selected type details */}
-                <div className="md:col-span-2">
+                <div className="lg:col-span-2">
                     {selectedType ? (
                         <div className="space-y-6">
-                            {/* Type header */}
+                            {/* Type header card */}
                             <Card>
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                                    <div className="flex items-center gap-3">
-                                        <span
-                                            className="w-4 h-4 rounded-full"
-                                            style={{ backgroundColor: selectedType.color || '#94a3b8' }}
-                                        />
-                                        <CardTitle>{selectedType.name}</CardTitle>
-                                        <Badge variant="secondary">{getItemCount(selectedType.id)} {t('assets.types.items', 'items')}</Badge>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => { setEditingType(selectedType); setTypeFormOpen(true); }}
-                                        >
-                                            <Edit className="h-4 w-4 mr-1" />
-                                            {t('common.edit', 'Edit')}
-                                        </Button>
-                                        {getItemCount(selectedType.id) === 0 && (
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button variant="destructive" size="sm">
-                                                        <Trash2 className="h-4 w-4 mr-1" />
-                                                        {t('common.delete', 'Delete')}
-                                                    </Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>{t('assets.types.deleteTitle', 'Delete Type?')}</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                            {t('assets.types.deleteDescription', 'This will remove this asset type and all its custom field definitions.')}
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>{t('common.cancel', 'Cancel')}</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleDeleteType(selectedType.id)}>
+                                <CardContent className="pt-6">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="flex items-start gap-4">
+                                            <div
+                                                className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
+                                                style={{ backgroundColor: selectedType.color || '#6366f1' }}
+                                            >
+                                                {(() => {
+                                                    const IconComponent = getAssetTypeIcon(selectedType.icon);
+                                                    return <IconComponent className="h-7 w-7 text-white" />;
+                                                })()}
+                                            </div>
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-3">
+                                                    <h2 className="text-xl font-semibold">{selectedType.name}</h2>
+                                                    <Badge variant="secondary">
+                                                        {getItemCount(selectedType.id)} {t('assets.types.items', 'items')}
+                                                    </Badge>
+                                                </div>
+                                                {selectedType.description && (
+                                                    <p className="text-muted-foreground">
+                                                        {selectedType.description}
+                                                    </p>
+                                                )}
+                                                <div className="flex items-center gap-4 pt-2 text-xs text-muted-foreground">
+                                                    <span>
+                                                        {t('assets.types.iconLabel', 'Icon')}: <code className="bg-muted px-1 rounded">{selectedType.icon || 'Package'}</code>
+                                                    </span>
+                                                    <span>
+                                                        {t('assets.types.colorLabel', 'Color')}: <code className="bg-muted px-1 rounded">{selectedType.color || '#6366f1'}</code>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => { setEditingType(selectedType); setTypeFormOpen(true); }}
+                                            >
+                                                <Edit className="h-4 w-4 mr-1" />
+                                                {t('common.edit', 'Edit')}
+                                            </Button>
+                                            {getItemCount(selectedType.id) === 0 && (
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button variant="destructive" size="sm">
+                                                            <Trash2 className="h-4 w-4 mr-1" />
                                                             {t('common.delete', 'Delete')}
-                                                        </AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        )}
+                                                        </Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>{t('assets.types.deleteTitle', 'Delete Type?')}</AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                                {t('assets.types.deleteDescription', 'This will remove this asset type and all its custom field definitions.')}
+                                                            </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>{t('common.cancel', 'Cancel')}</AlertDialogCancel>
+                                                            <AlertDialogAction onClick={() => handleDeleteType(selectedType.id)}>
+                                                                {t('common.delete', 'Delete')}
+                                                            </AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            )}
+                                        </div>
                                     </div>
-                                </CardHeader>
+                                </CardContent>
                             </Card>
+
+                            {/* Quick stats */}
+                            <div className="grid grid-cols-3 gap-4">
+                                <Card>
+                                    <CardContent className="pt-4 pb-4">
+                                        <div className="text-2xl font-bold">{getItemCount(selectedType.id)}</div>
+                                        <div className="text-xs text-muted-foreground">{t('assets.types.totalAssets', 'Total Assets')}</div>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardContent className="pt-4 pb-4">
+                                        <div className="text-2xl font-bold">{selectedTypeFields.length}</div>
+                                        <div className="text-xs text-muted-foreground">{t('assets.types.customFieldsCount', 'Custom Fields')}</div>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardContent className="pt-4 pb-4">
+                                        <div className="text-2xl font-bold">
+                                            {(assetItems as AssetItem[]).filter(i => 
+                                                i.asset_type_id === selectedType.id && 
+                                                !i.deleted_at && 
+                                                i.status === 'active'
+                                            ).length}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">{t('assets.types.activeAssets', 'Active')}</div>
+                                    </CardContent>
+                                </Card>
+                            </div>
 
                             {/* Custom fields */}
                             <Card>
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                                    <CardTitle className="text-base">
-                                        {t('assets.types.customFields', 'Custom Fields')}
-                                    </CardTitle>
+                                    <div>
+                                        <CardTitle className="text-base">
+                                            {t('assets.types.customFields', 'Custom Fields')}
+                                        </CardTitle>
+                                        <CardDescription>
+                                            {t('assets.types.customFieldsDesc', 'Define additional fields for assets of this type')}
+                                        </CardDescription>
+                                    </div>
                                     <Button
                                         size="sm"
                                         variant="outline"
                                         onClick={() => {
-                                            // For now, direct API call -- a custom field form can be built later
+                                            // TODO: Implement custom field form
                                         }}
                                         disabled
                                     >
@@ -215,15 +323,20 @@ export const AssetTypesManager = () => {
                                 </CardHeader>
                                 <CardContent>
                                     {selectedTypeFields.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground text-center py-4">
-                                            {t('assets.types.noFields', 'No custom fields defined for this type.')}
-                                        </p>
+                                        <div className="text-center py-8 border-2 border-dashed rounded-lg">
+                                            <p className="text-sm text-muted-foreground">
+                                                {t('assets.types.noFields', 'No custom fields defined for this type.')}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                {t('assets.types.noFieldsHint', 'Custom fields let you track additional information specific to this asset type.')}
+                                            </p>
+                                        </div>
                                     ) : (
                                         <div className="space-y-2">
                                             {selectedTypeFields.map((field, index) => (
                                                 <div
                                                     key={field.id}
-                                                    className="flex items-center justify-between p-3 rounded-lg border border-border"
+                                                    className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/30 transition-colors"
                                                 >
                                                     <div className="flex items-center gap-3">
                                                         <GripVertical className="h-4 w-4 text-muted-foreground/50" />
@@ -239,7 +352,7 @@ export const AssetTypesManager = () => {
                                                             <span className="text-xs text-muted-foreground">{field.field_type}</span>
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-1">
+                                                    <div className="flex items-center gap-2">
                                                         <Badge variant="secondary" className="text-xs">
                                                             #{index + 1}
                                                         </Badge>
@@ -252,10 +365,13 @@ export const AssetTypesManager = () => {
                             </Card>
                         </div>
                     ) : (
-                        <Card>
-                            <CardContent className="py-12 text-center">
+                        <Card className="h-[400px] flex items-center justify-center">
+                            <CardContent className="text-center">
+                                <Package className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
                                 <p className="text-muted-foreground">
-                                    {t('assets.types.selectType', 'Select a type from the list to view its details and custom fields.')}
+                                    {activeTypes.length === 0
+                                        ? t('assets.types.createTypePrompt', 'Create an asset type to get started.')
+                                        : t('assets.types.selectType', 'Select a type from the list to view its details.')}
                                 </p>
                             </CardContent>
                         </Card>

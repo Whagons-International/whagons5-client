@@ -35,6 +35,10 @@ export class RealTimeListener {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private pingInterval: NodeJS.Timeout | null = null;
   private options: ConnectionOptions;
+  private hasWarnedAboutServer: boolean = false;
+  private lastErrorLogTime: number = 0;
+  private readonly ERROR_LOG_THROTTLE_MS = 10000; // Only log errors every 10 seconds
+  private serverUnavailable: boolean = false; // Track if server is known to be unavailable
   
   // Event listeners
   private listeners: Map<string, ((data: any) => void)[]> = new Map();
@@ -154,8 +158,11 @@ export class RealTimeListener {
         return true;
       } catch (error) {
         this.debugLog('Server health check failed:', error);
-        console.warn('⚠️  WebSocket server appears to be offline (development health-check failed)');
-        console.warn('💡 Make sure your WebSocket server is running before connecting');
+        // Only log warning in debug mode to avoid console spam
+        if (this.options.debug) {
+          console.warn('⚠️  WebSocket server appears to be offline (development health-check failed)');
+          console.warn('💡 Make sure your WebSocket server is running before connecting');
+        }
         return false;
       }
     }
@@ -168,10 +175,28 @@ export class RealTimeListener {
    * Connect to WebSocket and immediately send a keep-alive message
    */
   async connectAndHold(): Promise<void> {
-   //check if server is available
-   const serverAvailable = await this.checkServerAvailability();
-   if(!serverAvailable) {
-    throw new Error('WebSocket server is not available. Please start the server and try again.');
+   // Prevent multiple simultaneous connection attempts
+   if (this.isConnected || this.isConnecting) {
+     this.debugLog('Already connected or connecting, skipping connectAndHold');
+     return;
+   }
+
+   // If we've determined the server is unavailable, don't attempt connection
+   if (this.serverUnavailable) {
+     this.debugLog('Skipping WebSocket connection - server marked as unavailable');
+     return;
+   }
+
+   // Check if server is available (only in development)
+   const { VITE_DEVELOPMENT } = getEnvVariables();
+   if (VITE_DEVELOPMENT === 'true') {
+     const serverAvailable = await this.checkServerAvailability();
+     if (!serverAvailable) {
+       // In development, mark server as unavailable and skip connection
+       this.serverUnavailable = true;
+       this.debugLog('Skipping WebSocket connection - server not available');
+       return;
+     }
    }
    
    this.connect();
@@ -196,6 +221,12 @@ export class RealTimeListener {
       return;
     }
 
+    // Don't attempt connection if server is marked as unavailable
+    if (this.serverUnavailable) {
+      this.debugLog('Skipping WebSocket connection - server marked as unavailable');
+      return;
+    }
+
     try {
       this.isConnecting = true;
       const wsUrl = this.getWebSocketUrl();
@@ -211,11 +242,20 @@ export class RealTimeListener {
       this.ws.onerror = this.handleError.bind(this);
 
     } catch (error) {
-      console.error('RTL: Failed to create WebSocket connection:', error);
+      // Only log errors if not in silent mode (server unavailable)
+      if (!this.serverUnavailable) {
+        console.error('RTL: Failed to create WebSocket connection:', error);
+      }
       this.isConnecting = false;
       this.emit('connection:error', { error: error instanceof Error ? error.message : String(error) });
       
-      if (this.options.autoReconnect) {
+      // Mark server as unavailable in development if connection fails immediately
+      const { VITE_DEVELOPMENT } = getEnvVariables();
+      if (VITE_DEVELOPMENT === 'true') {
+        this.serverUnavailable = true;
+      }
+      
+      if (this.options.autoReconnect && !this.serverUnavailable) {
         this.scheduleReconnect();
       }
     }
@@ -302,6 +342,8 @@ export class RealTimeListener {
     this.isConnected = true;
     this.isConnecting = false;
     this.reconnectAttempts = 0;
+    this.hasWarnedAboutServer = false; // Reset warning flag on successful connection
+    this.serverUnavailable = false; // Reset server availability flag on successful connection
     setRtlConnected(true);
     
     // Start ping interval to keep connection alive
@@ -356,20 +398,42 @@ export class RealTimeListener {
    * Handle WebSocket error event
    */
   private handleError(error: Event): void {
-    console.error('RTL: WebSocket error:', error);
     this.isConnecting = false;
     
-    // More specific error message based on the current state
+    // Mark server as unavailable if we're in development and connecting to localhost
+    const { VITE_DEVELOPMENT } = getEnvVariables();
     const wsUrl = this.ws?.url || 'unknown';
+    if (VITE_DEVELOPMENT === 'true' && wsUrl.includes('localhost:8082')) {
+      this.serverUnavailable = true;
+    }
+    
+    // More specific error message based on the current state
     const errorMessage = this.getConnectionErrorMessage(wsUrl);
     
-    console.error('❌ WebSocket Connection Failed');
-    console.error('📍 URL:', wsUrl);
-    console.error('💡 Suggestion:', errorMessage);
+    // Throttle error logging to avoid console spam
+    const now = Date.now();
+    const shouldLog = !this.hasWarnedAboutServer || 
+                     (now - this.lastErrorLogTime) > this.ERROR_LOG_THROTTLE_MS;
+    
+    if (shouldLog) {
+      // Only log detailed error on first attempt or after throttle period
+      if (!this.hasWarnedAboutServer) {
+        console.warn('⚠️  WebSocket server unavailable');
+        console.warn('📍 URL:', wsUrl);
+        console.warn('💡 Suggestion:', errorMessage);
+        console.warn('ℹ️  Real-time updates disabled. The app will continue to work normally.');
+        this.hasWarnedAboutServer = true;
+      } else {
+        // Subsequent errors: just a brief debug log
+        this.debugLog('WebSocket connection failed (server still unavailable)');
+      }
+      this.lastErrorLogTime = now;
+    }
     
     this.emit('connection:error', { error: errorMessage, url: wsUrl });
 
-    if (this.options.autoReconnect) {
+    // Only attempt reconnection if server is not marked as unavailable
+    if (this.options.autoReconnect && !this.serverUnavailable) {
       this.scheduleReconnect();
     }
   }
@@ -576,8 +640,15 @@ export class RealTimeListener {
    * Schedule reconnection attempt
    */
   private scheduleReconnect(): void {
+    // Don't schedule reconnection if server is marked as unavailable
+    if (this.serverUnavailable) {
+      this.debugLog('Skipping reconnection - server marked as unavailable');
+      return;
+    }
+
     if (this.reconnectAttempts >= (this.options.maxReconnectAttempts || 5)) {
       this.debugLog('Max reconnection attempts reached');
+      // Only emit status, don't log to console to avoid spam
       this.emit('connection:status', { 
         status: 'failed', 
         message: 'Max reconnection attempts reached' 
@@ -588,6 +659,7 @@ export class RealTimeListener {
     this.reconnectAttempts++;
     const delay = this.options.reconnectInterval || 5000;
     
+    // Only log reconnection attempts in debug mode
     this.debugLog(`Scheduling reconnection attempt ${this.reconnectAttempts}/${this.options.maxReconnectAttempts} in ${delay}ms`);
     
     this.emit('connection:status', { 

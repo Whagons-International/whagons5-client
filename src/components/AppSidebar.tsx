@@ -33,6 +33,7 @@ import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
 import { RootState } from '@/store';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { usePluginEnabled } from '@/hooks/usePluginEnabled';
 // import { useAuth } from '@/providers/AuthProvider'; // Currently not used, uncomment when needed
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -512,6 +513,11 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   const { t } = useLanguage();
   const { config } = useBranding();
   
+  // Get backend plugin statuses for plugin-guarded routes
+  const assetsPluginEnabled = usePluginEnabled('assets').isEnabled;
+  const qrCodesPluginEnabled = usePluginEnabled('qr-codes').isEnabled;
+  const workingHoursPluginEnabled = usePluginEnabled('working-hours').isEnabled;
+  
   // Check if primary color is a gradient
   const isPrimaryGradient = useMemo(() => {
     const primaryColor = config.primaryColor || '';
@@ -796,8 +802,22 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   const [pinnedPluginsOrder, setPinnedPluginsOrderState] = useState<string[]>(getPinnedPluginsOrder());
   
   // Sort pinned plugins by saved order (excluding boards and activity from drag-and-drop ordering)
+  // Also filter out plugins that are not enabled in the backend
   const pinnedPlugins = useMemo(() => {
-    const pinned = pluginsConfig.filter(p => p.enabled && p.pinned && p.id !== 'boards' && p.id !== 'activity');
+    const pinned = pluginsConfig.filter(p => {
+      // Must be enabled in UI config AND pinned
+      if (!p.enabled || !p.pinned) return false;
+      
+      // Exclude boards and activity from drag-and-drop ordering
+      if (p.id === 'boards' || p.id === 'activity') return false;
+      
+      // For plugin-guarded routes, check backend plugin status
+      if (p.id === 'assets' && !assetsPluginEnabled) return false;
+      if (p.id === 'qr-codes' && !qrCodesPluginEnabled) return false;
+      if (p.id === 'working-hours' && !workingHoursPluginEnabled) return false;
+      
+      return true;
+    });
     const order = pinnedPluginsOrder;
     
     if (order.length === 0) return pinned;
@@ -811,7 +831,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
       if (bIndex === -1) return -1;
       return aIndex - bIndex;
     });
-  }, [pluginsConfig, pinnedPluginsOrder]);
+  }, [pluginsConfig, pinnedPluginsOrder, assetsPluginEnabled, qrCodesPluginEnabled, workingHoursPluginEnabled]);
   
   // Plugins that are not visible in sidebar (pinned=false) are not shown anywhere
   const unpinnedPlugins: PluginConfig[] = [];

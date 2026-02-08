@@ -196,6 +196,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     taskNotes,
     taskAttachments,
     roles,
+    assetItems,
   } = reduxState as any;
   const { defaultCategoryId, workspaceNumericId, isAllWorkspaces } = derivedState as any;
   const metadataLoadedFlags = useMetadataLoadedFlags(reduxState);
@@ -211,6 +212,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     priorityMap,
     spotMap,
     userMap,
+    assetMap,
     filteredPriorities,
     tagMap,
     templateMap,
@@ -244,6 +246,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     approvals,
     taskApprovalInstances,
     roles,
+    assetItems,
     defaultCategoryId,
     workspaceNumericId,
     isAllWorkspaces,
@@ -484,6 +487,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     formatDueDate,
     spotMap,
     spotsLoaded: metadataLoadedFlags.spotsLoaded,
+    assetMap,
+    assetsLoaded: metadataLoadedFlags.assetsLoaded,
     userMap,
     getDoneStatusId,
     groupField: (useClientSide && groupBy !== 'none') ? groupBy : undefined,
@@ -527,9 +532,9 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     statusMap, priorityMap, spotMap, userMap, tagMap, templateMap, formMap, formVersionMap, taskFormsMap, taskTags, taskUsers,
     getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,
     metadataLoadedFlags.statusesLoaded, metadataLoadedFlags.prioritiesLoaded,
-    metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,
+    metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded, metadataLoadedFlags.assetsLoaded,
     filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, rowDensity, showDescriptionBelowName, tagDisplayMode,
-    approvalMap, approvalApprovers, stableTaskApprovalInstances, user?.id, slas, slaMap, roleMap,
+    approvalMap, approvalApprovers, stableTaskApprovalInstances, user?.id, slas, slaMap, roleMap, assetMap,
     visibleColumns, workspaceCustomFields, taskCustomFieldValueMap, customFields, taskNotes, taskAttachments, handleDeleteTask,
     getDoneStatusId, handleOpenFormDialog,
   ]);

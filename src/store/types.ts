@@ -125,6 +125,7 @@ export interface Task {
     team_id: number;
     template_id: number | null;
     spot_id: number | null;
+    asset_id: number | null; // Link to asset item for asset-related tasks
     status_id: number;
     priority_id: number;
     approval_id: number | null;
@@ -632,18 +633,52 @@ export interface Exception {
     created_at: string;
 }
 
-// Workflow Management (Coming Soon)
+// Workflow Management
+export interface WorkflowVersion {
+    id: number;
+    workflow_id: number;
+    version_number: number;
+    status: string;
+    change_notes?: string | null;
+    metadata?: Record<string, any> | null;
+    nodes?: WorkflowNodeRecord[];
+    edges?: WorkflowEdgeRecord[];
+    created_at: string;
+    updated_at: string;
+}
+
+export interface WorkflowNodeRecord {
+    id: number;
+    node_key: string;
+    type: string;
+    label: string;
+    config: Record<string, any>;
+    position: { x: number; y: number };
+    metadata?: Record<string, any> | null;
+}
+
+export interface WorkflowEdgeRecord {
+    id: number;
+    source_node_key: string;
+    target_node_key: string;
+    label?: string;
+    metadata?: Record<string, any> | null;
+}
+
 export interface Workflow {
     id: number;
     name: string;
     description?: string | null;
     workspace_id?: number | null;
     is_active: boolean;
-    trigger_conditions?: string | null; // JSON conditions for when workflow runs
-    actions?: string | null; // JSON array of actions to perform
+    current_version_id?: number | null;
+    activated_at?: string | null;
     created_by?: number | null;
+    updated_by?: number | null;
     created_at: string;
     updated_at: string;
+    current_version?: WorkflowVersion | null;
+    versions?: WorkflowVersion[];
 }
 
 // Boards (Communication Boards)
@@ -770,6 +805,7 @@ export type AssetCustomFieldType = 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'CHECKBOX' |
 export interface AssetType {
     id: number;
     name: string;
+    description?: string | null;
     color?: string | null;
     icon?: string | null;
     created_at: string;

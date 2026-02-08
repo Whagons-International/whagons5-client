@@ -17,6 +17,8 @@ export function createBaseColumns(opts: ColumnBuilderOptions) {
     taskAttachments,
     spotMap,
     spotsLoaded,
+    assetMap,
+    assetsLoaded,
     visibleColumns,
     density,
   } = opts;
@@ -262,6 +264,53 @@ export function createBaseColumns(opts: ColumnBuilderOptions) {
       },
       flex: 2,
       minWidth: 180,
+    },
+    {
+      field: 'asset_id',
+      headerName: t('workspace.columns.asset', 'Asset'),
+      sortable: true,
+      filter: 'agSetColumnFilter',
+      hide: !isVisible('asset_id'),
+      valueFormatter: (p: any) => {
+        const meta: any = assetMap?.[p.value as number];
+        return meta?.name || (p.value ? `#${p.value}` : '');
+      },
+      filterParams: {
+        values: (params: any) => {
+          const ids = Object.keys(assetMap || {}).map((k: any) => Number(k));
+          params.success(ids);
+        },
+        suppressMiniFilter: false,
+        valueFormatter: (p: any) => {
+          const meta: any = assetMap?.[p.value as number];
+          return meta?.name || `#${p.value}`;
+        },
+      },
+      cellRenderer: (p: any) => {
+        if (!p.data) {
+          return (
+            <div className="flex items-center h-full py-1">
+              <div className="h-3 w-24 bg-muted animate-pulse rounded" />
+            </div>
+          );
+        }
+        if (!assetsLoaded) return (<div className="flex items-center h-full py-1"><span className="opacity-0">.</span></div>);
+        if (p.value == null) return (<div className="flex items-center h-full py-2"><span className="text-[12px] text-muted-foreground"></span></div>);
+        const meta: any = assetMap?.[p.value as number];
+        if (!meta) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
+        const name = meta.name;
+        const tag = (
+          <div className="inline-flex items-center gap-1.5 text-[12px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+            <span className="truncate max-w-[140px]">{name}</span>
+          </div>
+        );
+        const node = (
+          <div className="flex items-center h-full py-1">{tag}</div>
+        );
+        return node;
+      },
+      flex: 2,
+      minWidth: 160,
     },
     {
       field: 'updated_at',

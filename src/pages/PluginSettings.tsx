@@ -31,6 +31,10 @@ function PluginSettings() {
 	const [selectedSpotTypeIds, setSelectedSpotTypeIds] = useState<string[]>([]);
 	const [savedSpotTypeIds, setSavedSpotTypeIds] = useState<string[]>([]);
 	const [saving, setSaving] = useState(false);
+	// Template states
+	const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
+	const [savedTemplateIds, setSavedTemplateIds] = useState<string[]>([]);
+	const [savingTemplates, setSavingTemplates] = useState(false);
 	// Change to array of objects: [{status_id: number, cleaning_status_id: number}, ...]
 	const [statusToCleaningStatusMap, setStatusToCleaningStatusMap] = useState<Array<{status_id: number, cleaning_status_id: number}>>([]);
 	const [savedStatusToCleaningStatusMap, setSavedStatusToCleaningStatusMap] = useState<Array<{status_id: number, cleaning_status_id: number}>>([]);
@@ -99,6 +103,33 @@ function PluginSettings() {
 		}
 	}) as CleaningStatus[];
 
+	// Get templates and categories from Redux
+	const templates = useSelector((state: RootState) => {
+		try {
+			return (state as any).templates?.value || [];
+		} catch (error) {
+			console.error('Error accessing templates from Redux:', error);
+			return [];
+		}
+	});
+
+	const categories = useSelector((state: RootState) => {
+		try {
+			return (state as any).categories?.value || [];
+		} catch (error) {
+			console.error('Error accessing categories from Redux:', error);
+			return [];
+		}
+	});
+
+	// Filter cleaning templates (templates that belong to Cleaning category)
+	const cleaningCategory = categories.find((cat: any) => 
+		cat.name?.toLowerCase() === 'cleaning'
+	);
+	const cleaningTemplates = cleaningCategory 
+		? templates.filter((t: any) => t.category_id === cleaningCategory.id)
+		: [];
+
 	useEffect(() => {
 		const unsubscribe = subscribeToPluginsConfig(setPluginsConfigState);
 		return unsubscribe;
@@ -129,6 +160,20 @@ function PluginSettings() {
 				if (genericInternalActions?.cleaningStatuses?.fetchFromAPI) {
 					dispatch(genericInternalActions.cleaningStatuses.fetchFromAPI() as any);
 				}
+				// Load templates
+				if (genericInternalActions?.templates?.getFromIndexedDB) {
+					dispatch(genericInternalActions.templates.getFromIndexedDB() as any);
+				}
+				if (genericInternalActions?.templates?.fetchFromAPI) {
+					dispatch(genericInternalActions.templates.fetchFromAPI() as any);
+				}
+				// Load categories
+				if (genericInternalActions?.categories?.getFromIndexedDB) {
+					dispatch(genericInternalActions.categories.getFromIndexedDB() as any);
+				}
+				if (genericInternalActions?.categories?.fetchFromAPI) {
+					dispatch(genericInternalActions.categories.fetchFromAPI() as any);
+				}
 			} catch (error) {
 				console.error('Error loading data:', error);
 			}
@@ -158,6 +203,12 @@ function PluginSettings() {
 				setSelectedSpotTypeIds(spotTypeIdsString);
 				setSavedSpotTypeIds(spotTypeIdsString);
 
+				// Parse template_ids
+				const templateIds = (settings as any).template_ids || [];
+				const templateIdsString = templateIds.map((id: number) => String(id));
+				setSelectedTemplateIds(templateIdsString);
+				setSavedTemplateIds(templateIdsString);
+
 				// Parse status to cleaning status mapping - now expects array of objects
 				const statusMapping = (settings as any).status_to_cleaning_status || [];
 				
@@ -183,74 +234,90 @@ function PluginSettings() {
 			} catch (error) {
 				console.error('Error parsing plugin settings:', error);
 				setSelectedSpotTypeIds([]);
+				setSelectedTemplateIds([]);
 				setStatusToCleaningStatusMap([]);
 				setSavedStatusToCleaningStatusMap([]);
 			}
 		} else if (pluginId === 'cleaning' && !backendPlugin) {
 			// Reset if plugin not found
 			setSelectedSpotTypeIds([]);
+			setSelectedTemplateIds([]);
 			setStatusToCleaningStatusMap([]);
 		}
 	}, [backendPlugin, pluginId]);
 
 	const currentPlugin = pluginId ? pluginsConfig.find(p => p.id === pluginId) : undefined;
 
+	// Helper function to get current settings from backendPlugin
+	const getCurrentSettings = (): Record<string, any> => {
+		if (!backendPlugin?.settings) {
+			return {};
+		}
+		
+		if (typeof backendPlugin.settings === 'string') {
+			try {
+				return JSON.parse(backendPlugin.settings);
+			} catch (e) {
+				console.error('Error parsing settings JSON:', e);
+				return {};
+			}
+		}
+		
+		if (typeof backendPlugin.settings === 'object') {
+			return { ...backendPlugin.settings };
+		}
+		
+		return {};
+	};
+
+	// Generic helper function to update plugin settings
+	const updatePluginSettings = async (updates: Record<string, any>): Promise<any> => {
+		if (!backendPlugin) {
+			throw new Error('Backend plugin not found');
+		}
+
+		const currentSettings = getCurrentSettings();
+		const updatedSettings = {
+			...currentSettings,
+			...updates
+		};
+
+		const pluginSlug = effectivePluginSlug;
+		const response = await actionsApi.patch(`/plugins/${pluginSlug}/settings`, {
+			settings: updatedSettings
+		});
+
+		const savedPlugin = response?.data?.data;
+		if (savedPlugin) {
+			dispatch(genericActions.plugins.updateItem(savedPlugin));
+		}
+
+		return savedPlugin;
+	};
+
 	// Handle spot types selection change (only updates local state)
 	const handleSpotTypesChange = (values: string[]) => {
 		setSelectedSpotTypeIds(values);
 	};
 
+	// Handle templates selection change (only updates local state)
+	const handleTemplatesChange = (values: string[]) => {
+		setSelectedTemplateIds(values);
+	};
+
 	// Handle saving spot_type_ids
 	const handleSaveSpotTypes = async () => {
-		if (!backendPlugin) {
-			console.error('Backend plugin not found');
-			toast.error(t('plugins.cleaning.spotTypesError', 'Failed to save spot types'));
-			return;
-		}
-
 		setSaving(true);
 		
 		try {
 			const spotTypeIds = selectedSpotTypeIds.map(v => parseInt(v));
-			let currentSettings = {};
+			await updatePluginSettings({ spot_type_ids: spotTypeIds });
 			
-			if (backendPlugin.settings) {
-				if (typeof backendPlugin.settings === 'string') {
-					try {
-						currentSettings = JSON.parse(backendPlugin.settings);
-					} catch (e) {
-						console.error('Error parsing settings JSON:', e);
-						currentSettings = {};
-					}
-				} else if (typeof backendPlugin.settings === 'object') {
-					currentSettings = backendPlugin.settings;
-				}
-			}
-			
-			const updatedSettings = {
-				...currentSettings,
-				spot_type_ids: spotTypeIds
-			};
-
-			// Use slug instead of id, and send settings as object (backend will handle it)
-			// Ensure we use the slug, not the ID
-			const pluginSlug = effectivePluginSlug;
-			const response = await actionsApi.patch(`/plugins/${pluginSlug}/settings`, {
-				settings: updatedSettings
-			});
-
-			// Update Redux store with the response data
-			// Use updateItem directly instead of updateAsync to avoid extra API call
-			const savedPlugin = response?.data?.data;
-			if (savedPlugin) {
-				dispatch(genericActions.plugins.updateItem(savedPlugin));
-			}
-
 			setSavedSpotTypeIds([...selectedSpotTypeIds]);
 			toast.success(t('plugins.cleaning.spotTypesSaved', 'Spot types saved successfully'));
 		} catch (error: any) {
 			console.error('Error saving spot types:', error);
-			const errorMessage = error?.response?.data?.message || error?.message || t('plugins.cleaning.spotTypesError', 'Failed to save spot types');
+			const errorMessage = error?.response?.data?.message || error?.message || t('plugins.cleaning.saveError', 'Failed to save settings');
 			toast.error(errorMessage);
 			// Revert to saved selection
 			setSelectedSpotTypeIds([...savedSpotTypeIds]);
@@ -259,69 +326,45 @@ function PluginSettings() {
 		}
 	};
 
+	// Handle saving template_ids
+	const handleSaveTemplates = async () => {
+		setSavingTemplates(true);
+		
+		try {
+			const templateIds = selectedTemplateIds.map(v => parseInt(v));
+			await updatePluginSettings({ template_ids: templateIds });
+			
+			setSavedTemplateIds([...selectedTemplateIds]);
+			toast.success(t('plugins.cleaning.templatesSaved', 'Templates saved successfully'));
+		} catch (error: any) {
+			console.error('Error saving templates:', error);
+			const errorMessage = error?.response?.data?.message || error?.message || t('plugins.cleaning.saveError', 'Failed to save settings');
+			toast.error(errorMessage);
+			// Revert to saved selection
+			setSelectedTemplateIds([...savedTemplateIds]);
+		} finally {
+			setSavingTemplates(false);
+		}
+	};
+
 	// Handle saving status to cleaning status mapping
 	const handleSaveStatusMapping = async () => {
-		if (!backendPlugin) {
-			console.error('Backend plugin not found');
-			toast.error(t('plugins.cleaning.statusMappingError', 'Failed to save status mapping'));
-			return;
-		}
-
 		setSavingStatusMapping(true);
 		
 		try {
 			// Convert to array of objects format
-			// Ensure statusToCleaningStatusMap is always an array
 			const currentMapping = Array.isArray(statusToCleaningStatusMap) ? statusToCleaningStatusMap : [];
 			const statusMappingArray = currentMapping.map(item => ({
 				status_id: typeof item.status_id === 'string' ? parseInt(item.status_id, 10) : item.status_id,
 				cleaning_status_id: typeof item.cleaning_status_id === 'string' ? parseInt(item.cleaning_status_id, 10) : item.cleaning_status_id
 			})).filter(item => !isNaN(item.status_id) && !isNaN(item.cleaning_status_id));
 
-			let currentSettings: any = {};
-			
-			if (backendPlugin.settings) {
-				if (typeof backendPlugin.settings === 'string') {
-					try {
-						currentSettings = JSON.parse(backendPlugin.settings);
-					} catch (e) {
-						console.error('Error parsing settings JSON:', e);
-						currentSettings = {};
-					}
-				} else if (typeof backendPlugin.settings === 'object') {
-					currentSettings = { ...backendPlugin.settings };
-				}
-			}
-			
-			// Set status_to_cleaning_status as array of objects
-			const updatedSettings = {
-				...currentSettings,
-				status_to_cleaning_status: statusMappingArray
-			};
-
-			// Use slug instead of id, and send settings as object (backend will handle it)
-			// Ensure we use the slug, not the ID
-			const pluginSlug = effectivePluginSlug;
-			
-			// Create payload with array of objects format
-			const payloadSettings = {
-				...updatedSettings,
-				status_to_cleaning_status: statusMappingArray
-			};
-			
-			const response = await actionsApi.patch(`/plugins/${pluginSlug}/settings`, {
-				settings: payloadSettings
+			const savedPlugin = await updatePluginSettings({ 
+				status_to_cleaning_status: statusMappingArray 
 			});
 
-			// Update Redux store with the response data
-			// Use updateItem directly instead of updateAsync to avoid extra API call
-			const savedPlugin = response?.data?.data;
-			if (savedPlugin) {
-				dispatch(genericActions.plugins.updateItem(savedPlugin));
-			}
-
 			// Parse the saved settings to update local state
-			const savedSettings = savedPlugin?.settings || updatedSettings;
+			const savedSettings = savedPlugin?.settings || getCurrentSettings();
 			const savedStatusMapping = savedSettings?.status_to_cleaning_status || [];
 			const savedMappingsArray = Array.isArray(savedStatusMapping) 
 				? savedStatusMapping.map((item: any) => ({
@@ -337,7 +380,7 @@ function PluginSettings() {
 			toast.success(t('plugins.cleaning.statusMappingSaved', 'Status mapping saved successfully'));
 		} catch (error: any) {
 			console.error('Error saving status mapping:', error);
-			const errorMessage = error?.response?.data?.message || error?.message || t('plugins.cleaning.statusMappingError', 'Failed to save status mapping');
+			const errorMessage = error?.response?.data?.message || error?.message || t('plugins.cleaning.saveError', 'Failed to save settings');
 			toast.error(errorMessage);
 			// Revert to saved mapping
 			setStatusToCleaningStatusMap([...savedStatusToCleaningStatusMap]);
@@ -380,6 +423,7 @@ function PluginSettings() {
 
 	// Check if there are unsaved changes
 	const hasUnsavedChanges = JSON.stringify(selectedSpotTypeIds.sort()) !== JSON.stringify(savedSpotTypeIds.sort());
+	const hasUnsavedTemplateChanges = JSON.stringify(selectedTemplateIds.sort()) !== JSON.stringify(savedTemplateIds.sort());
 	const savedMappingArray = Array.isArray(savedStatusToCleaningStatusMap) ? savedStatusToCleaningStatusMap : [];
 	const hasUnsavedStatusMappingChanges = JSON.stringify(statusMappingArray.sort((a, b) => a.status_id - b.status_id)) !== JSON.stringify(savedMappingArray.sort((a, b) => a.status_id - b.status_id));
 
@@ -723,6 +767,66 @@ function PluginSettings() {
 								>
 									<Save className="h-4 w-4" />
 									{saving 
+										? t('plugins.cleaning.saving', 'Saving...')
+										: t('plugins.cleaning.save', 'Save')
+									}
+								</Button>
+							</div>
+						</CardContent>
+					</Card>
+				)}
+
+				{/* Templates Selection for Cleaning Plugin */}
+				{pluginId === 'cleaning' && Array.isArray(cleaningTemplates) && (
+					<Card>
+						<CardHeader>
+							<CardTitle className="flex items-center justify-between">
+								<span>{t('plugins.cleaning.templates', 'Cleaning Templates')}</span>
+								{hasUnsavedTemplateChanges && (
+									<span className="text-xs text-amber-500 font-normal">
+										{t('plugins.cleaning.unsavedChanges', 'Unsaved changes')}
+									</span>
+								)}
+							</CardTitle>
+							<CardDescription>
+								{t('plugins.cleaning.templatesDescription', 'Select which cleaning templates are available for use')}
+							</CardDescription>
+						</CardHeader>
+						<CardContent className="space-y-4">
+							<div className="space-y-2">
+								<label className="text-sm font-medium">
+									{t('plugins.cleaning.selectTemplates', 'Select Templates')}
+								</label>
+								<MultiSelect
+									options={Array.isArray(cleaningTemplates) ? cleaningTemplates.map((t: any) => ({
+										value: String(t.id),
+										label: t.name || `Template ${t.id}`
+									})) : []}
+									onValueChange={handleTemplatesChange}
+									defaultValue={Array.isArray(cleaningTemplates) && cleaningTemplates.length > 0 
+										? selectedTemplateIds.filter(id => cleaningTemplates.some((t: any) => String(t.id) === id))
+										: []}
+									placeholder={
+										!Array.isArray(cleaningTemplates) || cleaningTemplates.length === 0
+											? t('plugins.cleaning.loadingTemplates', 'Loading templates...')
+											: t('plugins.cleaning.selectTemplatesPlaceholder', 'Select templates...')
+									}
+									maxCount={10}
+									disabled={savingTemplates}
+									className="w-full"
+								/>
+								<p className="text-xs text-muted-foreground">
+									{t('plugins.cleaning.templatesHint', 'Only selected templates will be available for cleaning operations')}
+								</p>
+							</div>
+							<div className="flex justify-end pt-2">
+								<Button
+									onClick={handleSaveTemplates}
+									disabled={savingTemplates || !hasUnsavedTemplateChanges || !backendPlugin}
+									className="gap-2"
+								>
+									<Save className="h-4 w-4" />
+									{savingTemplates 
 										? t('plugins.cleaning.saving', 'Saving...')
 										: t('plugins.cleaning.save', 'Save')
 									}

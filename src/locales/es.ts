@@ -2031,7 +2031,7 @@ export const esTranslations: Record<string, string> = {
   "qrCodes.copyUuid": "Copiar UUID",
   "qrCodes.viewQrCode": "Ver Código QR",
   "qrCodes.uuidCopied": "UUID copiado al portapapeles",
-  "qrCodes.created": "Código QR generado exitosamente",
+  "qrCodes.generated": "Código QR generado exitosamente",
   "qrCodes.createError": "Error al generar el código QR",
   "qrCodes.downloaded": "Código QR descargado",
   "qrCodes.downloadError": "Error al descargar el código QR",

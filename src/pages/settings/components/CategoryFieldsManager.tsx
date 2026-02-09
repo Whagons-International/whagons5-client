@@ -5,11 +5,13 @@ import { faPlus, faSpinner, faTrash, faGripVertical } from "@fortawesome/free-so
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RootState, AppDispatch } from "@/store/store";
 import { genericActions, genericCaches, genericEventNames, genericEvents } from '@/store/genericSlices';
 import { Category } from "@/store/types";
 import { useLanguage } from "@/providers/LanguageProvider";
 
+import { Logger } from '@/utils/logger';
 type CategoryFieldAssignment = { 
   id: number; 
   field_id: number; 
@@ -30,12 +32,13 @@ type CustomField = {
 };
 
 export interface CategoryFieldsManagerProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   category: Category | null;
+  variant?: 'dialog' | 'inline';
 }
 
-export function CategoryFieldsManager({ open, onOpenChange, category }: CategoryFieldsManagerProps) {
+export function CategoryFieldsManager({ open, onOpenChange, category, variant = 'dialog' }: CategoryFieldsManagerProps) {
   const dispatch = useDispatch<AppDispatch>();
   const { t } = useLanguage();
   const tc = (key: string, fallback: string) => t(`settings.categories.fieldsManager.${key}`, fallback);
@@ -71,12 +74,14 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
 
   // Data is hydrated on login; this dialog should not trigger ad-hoc IndexedDB/API loading.
   React.useEffect(() => {
-    if (open && category) {
-      setInlineError(null);
-      // Reset local overrides so we display the hydrated Redux data.
-      setLocalAssignments([]);
+    if ((variant === 'dialog' && open) || variant === 'inline') {
+      if (category) {
+        setInlineError(null);
+        // Reset local overrides so we display the hydrated Redux data.
+        setLocalAssignments([]);
+      }
     }
-  }, [open, category]);
+  }, [variant, open, category]);
 
   const addAssignment = async () => {
     if (!category || !newFieldId) return;
@@ -89,7 +94,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
     try {
       lastMutationRef.current = Date.now();
       const dbg = true;
-      if (dbg) console.log('[CFM] addAssignment start', { category, newFieldId });
+      if (dbg) Logger.info('settings', '[CFM] addAssignment start', { category, newFieldId });
       const nextOrder = currentAssignments.length > 0 ? Math.max(...currentAssignments.map(a => a.order || 0)) + 1 : 0;
       // Optimistic local push to avoid flash if cache write lags
       const optimistic: any = {
@@ -110,7 +115,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
         order: nextOrder,
         default_value: null,
       } as any)).unwrap();
-      if (dbg) console.log('[CFM] addAssignment saved', saved);
+      if (dbg) Logger.info('settings', '[CFM] addAssignment saved', saved);
       setNewFieldId("");
       // Replace optimistic row with server row to prevent flash-removal
       setLocalAssignments(prev => {
@@ -120,7 +125,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
         return copy;
       });
     } catch (e: any) {
-      console.error('Error adding assignment', e?.response?.data || e);
+      Logger.error('settings', 'Error adding assignment', e?.response?.data || e);
       // If server add fails, remove our optimistic row
       setLocalAssignments(prev => prev.filter(r => r.id >= 0));
       const msg = e?.response?.data?.message || e?.response?.data?.error || (Array.isArray(e?.response?.data?.errors) ? e.response.data.errors.join(', ') : '') || e?.message || tc('errors.failedToAdd', 'Failed to add field');
@@ -136,7 +141,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
       await dispatch(genericActions.categoryCustomFields.removeAsync(assignment.id)).unwrap();
       setLocalAssignments(prev => prev.filter((r: any) => r?.id !== assignment.id));
     } catch (e) {
-      console.error('Error removing assignment', e);
+      Logger.error('settings', 'Error removing assignment', e);
     } finally {
       setAssignSubmitting(false);
     }
@@ -147,7 +152,7 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
       await dispatch(genericActions.categoryCustomFields.updateAsync({ id: assignmentId, updates } as any)).unwrap();
       setLocalAssignments(prev => prev.map((r: any) => (r?.id === assignmentId ? { ...r, ...(updates as any) } : r)));
     } catch (e) {
-      console.error('Error updating assignment', e);
+      Logger.error('settings', 'Error updating assignment', e);
     }
   };
 
@@ -307,32 +312,25 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
   };
 
   const closeDialog = () => {
-    onOpenChange(false);
+    if (onOpenChange) {
+      onOpenChange(false);
+    }
     setNewFieldId("");
   };
 
-  return (
-    <Dialog open={open} onOpenChange={closeDialog}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>{tc('title', 'Manage Fields')}{category ? ` • ${category.name}` : ''}</DialogTitle>
-          <DialogDescription>
-            {tc('description', 'Assign custom fields to this category and configure their requirements, defaults, and order.')}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
+  const content = (
+    <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <select
-              value={newFieldId}
-              onChange={(e) => setNewFieldId(e.target.value)}
-              className="px-3 py-2 border border-input bg-background rounded-md text-sm"
-            >
-              <option value="">{tc('selectPlaceholder', 'Select field to add')}</option>
+          <Select value={newFieldId} onValueChange={(value) => setNewFieldId(value)}>
+            <SelectTrigger className="w-[250px]">
+              <SelectValue placeholder={tc('selectPlaceholder', 'Select field to add')} />
+            </SelectTrigger>
+            <SelectContent>
               {availableFields.map((f: any) => (
-                <option key={f.id} value={f.id}>{f.name}</option>
+                <SelectItem key={f.id} value={String(f.id)}>{f.name}</SelectItem>
               ))}
-            </select>
+            </SelectContent>
+          </Select>
             <Button onClick={addAssignment} disabled={!newFieldId || assignSubmitting} size="sm">
               {assignSubmitting ? <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" /> : <FontAwesomeIcon icon={faPlus} className="mr-2" />}
               {tc('addButton', 'Add Field')}
@@ -398,6 +396,49 @@ export function CategoryFieldsManager({ open, onOpenChange, category }: Category
             </div>
           )}
         </div>
+  );
+
+  if (variant === 'inline') {
+    return (
+      <>
+        {content}
+        {/* Confirm delete assignment */}
+        <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{tc('deleteDialog.title', 'Remove field from category')}</DialogTitle>
+              <DialogDescription>
+                {(() => {
+                  const fid = deleteTarget ? getFieldId(deleteTarget) : null;
+                  const f = (customFields as CustomField[]).find((cf) => Number(cf.id) === Number(fid));
+                  const name = f?.name || (fid != null ? tc('deleteDialog.fieldNumber', 'Field #{id}').replace('{id}', String(fid)) : tc('deleteDialog.thisField', 'this field'));
+                  return tc('deleteDialog.confirm', 'Are you sure you want to remove "{name}" from {category}? This does not delete the custom field itself.')
+                    .replace('{name}', name)
+                    .replace('{category}', category?.name ?? tc('deleteDialog.thisCategory', 'this category'));
+                })()}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteTarget(null)}>{tc('deleteDialog.cancel', 'Cancel')}</Button>
+              <Button variant="destructive" onClick={async () => { if (deleteTarget) { await removeAssignment(deleteTarget); setDeleteTarget(null); } }}>{tc('deleteDialog.delete', 'Delete')}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
+
+  return (
+    <Dialog open={open ?? false} onOpenChange={closeDialog}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>{tc('title', 'Manage Fields')}{category ? ` • ${category.name}` : ''}</DialogTitle>
+          <DialogDescription>
+            {tc('description', 'Assign custom fields to this category and configure their requirements, defaults, and order.')}
+          </DialogDescription>
+        </DialogHeader>
+
+        {content}
 
         <DialogFooter>
           <Button variant="outline" onClick={closeDialog}>{tc('closeButton', 'Close')}</Button>

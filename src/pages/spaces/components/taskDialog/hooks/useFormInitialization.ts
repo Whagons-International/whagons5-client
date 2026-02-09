@@ -1,7 +1,8 @@
-import { useEffect, startTransition } from 'react';
+import { useEffect, startTransition, useRef } from 'react';
 import { normalizeDefaultUserIds } from '../utils/fieldHelpers';
 import { getAssignedUserIdsFromTaskUsers } from '../../workspaceTable/utils/userUtils';
 
+import { Logger } from '@/utils/logger';
 export function useFormInitialization(params: any) {
   const {
     open,
@@ -17,6 +18,7 @@ export function useFormInitialization(params: any) {
     setCategoryId,
     setPriorityId,
     setSpotId,
+    setAssetId,
     setStatusId,
     setTemplateId,
     setStartDate,
@@ -32,16 +34,41 @@ export function useFormInitialization(params: any) {
     setSelectedTagIds,
   } = params;
 
+  // Track the last task object we initialized with (by reference and key fields)
+  const lastInitializedTaskRef = useRef<{ id: number | string | null; hash: string | null }>({ id: null, hash: null });
+
   useEffect(() => {
     if (!open) {
       formInitializedRef.current = false;
+      lastInitializedTaskRef.current = { id: null, hash: null };
       return;
     }
+    
+    // In edit mode, reset initialization if task changed (ID changed or task object reference changed)
+    // This ensures we re-initialize when full task data loads after initial incomplete data
+    if (mode === 'edit' && task) {
+      const currentTaskId = task.id ? String(task.id) : null;
+      // Create a simple hash of key fields to detect if task data changed
+      const taskHash = task.id 
+        ? `${task.id}-${task.category_id || 'null'}-${task.priority_id || 'null'}-${task.status_id || 'null'}-${task.name || 'null'}`
+        : null;
+      
+      const last = lastInitializedTaskRef.current;
+      // Reset if ID changed OR if same ID but task data seems different (more complete)
+      if (currentTaskId && (last.id !== currentTaskId || (last.id === currentTaskId && last.hash !== taskHash))) {
+        formInitializedRef.current = false;
+      }
+    }
+    
     if (formInitializedRef.current) return;
     
     // Use setTimeout to defer initialization slightly so Sheet can start animating first
     const timer = setTimeout(() => {
       formInitializedRef.current = true;
+      if (mode === 'edit' && task?.id) {
+        const taskHash = `${task.id}-${task.category_id || 'null'}-${task.priority_id || 'null'}-${task.status_id || 'null'}-${task.name || 'null'}`;
+        lastInitializedTaskRef.current = { id: String(task.id), hash: taskHash };
+      }
 
       // Batch all state updates in a transition to not block render
       startTransition(() => {
@@ -51,24 +78,73 @@ export function useFormInitialization(params: any) {
       setCategoryId(task.category_id ? Number(task.category_id) : null);
       setPriorityId(task.priority_id ? Number(task.priority_id) : null);
       setSpotId(task.spot_id ? Number(task.spot_id) : null);
+      setAssetId?.(task.asset_id ? Number(task.asset_id) : null);
       setStatusId(task.status_id ? Number(task.status_id) : null);
       setTemplateId(task.template_id ? Number(task.template_id) : null);
       
-      // Extract date and time from start_date
+      // Extract date and time from start_date (avoid timezone conversion)
       if (task.start_date) {
-        const startDateObj = new Date(task.start_date);
-        setStartDate(startDateObj.toISOString().split('T')[0]);
-        setStartTime(startDateObj.toISOString().split('T')[1].substring(0, 5)); // HH:MM
+        if (typeof task.start_date === 'string') {
+          // Handle both 'T' and space separators, and strip timezone info
+          const normalized = task.start_date.replace(' ', 'T').replace(/[zZ]|[+\-]\d{2}:?\d{2}$/, '');
+          const [datePart, timePart] = normalized.split('T');
+          // Validate datePart is in expected format before setting
+          if (datePart && /^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+            setStartDate(datePart);
+            setStartTime(timePart?.substring(0, 5) || '');
+          } else {
+            Logger.warn('tasks', '[useFormInitialization] Invalid start_date format:', task.start_date);
+            setStartDate('');
+            setStartTime('');
+          }
+        } else {
+          const startDateObj = new Date(task.start_date);
+          if (!isNaN(startDateObj.getTime())) {
+            const year = startDateObj.getFullYear();
+            const month = String(startDateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(startDateObj.getDate()).padStart(2, '0');
+            setStartDate(`${year}-${month}-${day}`);
+            setStartTime(`${String(startDateObj.getHours()).padStart(2, '0')}:${String(startDateObj.getMinutes()).padStart(2, '0')}`);
+          } else {
+            Logger.warn('tasks', '[useFormInitialization] Invalid start_date object:', task.start_date);
+            setStartDate('');
+            setStartTime('');
+          }
+        }
       } else {
         setStartDate('');
         setStartTime('');
       }
       
-      // Extract date and time from due_date
+      // Extract date and time from due_date (avoid timezone conversion)
       if (task.due_date) {
-        const dueDateObj = new Date(task.due_date);
-        setDueDate(dueDateObj.toISOString().split('T')[0]);
-        setDueTime(dueDateObj.toISOString().split('T')[1].substring(0, 5)); // HH:MM
+        if (typeof task.due_date === 'string') {
+          // Handle both 'T' and space separators, and strip timezone info
+          const normalized = task.due_date.replace(' ', 'T').replace(/[zZ]|[+\-]\d{2}:?\d{2}$/, '');
+          const [datePart, timePart] = normalized.split('T');
+          // Validate datePart is in expected format before setting
+          if (datePart && /^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+            setDueDate(datePart);
+            setDueTime(timePart?.substring(0, 5) || '');
+          } else {
+            Logger.warn('tasks', '[useFormInitialization] Invalid due_date format:', task.due_date);
+            setDueDate('');
+            setDueTime('');
+          }
+        } else {
+          const dueDateObj = new Date(task.due_date);
+          if (!isNaN(dueDateObj.getTime())) {
+            const year = dueDateObj.getFullYear();
+            const month = String(dueDateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dueDateObj.getDate()).padStart(2, '0');
+            setDueDate(`${year}-${month}-${day}`);
+            setDueTime(`${String(dueDateObj.getHours()).padStart(2, '0')}:${String(dueDateObj.getMinutes()).padStart(2, '0')}`);
+          } else {
+            Logger.warn('tasks', '[useFormInitialization] Invalid due_date object:', task.due_date);
+            setDueDate('');
+            setDueTime('');
+          }
+        }
       } else {
         setDueDate('');
         setDueTime('');
@@ -88,7 +164,12 @@ export function useFormInitialization(params: any) {
       setSelectedTagIds(currentTaskTagIds);
     } else if (mode === 'create') {
       setDescription('');
-      setSpotId(null);
+      setSpotId(task?.spot_id ? Number(task.spot_id) : null);
+      setAssetId?.(task?.asset_id ? Number(task.asset_id) : null);
+      // Also initialize name from task prop if provided
+      if (task?.name) {
+        setName(task.name);
+      }
       // Use initial values from task prop if provided (e.g., from scheduler)
       let initialStartDate = '';
       let initialStartTime = '';
@@ -96,22 +177,54 @@ export function useFormInitialization(params: any) {
       let initialDueTime = '';
       
       if (task?.start_date) {
-        const startDateObj = new Date(task.start_date);
-        initialStartDate = startDateObj.toISOString().split('T')[0];
-        initialStartTime = startDateObj.toISOString().split('T')[1].substring(0, 5); // HH:MM
+        // Parse as string directly to avoid timezone conversion
+        if (typeof task.start_date === 'string') {
+          // Handle both 'T' and space separators, and strip timezone info
+          const normalized = task.start_date.replace(' ', 'T').replace(/[zZ]|[+\-]\d{2}:?\d{2}$/, '');
+          const [datePart, timePart] = normalized.split('T');
+          if (datePart && /^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+            initialStartDate = datePart;
+            initialStartTime = timePart?.substring(0, 5) || '';
+          }
+        } else {
+          const startDateObj = new Date(task.start_date);
+          if (!isNaN(startDateObj.getTime())) {
+            const year = startDateObj.getFullYear();
+            const month = String(startDateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(startDateObj.getDate()).padStart(2, '0');
+            initialStartDate = `${year}-${month}-${day}`;
+            initialStartTime = `${String(startDateObj.getHours()).padStart(2, '0')}:${String(startDateObj.getMinutes()).padStart(2, '0')}`;
+          }
+        }
       }
       
       if (task?.due_date) {
-        const dueDateObj = new Date(task.due_date);
-        initialDueDate = dueDateObj.toISOString().split('T')[0];
-        initialDueTime = dueDateObj.toISOString().split('T')[1].substring(0, 5); // HH:MM
+        // Parse as string directly to avoid timezone conversion
+        if (typeof task.due_date === 'string') {
+          // Handle both 'T' and space separators, and strip timezone info
+          const normalized = task.due_date.replace(' ', 'T').replace(/[zZ]|[+\-]\d{2}:?\d{2}$/, '');
+          const [datePart, timePart] = normalized.split('T');
+          if (datePart && /^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+            initialDueDate = datePart;
+            initialDueTime = timePart?.substring(0, 5) || '';
+          }
+        } else {
+          const dueDateObj = new Date(task.due_date);
+          if (!isNaN(dueDateObj.getTime())) {
+            const year = dueDateObj.getFullYear();
+            const month = String(dueDateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dueDateObj.getDate()).padStart(2, '0');
+            initialDueDate = `${year}-${month}-${day}`;
+            initialDueTime = `${String(dueDateObj.getHours()).padStart(2, '0')}:${String(dueDateObj.getMinutes()).padStart(2, '0')}`;
+          }
+        }
       }
       
       const initialUserIds = task?.user_ids && Array.isArray(task.user_ids) 
         ? task.user_ids.map((id: any) => Number(id)).filter((n: any) => Number.isFinite(n))
         : [];
       
-      console.log('[useFormInitialization] Create mode - initial data:', {
+      Logger.info('tasks', '[useFormInitialization] Create mode - initial data:', {
         startDate: initialStartDate,
         startTime: initialStartTime,
         userIds: initialUserIds,
@@ -127,7 +240,7 @@ export function useFormInitialization(params: any) {
       
       // CRITICAL: Set user IDs from scheduler click IMMEDIATELY
       if (initialUserIds.length > 0) {
-        console.log('[useFormInitialization] Setting initial user_ids from scheduler:', initialUserIds);
+        Logger.info('tasks', '[useFormInitialization] Setting initial user_ids from scheduler:', initialUserIds);
         setSelectedUserIds(initialUserIds);
       }
       
@@ -140,36 +253,12 @@ export function useFormInitialization(params: any) {
       setShowDescription(false);
       setSelectedTagIds([]);
       
-      const firstTemplate = workspaceTemplates[0];
-      if (firstTemplate) {
-        setTemplateId(firstTemplate.id);
-        setCategoryId(firstTemplate.category_id || null);
-        const tplPriority = firstTemplate.priority_id ?? firstTemplate.default_priority ?? null;
-        setPriorityId(tplPriority);
-        setName(firstTemplate.name || '');
-        setSlaId(firstTemplate.sla_id || null);
-        setApprovalId(firstTemplate.approval_id || null);
-        const spotsNotApplicable = firstTemplate.spots_not_applicable === true || firstTemplate.spots_not_applicable === 'true';
-        if (spotsNotApplicable) {
-          setSpotId(null);
-        } else if (firstTemplate.default_spot_id) {
-          setSpotId(firstTemplate.default_spot_id);
-        }
-        // Only use template default users if no initial users provided
-        if (initialUserIds.length === 0) {
-          const defaultsUsers = normalizeDefaultUserIds(firstTemplate.default_user_ids);
-          console.log('[useFormInitialization] No initial users, using template defaults:', defaultsUsers);
-          setSelectedUserIds(defaultsUsers);
-        } else {
-          console.log('[useFormInitialization] Keeping initial users from task prop:', initialUserIds);
-        }
-      } else {
-        setTemplateId(null);
-        setName('');
-        const defaultCategory = workspaceCategories[0];
-        setCategoryId(defaultCategory ? defaultCategory.id : null);
-        setPriorityId(null);
-      }
+      // Don't auto-select first template - let user search and select
+      setTemplateId(null);
+      setName('');
+      const defaultCategory = workspaceCategories[0];
+      setCategoryId(defaultCategory ? defaultCategory.id : null);
+      setPriorityId(null);
     } else if (mode === 'create-all') {
       setDescription('');
       setSpotId(null);

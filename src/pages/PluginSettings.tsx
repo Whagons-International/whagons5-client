@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
-import { getPluginsConfig, togglePluginEnabled, togglePluginPinned, subscribeToPluginsConfig, type PluginConfig } from '@/components/AppSidebar';
+import { getPluginsConfig, togglePluginPinned, subscribeToPluginsConfig, type PluginConfig } from '@/components/AppSidebar';
 import { Pin, PinOff, Save, Plus, Trash2 } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -580,18 +580,27 @@ function PluginSettings() {
 					'Ensure tools are maintained and returned on time'
 				]
 			},
+			'qr-codes': {
+				features: [
+					'Generate custom QR codes for any resource or location',
+					'Track scans with detailed analytics and timestamps',
+					'Support for multiple QR code types and formats',
+					'Bulk QR code generation and printing',
+					'Public and private QR code access controls'
+				],
+				benefits: [
+					'Streamline check-ins and asset identification',
+					'Gain insights into physical location traffic',
+					'Reduce manual data entry with instant scanning',
+					'Improve traceability across operations'
+				]
+			},
 		};
 
 		return detailsMap[pluginId] || { features: [], benefits: [] };
 	};
 
 	const pluginDetails = pluginId ? getPluginDetails(pluginId) : { features: [], benefits: [] };
-
-	const handleToggleEnabled = () => {
-		if (pluginId) {
-			togglePluginEnabled(pluginId);
-		}
-	};
 
 	const handleTogglePinned = () => {
 		if (pluginId) {
@@ -686,19 +695,6 @@ function PluginSettings() {
 					<CardContent className="space-y-6">
 						<div className="flex items-center justify-between">
 							<div className="space-y-0.5">
-								<div className="font-medium">{t('plugins.enabled', 'Enabled')}</div>
-								<div className="text-sm text-muted-foreground">
-									{t('plugins.enabledDescription', 'Show this plugin in the sidebar')}
-								</div>
-							</div>
-							<Switch
-								checked={currentPlugin.enabled}
-								onCheckedChange={handleToggleEnabled}
-							/>
-						</div>
-
-						<div className="flex items-center justify-between">
-							<div className="space-y-0.5">
 								<div className="font-medium flex items-center gap-2">
 									{currentPlugin.pinned ? <Pin className="h-4 w-4" /> : <PinOff className="h-4 w-4" />}
 									{t('plugins.visibleInSidebar', 'Visible in sidebar')}
@@ -710,7 +706,6 @@ function PluginSettings() {
 							<Switch
 								checked={currentPlugin.pinned}
 								onCheckedChange={handleTogglePinned}
-								disabled={!currentPlugin.enabled}
 							/>
 						</div>
 					</CardContent>
@@ -1095,8 +1090,8 @@ function PluginSettings() {
 								</div>
 								<div className="flex justify-between">
 									<span className="text-muted-foreground">{t('plugins.status', 'Status')}:</span>
-									<span className={`font-medium ${currentPlugin.enabled ? 'text-emerald-500' : 'text-muted-foreground'}`}>
-										{currentPlugin.enabled ? t('plugins.active', 'Active') : t('plugins.inactive', 'Inactive')}
+									<span className={`font-medium ${currentPlugin.pinned ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+										{currentPlugin.pinned ? t('plugins.active', 'Active') : t('plugins.inactive', 'Inactive')}
 									</span>
 								</div>
 							</div>

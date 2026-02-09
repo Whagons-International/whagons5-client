@@ -48,13 +48,13 @@ export const PresetThemesGrid = ({ selectedTheme, onThemeSelect, t }: PresetThem
                   className="flex-1 rounded-l-lg flex items-center justify-center text-[10px] font-medium text-white/80"
                   style={{ background: theme.light.gradient }}
                 >
-                  Light
+                  {t("settings.global.branding.presets.light", "Light")}
                 </div>
                 <div
                   className="flex-1 rounded-r-lg flex items-center justify-center text-[10px] font-medium text-white/80"
                   style={{ background: theme.dark.gradient }}
                 >
-                  Dark
+                  {t("settings.global.branding.presets.dark", "Dark")}
                 </div>
               </div>
               <div className="flex items-center justify-between">

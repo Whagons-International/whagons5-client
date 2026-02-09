@@ -18,6 +18,8 @@ export interface WorkspaceTableLookupsParams {
   categories: any[];
   templates: any[];
   forms: any[];
+  formVersions: any[];
+  taskForms: any[];
   statusTransitions: any[];
   slas: any[];
   tags: any[];
@@ -27,6 +29,8 @@ export interface WorkspaceTableLookupsParams {
   taskCustomFieldValues: any[];
   approvals: any[];
   taskApprovalInstances: any[];
+  roles: any[];
+  assetItems: any[];
   defaultCategoryId: number | null;
   workspaceNumericId: number | null;
   isAllWorkspaces: boolean;
@@ -47,6 +51,15 @@ export const useWorkspaceTableLookups = (p: WorkspaceTableLookupsParams) => {
   const priorityMap = useMemo(() => createPriorityMap(p.priorities), [p.priorities]);
   const spotMap = useMemo(() => createSpotMap(p.spots), [p.spots]);
   const userMap = useMemo(() => createUserMap(p.users), [p.users]);
+  
+  const assetMap = useMemo(() => {
+    const m: Record<number, any> = {};
+    for (const a of p.assetItems || []) {
+      const id = Number(a?.id);
+      if (Number.isFinite(id)) m[id] = a;
+    }
+    return m;
+  }, [p.assetItems]);
   const filteredPriorities = useMemo(
     () => createFilteredPriorities(p.priorities, p.defaultCategoryId),
     [p.priorities, p.defaultCategoryId]
@@ -72,6 +85,31 @@ export const useWorkspaceTableLookups = (p: WorkspaceTableLookupsParams) => {
     }
     return m;
   }, [p.forms]);
+
+  const formVersionMap = useMemo(() => {
+    const m: Record<number, any> = {};
+    for (const v of p.formVersions || []) {
+      const id = Number((v as any)?.id);
+      if (!Number.isFinite(id)) continue;
+      m[id] = v;
+    }
+    return m;
+  }, [p.formVersions]);
+
+  // Map task_id -> TaskForm (for form fill status)
+  const taskFormsMap = useMemo(() => {
+    const m = new Map<number, any>();
+    for (const tf of p.taskForms || []) {
+      const taskId = Number((tf as any)?.task_id);
+      if (!Number.isFinite(taskId)) continue;
+      // If multiple forms per task exist, keep the most recent one
+      const existing = m.get(taskId);
+      if (!existing || (tf as any).updated_at > existing.updated_at) {
+        m.set(taskId, tf);
+      }
+    }
+    return m;
+  }, [p.taskForms]);
 
   const taskTagsMap = useMemo(() => {
     const m = new Map<number, number[]>();
@@ -160,6 +198,15 @@ export const useWorkspaceTableLookups = (p: WorkspaceTableLookupsParams) => {
 
   const stableTaskApprovalInstances = useMemo(() => p.taskApprovalInstances, [p.taskApprovalInstances]);
 
+  const roleMap = useMemo(() => {
+    const m: Record<number, any> = {};
+    for (const r of p.roles || []) {
+      const id = Number((r as any).id);
+      if (Number.isFinite(id)) m[id] = r;
+    }
+    return m;
+  }, [p.roles]);
+
   return {
     slaMap,
     statusMap,
@@ -168,16 +215,20 @@ export const useWorkspaceTableLookups = (p: WorkspaceTableLookupsParams) => {
     priorityMap,
     spotMap,
     userMap,
+    assetMap,
     filteredPriorities,
     tagMap,
     templateMap,
     formMap,
+    formVersionMap,
+    taskFormsMap,
     taskTagsMap,
     categoryMap,
     workspaceCustomFields,
     taskCustomFieldValueMap,
     approvalMap,
     stableTaskApprovalInstances,
+    roleMap,
   };
 };
 

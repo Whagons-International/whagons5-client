@@ -22,9 +22,10 @@ import { useTaskDialogComputed } from './hooks/useTaskDialogComputed';
 import { useFormInitialization } from './hooks/useFormInitialization';
 import { useCustomFieldSync } from './hooks/useCustomFieldSync';
 import { useShareHandlers } from './hooks/useShareHandlers';
+import { useDialogLayout } from './hooks/useDialogLayout';
 import { useIconDefinition } from '../workspaceTable/columnUtils/icon';
 
-import { BasicTab, CustomFieldsTab, AdditionalTab, ShareTab } from './components';
+import { BasicTab, CustomFieldsTab, DateTimingTab, AdditionalInfoTab, ShareTab, DynamicTabContent } from './components';
 
 import {
   deserializeCustomFieldValue,
@@ -34,8 +35,10 @@ import {
 import { normalizeDefaultUserIds } from './utils/fieldHelpers';
 import type { TaskDialogProps } from './types';
 import { celebrateTaskCompletion } from '@/utils/confetti';
-import { createStatusMap } from '../workspaceTable/utils/mappers';
+import { combineLocalDateAndTime, formatLocalDateTime } from '@/features/scheduler/utils/dateTime';
+import { trackSelection, trackSelections } from '@/utils/taskCreationPreferences';
 
+import { Logger } from '@/utils/logger';
 type Props = TaskDialogProps & {
   clickTime?: number;
   perfEnabled?: boolean;
@@ -66,7 +69,7 @@ export default function TaskDialogContent({
     if (!perfEnabled || clickTime == null) return;
     const mountTime = performance.now();
     // eslint-disable-next-line no-console
-    console.log(`[PERF] TaskDialog: click→content-mount ${(mountTime - clickTime).toFixed(2)}ms`);
+    Logger.info('tasks', `[PERF] TaskDialog: click→content-mount ${(mountTime - clickTime).toFixed(2)}ms`);
   }, [perfEnabled, clickTime]);
 
   // Data and state hooks - must be unconditional (React rules)
@@ -79,7 +82,12 @@ export default function TaskDialogContent({
   const formState = useTaskFormState();
   const t3 = perfEnabled ? performance.now() : 0;
   markOnce('useTaskFormState', t2, t3);
-  const { categoryId, templateId, priorityId, activeTab, setActiveTab, formInitializedRef, startTime, dueTime } = formState;
+  const { categoryId, templateId, priorityId, activeTab, setActiveTab, formInitializedRef, startTime, dueTime, assetId } = formState;
+
+  // Detect if task is being created from scheduler (has start_date/due_date in create mode)
+  const isFromScheduler = useMemo(() => {
+    return mode === 'create' && task && (task.start_date || task.due_date);
+  }, [mode, task]);
 
   const [customFieldValues, setCustomFieldValues] = useState<Record<number, any>>({});
   const customFieldValuesRef = useRef<Record<number, any>>({});
@@ -187,6 +195,10 @@ export default function TaskDialogContent({
   const t17 = perfEnabled ? performance.now() : 0;
   markOnce('categoryFields-memo', t16, t17);
 
+  // Get dialog layout for the current category (for custom field/tab arrangement)
+  // When isFromScheduler is true, date fields are moved to basic tab automatically
+  const dialogLayout = useDialogLayout({ categoryId, isFromScheduler });
+
   const t18 = perfEnabled ? performance.now() : 0;
   const customFieldRequirementMissing = useMemo(() => {
     return categoryFields.some(({ assignment, field }: any) => {
@@ -242,6 +254,7 @@ export default function TaskDialogContent({
     setCategoryId: formState.setCategoryId,
     setPriorityId: formState.setPriorityId,
     setSpotId: formState.setSpotId,
+    setAssetId: formState.setAssetId,
     setStatusId: formState.setStatusId,
     setTemplateId: formState.setTemplateId,
     setStartDate: formState.setStartDate,
@@ -285,15 +298,16 @@ export default function TaskDialogContent({
   const t27 = perfEnabled ? performance.now() : 0;
   markOnce('useShareHandlers', t26, t27);
 
-  // Helper to combine date and time into ISO format
+  // Helper to combine date and time into an ISO string with timezone offset
   const combineDateAndTime = (date: string, time: string): string | null => {
     if (!date) return null;
-    if (time) {
-      // Combine date and time
-      return `${date}T${time}:00`;
+    const combined = combineLocalDateAndTime(date, time || '00:00');
+    // Validate the resulting date is valid before formatting
+    if (isNaN(combined.getTime())) {
+      Logger.warn('tasks', '[TaskDialog] Invalid date produced from:', { date, time });
+      return null;
     }
-    // If no time, use midnight
-    return `${date}T00:00:00`;
+    return formatLocalDateTime(combined);
   };
 
   const handleSubmit = async () => {
@@ -324,6 +338,8 @@ export default function TaskDialogContent({
               : [],
         };
         if (computed.spotsApplicable) updates.spot_id = formState.spotId;
+        // Include asset_id if set
+        if (assetId) updates.asset_id = assetId;
 
         await dispatch((await import('@/store/reducers/tasksSlice')).updateTaskAsync({ id: Number(task.id), updates })).unwrap();
 
@@ -359,6 +375,8 @@ export default function TaskDialogContent({
           if (taskTag) await dispatch(genericActions.taskTags.removeAsync(taskTag.id)).unwrap();
         }
         await syncTaskCustomFields(Number(task.id));
+        // Note: taskUsers pivot sync is handled by the backend PATCH endpoint
+        // (via Eloquent sync()). Changes propagate to frontend via WebSocket/RTL.
       } else {
         const payload: any = {
           name: formState.name.trim(),
@@ -383,13 +401,10 @@ export default function TaskDialogContent({
           user_ids: formState.selectedUserIds.filter((n) => Number.isFinite(n)),
         };
         if (computed.spotsApplicable) payload.spot_id = formState.spotId;
-
-        console.log('[TaskDialog] Creating task with payload:', JSON.stringify(payload, null, 2));
+        // Include asset_id if set (e.g., creating task from asset detail page)
+        if (assetId) payload.asset_id = assetId;
 
         const result = await dispatch((await import('@/store/reducers/tasksSlice')).addTaskAsync(payload)).unwrap();
-        
-        console.log('[TaskDialog] Task created successfully:', JSON.stringify(result, null, 2));
-        console.log('[TaskDialog] Task has start_date:', !!result?.start_date, 'user_ids:', result?.user_ids);
         const newTaskId = result?.id;
 
         if (mode === 'create' && newTaskId && formState.selectedTagIds.length > 0) {
@@ -398,6 +413,21 @@ export default function TaskDialogContent({
           }
         }
         if (newTaskId) await syncTaskCustomFields(Number(newTaskId));
+        // Note: taskUsers pivot rows are created by the backend (via Eloquent sync()).
+        // Changes propagate to frontend via WebSocket/RTL.
+
+        // Track selections for recent history (only on successful create)
+        if (computed.workspaceId) {
+          if (templateId) trackSelection(computed.workspaceId, 'templates', templateId);
+          if (categoryId) trackSelection(computed.workspaceId, 'categories', categoryId);
+          if (formState.spotId) trackSelection(computed.workspaceId, 'spots', formState.spotId);
+          if (formState.selectedUserIds.length > 0) {
+            trackSelections(computed.workspaceId, 'users', formState.selectedUserIds);
+          }
+          if (formState.selectedTagIds.length > 0) {
+            trackSelections(computed.workspaceId, 'tags', formState.selectedTagIds);
+          }
+        }
       }
 
       onOpenChange(false);
@@ -417,19 +447,9 @@ export default function TaskDialogContent({
   // Capture initial user_ids when dialog opens (from scheduler or other source)
   useEffect(() => {
     if (open && mode === 'create') {
-      console.log('[TaskDialog] Dialog opened with task prop:', {
-        task,
-        user_ids: task?.user_ids,
-        user_ids_type: typeof task?.user_ids,
-        is_array: Array.isArray(task?.user_ids),
-        user_ids_length: task?.user_ids?.length,
-      });
-      
       if (task?.user_ids && Array.isArray(task.user_ids)) {
         initialUserIdsRef.current = task.user_ids.map((id: any) => Number(id)).filter((n: any) => Number.isFinite(n));
-        console.log('[TaskDialog] Captured initial user_ids:', initialUserIdsRef.current);
       } else {
-        console.warn('[TaskDialog] No valid user_ids in task prop!');
         initialUserIdsRef.current = [];
       }
     } else if (!open) {
@@ -515,9 +535,7 @@ export default function TaskDialogContent({
       if (!hasInitialUsers) {
         const defaultsUsers = normalizeDefaultUserIds(t.default_user_ids);
         formState.setSelectedUserIds(defaultsUsers.length > 0 ? defaultsUsers : []);
-        console.log('[TaskDialog] Applied template default users:', defaultsUsers);
       } else {
-        console.log('[TaskDialog] Preserving initial user_ids from ref:', initialUserIdsRef.current);
         // Make sure the users are still set (in case template changed before form init completed)
         formState.setSelectedUserIds(initialUserIdsRef.current);
       }
@@ -540,14 +558,16 @@ export default function TaskDialogContent({
     setCustomFieldValues((prev) => ({ ...prev, [fieldId]: value }));
   };
 
-  if (mode === 'edit' && !task) return null;
-
+  // Performance logging effect - must be before early return to follow React hooks rules
   useEffect(() => {
     if (!perfEnabled || clickTime == null) return;
     const now = performance.now();
     // eslint-disable-next-line no-console
-    console.log(`[PERF] TaskDialog: click→content-ready ${(now - clickTime).toFixed(2)}ms`, perfRef.current.marks);
+    Logger.info('tasks', `[PERF] TaskDialog: click→content-ready ${(now - clickTime).toFixed(2)}ms`, perfRef.current.marks);
   }, [perfEnabled, clickTime]);
+
+  // Early return MUST be after all hooks
+  if (mode === 'edit' && !task) return null;
 
   return (
     <>
@@ -597,6 +617,14 @@ export default function TaskDialogContent({
                   )}
                 </TabsTrigger>
               )}
+              {!isFromScheduler && (
+                <TabsTrigger
+                  value="dateTiming"
+                  className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none transition-all duration-150 ease-in-out"
+                >
+                  {t('taskDialog.dateTiming', 'Date & Timing')}
+                </TabsTrigger>
+              )}
               <TabsTrigger
                 value="additional"
                 className="px-0 py-3 mr-4 sm:mr-8 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none transition-all duration-150 ease-in-out"
@@ -613,7 +641,7 @@ export default function TaskDialogContent({
               )}
             </TabsList>
 
-            <TabsContent value="basic" className="mt-0 pt-4 sm:pt-6 pb-6 data-[state=inactive]:hidden">
+            <TabsContent value="basic" className="mt-0 pt-4 sm:pt-6 pb-8 data-[state=inactive]:hidden">
               <BasicTab
                 {...{
                   mode,
@@ -646,6 +674,28 @@ export default function TaskDialogContent({
                   categoryPriorities: computed.categoryPriorities,
                   priorityId,
                   setPriorityId: formState.setPriorityId,
+                  // Tags
+                  tags: data.tags,
+                  selectedTagIds: formState.selectedTagIds,
+                  setSelectedTagIds: formState.setSelectedTagIds,
+                  // Assets
+                  assetItems: data.assetItems,
+                  assetTypes: data.assetTypes,
+                  assetId,
+                  setAssetId: formState.setAssetId,
+                  // Date and recurrence fields for scheduler
+                  isFromScheduler,
+                  startDate: formState.startDate,
+                  setStartDate: formState.setStartDate,
+                  startTime,
+                  setStartTime: formState.setStartTime,
+                  dueDate: formState.dueDate,
+                  setDueDate: formState.setDueDate,
+                  dueTime,
+                  setDueTime: formState.setDueTime,
+                  recurrenceSettings: formState.recurrenceSettings,
+                  setRecurrenceSettings: formState.setRecurrenceSettings,
+                  isExistingRecurringTask: mode === 'edit' && task?.recurrence_id != null,
                 }}
               />
             </TabsContent>
@@ -661,22 +711,34 @@ export default function TaskDialogContent({
               </TabsContent>
             )}
 
+            {!isFromScheduler && (
+              <TabsContent value="dateTiming" className="mt-0 pt-4 sm:pt-6 pb-6 data-[state=inactive]:hidden">
+                <DateTimingTab
+                  mode={mode}
+                  startDate={formState.startDate}
+                  setStartDate={formState.setStartDate}
+                  startTime={startTime}
+                  setStartTime={formState.setStartTime}
+                  dueDate={formState.dueDate}
+                  setDueDate={formState.setDueDate}
+                  dueTime={dueTime}
+                  setDueTime={formState.setDueTime}
+                  recurrenceSettings={formState.recurrenceSettings}
+                  setRecurrenceSettings={formState.setRecurrenceSettings}
+                  isExistingRecurringTask={mode === 'edit' && task?.recurrence_id != null}
+                  isFromScheduler={isFromScheduler}
+                />
+              </TabsContent>
+            )}
+
             <TabsContent value="additional" className="mt-0 pt-4 sm:pt-6 pb-6 data-[state=inactive]:hidden">
-              <AdditionalTab
-                mode={mode}
-                tags={data.tags}
-                selectedTagIds={formState.selectedTagIds}
-                setSelectedTagIds={formState.setSelectedTagIds}
+              <AdditionalInfoTab
                 slas={data.slas}
                 slaId={formState.slaId}
                 setSlaId={formState.setSlaId}
                 approvals={data.approvals}
                 approvalId={formState.approvalId}
                 setApprovalId={formState.setApprovalId}
-                startDate={formState.startDate}
-                setStartDate={formState.setStartDate}
-                dueDate={formState.dueDate}
-                setDueDate={formState.setDueDate}
               />
             </TabsContent>
 
@@ -740,6 +802,9 @@ export default function TaskDialogContent({
                 : t('task.createTask', 'Create Task')}
           </Button>
         </div>
+        {mode === 'edit' && task?.id && (
+          <p className="text-[11px] text-muted-foreground/50 text-center mt-2 select-all">ID: {task.id}</p>
+        )}
       </div>
     </>
   );

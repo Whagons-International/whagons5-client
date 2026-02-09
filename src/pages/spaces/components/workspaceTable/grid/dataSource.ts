@@ -2,7 +2,8 @@
 
 import type React from 'react';
 
-const DEFAULT_SORT = [{ colId: 'created_at', sort: 'desc' }];
+import { Logger } from '@/utils/logger';
+const DEFAULT_SORT = [{ colId: 'id', sort: 'desc' }];
 const getSort = (s?: any[]) => Array.isArray(s) && s.length > 0 ? s : DEFAULT_SORT;
 const buildParams = (wr: React.MutableRefObject<string>, sm: any, pm: any, spm: any, um: any, tm: any, tt: any) => {
   const p: any = { __statusMap: sm.current, __priorityMap: pm.current, __spotMap: spm.current, __userMap: um.current, __tagMap: tm.current, __taskTags: tt.current };
@@ -12,7 +13,7 @@ const buildParams = (wr: React.MutableRefObject<string>, sm: any, pm: any, spm: 
 };
 
 export function buildGetRows(TasksCache: any, refs: any) {
-  const { rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, externalFilterModelRef, normalizeFilterModelForQuery, setEmptyOverlayVisible } = refs;
+  const { rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, externalFilterModelRef, normalizeFilterModelForQuery, setEmptyOverlayVisible, spotVisibilityFilterRef } = refs;
   return async (params: any) => {
     const sortModel = getSort(params.sortModel);
     const cacheKey = `${workspaceRef.current}-${params.startRow}-${params.endRow}-${JSON.stringify(params.filterModel || {})}-${JSON.stringify(sortModel)}-${searchRef.current}`;
@@ -59,9 +60,9 @@ export function buildGetRows(TasksCache: any, refs: any) {
       normalized.filterModel = Object.keys(mergedFm).length > 0 ? normalizeFilterModelForQuery(mergedFm) : undefined;
       try {
         if (localStorage.getItem('wh-debug-filters') === 'true') {
-          console.log('[WT getRows] merged filter=', JSON.stringify(mergedFm, null, 2));
-          console.log('[WT getRows] normalized filterModel=', JSON.stringify(normalized.filterModel, null, 2));
-          console.log('[WT getRows] search=', searchRef.current, 'ws=', workspaceRef.current);
+          Logger.info('workspaces', '[WT getRows] merged filter=', JSON.stringify(mergedFm, null, 2));
+          Logger.info('workspaces', '[WT getRows] normalized filterModel=', JSON.stringify(normalized.filterModel, null, 2));
+          Logger.info('workspaces', '[WT getRows] search=', searchRef.current, 'ws=', workspaceRef.current);
         }
       } catch {}
       const queryParams: any = {
@@ -72,14 +73,19 @@ export function buildGetRows(TasksCache: any, refs: any) {
       };
 
       const result = await TasksCache.queryTasks(queryParams);
-      const rows = result?.rows || [];
+      let rows = result?.rows || [];
+      // Apply spot-based visibility filter (belt-and-suspenders with backend filtering)
+      if (spotVisibilityFilterRef?.current) {
+        rows = rows.filter(spotVisibilityFilterRef.current);
+      }
+      // Use the total row count from the query result, not the filtered page length
       const total = result?.rowCount || 0;
-      try { if (localStorage.getItem('wh-debug-filters') === 'true') console.log('[WT getRows] result rows=', rows.length, 'total=', total); } catch {}
+      try { if (localStorage.getItem('wh-debug-filters') === 'true') Logger.info('workspaces', '[WT getRows] result rows=', rows.length, 'total=', total); } catch {}
       rowCache.current.set(cacheKey, { rows, rowCount: total });
       try { setEmptyOverlayVisible?.(total === 0); } catch {}
       params.successCallback(rows, total);
     } catch (error) {
-      console.error('Error querying local tasks cache:', error);
+      Logger.error('workspaces', 'Error querying local tasks cache:', error);
       try { setEmptyOverlayVisible?.(false); } catch {}
       params.failCallback();
     }
@@ -87,16 +93,22 @@ export function buildGetRows(TasksCache: any, refs: any) {
 }
 
 export async function refreshClientSideGrid(gridApi: any, TasksCache: any, params: any) {
-  const { search, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, sortModel } = params;
+  const { search, workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, sortModel, spotVisibilityFilterRef } = params;
   const baseParams: any = { search, ...buildParams(workspaceRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef) };
   const effectiveSortModel = getSort(sortModel);
 
   const countResp = await TasksCache.queryTasks({ ...baseParams, sortModel: effectiveSortModel, startRow: 0, endRow: 0 });
   const totalFiltered = countResp?.rowCount ?? 0;
   const rowsResp = await TasksCache.queryTasks({ ...baseParams, sortModel: effectiveSortModel, startRow: 0, endRow: totalFiltered });
-  const rows = rowsResp?.rows || [];
+  let rows = rowsResp?.rows || [];
+  // Apply spot-based visibility filter
+  if (spotVisibilityFilterRef?.current) {
+    rows = rows.filter(spotVisibilityFilterRef.current);
+  }
   try {
-    gridApi?.setGridOption?.('rowData', rows);
+    if (gridApi && !gridApi.isDestroyed?.()) {
+      gridApi.setGridOption?.('rowData', rows);
+    }
   } catch {
     // ignore
   }

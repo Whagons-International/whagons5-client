@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { actionsApi } from '@/api/whagonsActionsApi';
@@ -11,18 +11,34 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DialogClose } from '@/components/ui/dialog';
-import { User as UserIcon, Camera, Save, X, Loader2, Mail, Calendar, UserCheck, Users, Shield, Cake, Phone, Sparkles, Heart, Plus } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { User as UserIcon, Camera, Save, X, Loader2, Mail, Calendar, UserCheck, Users, Shield, Cake, Phone, Sparkles, Heart, Plus, Bell, BellOff, Check } from 'lucide-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUpload, faXmark, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { uploadImageAsset, getAssetDisplayUrl, createImagePreview } from '@/lib/assetHelpers';
 import { ImageCropper } from '@/components/ImageCropper';
-import { RootState } from '@/store/store';
-import { UserTeam, Team } from '@/store/types';
+import { RootState, AppDispatch } from '@/store/store';
+import { UserTeam, Team, Role } from '@/store/types';
+import { UrlTabs } from '@/components/ui/url-tabs';
+import { 
+  fetchNotificationPreferences, 
+  updateNotificationPreferences,
+  type NotificationPreferences 
+} from '@/store/reducers/notificationPreferencesSlice';
+import { isFCMReady, isTokenRegistered } from '@/firebase/fcmHelper';
 
+import { Logger } from '@/utils/logger';
+import { getVersionInfo } from '@/utils/version';
+import { Info, Trash2, RefreshCw, Terminal } from 'lucide-react';
+import { DB } from '@/store/indexedDB/DB';
+import { DataManager } from '@/store/DataManager';
+import { auth } from '@/firebase/firebaseConfig';
+import { activateTempAdmin, isTempAdminActive, getTempAdminRemainingMs } from '@/hooks/useSuperAdmin';
+import toast from 'react-hot-toast';
 // Helper functions to get translated arrays
 const getMonths = (t: (key: string, fallback?: string) => string) => [
     { value: 1, label: t('profile.months.january', 'January') },
@@ -120,16 +136,37 @@ interface ExtendedUser {
     [key: string]: any;
 }
 
+const defaultPreferences: NotificationPreferences = {
+  broadcasts: true,
+  task_assignments: true,
+  task_mentions: true,
+  task_comments: true,
+  task_status_changes: true,
+  messages: true,
+  approval_requests: true,
+  approval_decisions: true,
+  sla_alerts: true,
+  workflow_notifications: true,
+};
+
 function Profile() {
     const { t } = useLanguage();
+    const dispatch = useDispatch<AppDispatch>();
     const { user: userData, userLoading, refetchUser } = useAuth();
     // Keep previous userData to prevent blank screen during refetch
     const [previousUserData, setPreviousUserData] = useState<ExtendedUser | null>(userData ? (userData as unknown as ExtendedUser) : null);
     const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
     const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[]; loading: boolean };
+    const { value: roles } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
     const [error, setError] = useState<string | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [saving, setSaving] = useState(false);
+    
+    // Notification preferences state
+    const { preferences: notificationPreferences, loading: notificationLoading, saving: notificationSaving } = useSelector((state: RootState) => state.notificationPreferences);
+    const [localNotificationPreferences, setLocalNotificationPreferences] = useState<NotificationPreferences>(notificationPreferences);
+    const [hasNotificationChanges, setHasNotificationChanges] = useState(false);
+    const [fcmEnabled, setFcmEnabled] = useState(false);
     
     // Update previousUserData when userData changes, but keep it if userData becomes null during loading
     useEffect(() => {
@@ -157,10 +194,226 @@ function Profile() {
     const [showCropper, setShowCropper] = useState(false);
     const [imageToCrop, setImageToCrop] = useState<string | null>(null);
     const [originalFile, setOriginalFile] = useState<File | null>(null);
+    
+    // Clear cache state
+    const [clearingCache, setClearingCache] = useState(false);
     const [newHobby, setNewHobby] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
+    
+    // Dev mode / Super admin activation state
+    const [hashClickCount, setHashClickCount] = useState(0);
+    const [devModeActive, setDevModeActive] = useState(false);
+    const [devModeExpiry, setDevModeExpiry] = useState<number | null>(null);
+    const [keySequence, setKeySequence] = useState('');
+    const [showSecretInput, setShowSecretInput] = useState(false);
+    const [secretInput, setSecretInput] = useState('');
+    const [secretError, setSecretError] = useState<string | null>(null);
+    const lastClickTime = useRef<number>(0);
 
     // DataManager handles data loading, no need to call internal functions here
+
+    // Load notification preferences on mount
+    useEffect(() => {
+        dispatch(fetchNotificationPreferences());
+        checkFCMStatus();
+    }, [dispatch]);
+
+    // Sync local notification preferences with Redux state
+    useEffect(() => {
+        setLocalNotificationPreferences(notificationPreferences);
+        setHasNotificationChanges(false);
+    }, [notificationPreferences]);
+
+    const checkFCMStatus = async () => {
+        const isReady = await isFCMReady();
+        const isRegistered = isTokenRegistered();
+        setFcmEnabled(isReady && isRegistered);
+    };
+
+    // Dev mode activation - Step 1: Click hash 10 times quickly
+    const handleHashClick = () => {
+        const now = Date.now();
+        // Reset if more than 500ms between clicks
+        if (now - lastClickTime.current > 500) {
+            setHashClickCount(1);
+        } else {
+            setHashClickCount(prev => prev + 1);
+        }
+        lastClickTime.current = now;
+        
+        if (hashClickCount + 1 >= 10) {
+            // Activate dev mode for 15 minutes
+            const expiry = Date.now() + 15 * 60 * 1000;
+            setDevModeActive(true);
+            setDevModeExpiry(expiry);
+            setHashClickCount(0);
+            toast.success('Dev mode on for 15 minutes. Ctrl+Alt+T then type "techsupport"', { duration: 5000 });
+            
+            // Auto-deactivate after 15 minutes
+            setTimeout(() => {
+                setDevModeActive(false);
+                setDevModeExpiry(null);
+                toast('Dev mode expired', { icon: 'ℹ️' });
+            }, 15 * 60 * 1000);
+        }
+    };
+    
+    // Dev mode activation - Step 2: Keyboard shortcut Ctrl+Shift+K then type "techsupport"
+    useEffect(() => {
+        if (!devModeActive) {
+            setKeySequence('');
+            return;
+        }
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Check for Ctrl+Alt+T to start the sequence
+            if (e.ctrlKey && e.altKey && e.key === 't') {
+                e.preventDefault();
+                setKeySequence('');
+                toast('Enter sequence...', { duration: 2000, icon: '🔑' });
+                return;
+            }
+            
+            // If we're in typing mode, capture letters
+            if (keySequence !== null && e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+                const newSequence = keySequence + e.key.toLowerCase();
+                setKeySequence(newSequence);
+                
+                // Check if sequence matches
+                if (newSequence === 'techsupport') {
+                    setShowSecretInput(true);
+                    setKeySequence('');
+                    toast.dismiss();
+                } else if (!'techsupport'.startsWith(newSequence)) {
+                    // Wrong sequence, reset
+                    setKeySequence('');
+                }
+            }
+        };
+        
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [devModeActive, keySequence]);
+    
+    // Handle secret submission
+    const handleSecretSubmit = async () => {
+        if (!secretInput.trim()) {
+            setSecretError('Please enter the secret');
+            return;
+        }
+        
+        const success = await activateTempAdmin(secretInput);
+        if (success) {
+            setShowSecretInput(false);
+            setSecretInput('');
+            setSecretError(null);
+            setDevModeActive(false);
+            toast.success('Super admin mode activated for 15 minutes', { duration: 5000 });
+        } else {
+            setSecretError('Invalid secret');
+        }
+    };
+
+    const handleNotificationToggle = (key: keyof NotificationPreferences) => {
+        const updated = {
+            ...localNotificationPreferences,
+            [key]: !localNotificationPreferences[key]
+        };
+        setLocalNotificationPreferences(updated);
+        setHasNotificationChanges(true);
+    };
+
+    const handleEnableAllNotifications = () => {
+        const allEnabled = Object.keys(defaultPreferences).reduce((acc, key) => ({
+            ...acc,
+            [key]: true
+        }), {} as NotificationPreferences);
+        
+        setLocalNotificationPreferences(allEnabled);
+        setHasNotificationChanges(true);
+    };
+
+    const handleDisableAllNotifications = () => {
+        const allDisabled = Object.keys(defaultPreferences).reduce((acc, key) => ({
+            ...acc,
+            [key]: false
+        }), {} as NotificationPreferences);
+        
+        setLocalNotificationPreferences(allDisabled);
+        setHasNotificationChanges(true);
+    };
+
+    const handleSaveNotifications = () => {
+        dispatch(updateNotificationPreferences(localNotificationPreferences));
+    };
+
+    const handleCancelNotifications = () => {
+        setLocalNotificationPreferences(notificationPreferences);
+        setHasNotificationChanges(false);
+    };
+
+    const notificationTypes = [
+        {
+            key: 'broadcasts' as keyof NotificationPreferences,
+            label: t('notifications.broadcasts.label'),
+            description: t('notifications.broadcasts.description'),
+            icon: '📢'
+        },
+        {
+            key: 'task_assignments' as keyof NotificationPreferences,
+            label: t('notifications.task_assignments.label'),
+            description: t('notifications.task_assignments.description'),
+            icon: '📋'
+        },
+        {
+            key: 'task_mentions' as keyof NotificationPreferences,
+            label: t('notifications.task_mentions.label'),
+            description: t('notifications.task_mentions.description'),
+            icon: '@'
+        },
+        {
+            key: 'task_comments' as keyof NotificationPreferences,
+            label: t('notifications.task_comments.label'),
+            description: t('notifications.task_comments.description'),
+            icon: '💬'
+        },
+        {
+            key: 'task_status_changes' as keyof NotificationPreferences,
+            label: t('notifications.task_status_changes.label'),
+            description: t('notifications.task_status_changes.description'),
+            icon: '🔄'
+        },
+        {
+            key: 'messages' as keyof NotificationPreferences,
+            label: t('notifications.messages.label'),
+            description: t('notifications.messages.description'),
+            icon: '✉️'
+        },
+        {
+            key: 'approval_requests' as keyof NotificationPreferences,
+            label: t('notifications.approval_requests.label'),
+            description: t('notifications.approval_requests.description'),
+            icon: '✅'
+        },
+        {
+            key: 'approval_decisions' as keyof NotificationPreferences,
+            label: t('notifications.approval_decisions.label'),
+            description: t('notifications.approval_decisions.description'),
+            icon: '⚖️'
+        },
+        {
+            key: 'sla_alerts' as keyof NotificationPreferences,
+            label: t('notifications.sla_alerts.label'),
+            description: t('notifications.sla_alerts.description'),
+            icon: '⏰'
+        },
+        {
+            key: 'workflow_notifications' as keyof NotificationPreferences,
+            label: t('notifications.workflow_notifications.label'),
+            description: t('notifications.workflow_notifications.description'),
+            icon: '⚙️'
+        },
+    ];
 
     // Initialize form when user data is available
     useEffect(() => {
@@ -193,7 +446,7 @@ function Profile() {
                     setPreviewImage(null);
                 }
             } catch (error) {
-                console.error('Error initializing form:', error);
+                Logger.error('profile', 'Error initializing form:', error);
                 setError(t('profile.failedToLoad', 'Failed to load profile data'));
             }
         }
@@ -321,6 +574,43 @@ function Profile() {
         }
     };
 
+    // Handle clear cache and resync
+    const handleClearCache = async () => {
+        setClearingCache(true);
+        try {
+            const uid = auth.currentUser?.uid;
+            
+            // 1. Clear sessionStorage
+            sessionStorage.clear();
+            Logger.info('cache', 'Cleared sessionStorage');
+            
+            // 2. Clear localStorage (except auth-critical keys)
+            const keysToKeep = ['whagons-subdomain', 'firebase:'];
+            const keysToRemove: string[] = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && !keysToKeep.some(keep => key.startsWith(keep))) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+            Logger.info('cache', `Cleared ${keysToRemove.length} localStorage keys`);
+            
+            // 3. Delete IndexedDB
+            if (uid) {
+                await DB.deleteDatabase(uid);
+                Logger.info('cache', 'Deleted IndexedDB');
+            }
+            
+            // 4. Reload page - sync will happen automatically on reload
+            Logger.info('cache', 'Cache cleared, reloading page');
+            window.location.reload();
+        } catch (error) {
+            Logger.error('cache', 'Error clearing cache:', error);
+            setClearingCache(false);
+        }
+    };
+
     // Handle profile update
     const handleSaveProfile = async () => {
         try {
@@ -340,15 +630,15 @@ function Profile() {
             const response = await actionsApi.patch('/users/me', payload);
             
             if (response.status === 200) {
-                console.log('Profile: Saving profile with url_picture:', editForm.url_picture);
+                Logger.info('profile', 'Profile: Saving profile with url_picture:', editForm.url_picture);
                 
                 // Clear avatar cache BEFORE refreshing to ensure fresh image loads
                 const { AvatarCache } = await import('@/store/indexedDB/AvatarCache');
                 const firebaseUser = (window as any).firebase?.auth?.currentUser;
                 if (firebaseUser?.uid && displayUserData?.id) {
-                    console.log('Profile: Clearing cache for', [firebaseUser.uid, displayUserData.google_uuid, displayUserData.id]);
+                    Logger.info('profile', 'Profile: Clearing cache for', [firebaseUser.uid, displayUserData.google_uuid, displayUserData.id]);
                     await AvatarCache.deleteByAny([firebaseUser.uid, displayUserData.google_uuid, displayUserData.id]);
-                    console.log('Profile: Cache cleared');
+                    Logger.info('profile', 'Profile: Cache cleared');
                 }
                 
                 // Notify other components (like header) that profile was updated WITH THE NEW URL
@@ -359,7 +649,7 @@ function Profile() {
                         url_picture: editForm.url_picture 
                     }
                 }));
-                console.log('Profile: Dispatched profileUpdated event with url_picture:', editForm.url_picture);
+                Logger.info('profile', 'Profile: Dispatched profileUpdated event with url_picture:', editForm.url_picture);
                 
                 // Close dialog immediately to prevent blank screen during refetch
                 setIsEditing(false);
@@ -367,16 +657,16 @@ function Profile() {
                 // Refresh user data in the background (non-blocking)
                 // This prevents the blank screen flash since dialog is already closed
                 refetchUser().then(() => {
-                    console.log('Profile: User data refetched');
+                    Logger.info('profile', 'Profile: User data refetched');
                 }).catch((err) => {
-                    console.error('Error refetching user:', err);
+                    Logger.error('profile', 'Error refetching user:', err);
                 });
                 
                 // Also set localStorage for cross-tab communication
                 localStorage.setItem('profile_updated', Date.now().toString());
             }
         } catch (err: any) {
-            console.error('Error updating profile:', err);
+            Logger.error('profile', 'Error updating profile:', err);
             // Extract error message from API response if available
             const errorMessage = err?.response?.data?.message || 
                                 err?.response?.data?.errors?.zodiac_sign?.[0] ||
@@ -469,22 +759,32 @@ function Profile() {
             // Extract role info from userData if teams are loaded with role info
             let role: { id: number; name: string; description: string | null } | null = null;
             if (ut.role_id) {
-                // Check if role info comes with userData teams (userData might have teams array with role_id)
-                const userDataTyped = userData ? (userData as unknown as ExtendedUser) : null;
-                const teamFromUserData = userDataTyped?.teams?.find((t) => t.id === ut.team_id);
-                if (teamFromUserData?.role_id === ut.role_id && teamFromUserData?.role_name) {
+                // First, try to look up role from Redux roles state
+                const roleFromStore = roles.find((r: Role) => r.id === ut.role_id);
+                if (roleFromStore) {
                     role = {
-                        id: ut.role_id,
-                        name: teamFromUserData.role_name,
-                        description: null
+                        id: roleFromStore.id,
+                        name: roleFromStore.name,
+                        description: roleFromStore.description || null
                     };
                 } else {
-                    // Fallback to showing role_id
-                    role = {
-                        id: ut.role_id,
-                        name: `Role #${ut.role_id}`,
-                        description: null
-                    };
+                    // Fallback: Check if role info comes with userData teams
+                    const userDataTyped = userData ? (userData as unknown as ExtendedUser) : null;
+                    const teamFromUserData = userDataTyped?.teams?.find((t) => t.id === ut.team_id);
+                    if (teamFromUserData?.role_id === ut.role_id && teamFromUserData?.role_name) {
+                        role = {
+                            id: ut.role_id,
+                            name: teamFromUserData.role_name,
+                            description: null
+                        };
+                    } else {
+                        // Final fallback to showing role_id
+                        role = {
+                            id: ut.role_id,
+                            name: `Role #${ut.role_id}`,
+                            description: null
+                        };
+                    }
                 }
             }
             
@@ -565,10 +865,14 @@ function Profile() {
         return null;
     }
 
-    return (
-        <div className="container mx-auto p-6 max-w-6xl space-y-6">
-            {/* Profile Header Card */}
-            <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 border-none shadow-lg">
+    const profileTabs = [
+        {
+            value: 'profile',
+            label: t('profile.tabs.profile', 'Profile'),
+            content: (
+                <div className="space-y-6">
+                    {/* Profile Header Card */}
+                    <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 border-none shadow-lg">
                 <CardContent className="p-8">
                     <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
                         <Avatar className="w-32 h-32 border-4 border-white dark:border-gray-700 shadow-xl">
@@ -1143,24 +1447,309 @@ function Profile() {
                 </DialogContent>
             </Dialog>
 
-            {/* Image Cropper Dialog */}
-            {imageToCrop && (
-                <ImageCropper
-                    image={imageToCrop}
-                    open={showCropper}
-                    onClose={() => {
-                        setShowCropper(false);
-                        setImageToCrop(null);
-                        setOriginalFile(null);
-                        if (fileInputRef.current) {
-                            fileInputRef.current.value = '';
-                        }
-                    }}
-                    onCropComplete={handleCropComplete}
-                    aspect={1}
-                    circularCrop={true}
-                />
-            )}
+                    {/* Image Cropper Dialog */}
+                    {imageToCrop && (
+                        <ImageCropper
+                            image={imageToCrop}
+                            open={showCropper}
+                            onClose={() => {
+                                setShowCropper(false);
+                                setImageToCrop(null);
+                                setOriginalFile(null);
+                                if (fileInputRef.current) {
+                                    fileInputRef.current.value = '';
+                                }
+                            }}
+                            onCropComplete={handleCropComplete}
+                            aspect={1}
+                            circularCrop={true}
+                        />
+                    )}
+                </div>
+            )
+        },
+        {
+            value: 'notifications',
+            label: t('profile.tabs.notifications', 'Notifications'),
+            content: (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-2xl font-bold">{t('profile.notificationPreferences', 'Notification Preferences')}</h2>
+                            <p className="text-muted-foreground mt-2">
+                                {t('profile.chooseNotifications', 'Choose which notifications you want to receive')}
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {fcmEnabled ? (
+                                <Badge variant="default" className="gap-1">
+                                    <Bell className="w-3 h-3" />
+                                    {t('profile.enabled', 'Enabled')}
+                                </Badge>
+                            ) : (
+                                <Badge variant="secondary" className="gap-1">
+                                    <BellOff className="w-3 h-3" />
+                                    {t('profile.disabled', 'Disabled')}
+                                </Badge>
+                            )}
+                        </div>
+                    </div>
+
+                    {!fcmEnabled && (
+                        <Card className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/10">
+                            <CardHeader>
+                                <CardTitle className="text-yellow-700 dark:text-yellow-500 flex items-center gap-2">
+                                    <BellOff className="w-5 h-5" />
+                                    {t('profile.pushNotificationsDisabled', 'Push Notifications Disabled')}
+                                </CardTitle>
+                                <CardDescription className="text-yellow-600 dark:text-yellow-400">
+                                    {t('profile.pushNotificationsDisabledDescription', "You haven't enabled push notifications. You can still configure your preferences, but you won't receive push notifications until you grant permission in your browser.")}
+                                </CardDescription>
+                            </CardHeader>
+                        </Card>
+                    )}
+
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle>{t('profile.notificationTypes', 'Notification Types')}</CardTitle>
+                                    <CardDescription>
+                                        {t('profile.enableDisableNotifications', 'Enable or disable specific types of notifications')}
+                                    </CardDescription>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleEnableAllNotifications}
+                                        disabled={notificationSaving}
+                                    >
+                                        {t('profile.enableAll', 'Enable All')}
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleDisableAllNotifications}
+                                        disabled={notificationSaving}
+                                    >
+                                        {t('profile.disableAll', 'Disable All')}
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {notificationTypes.map((type) => (
+                                <div
+                                    key={type.key}
+                                    className="flex items-center justify-between p-4 rounded-lg border hover:bg-accent transition-colors"
+                                >
+                                    <div className="flex items-start gap-3 flex-1">
+                                        <span className="text-2xl">{type.icon}</span>
+                                        <div className="flex-1">
+                                            <Label
+                                                htmlFor={type.key}
+                                                className="text-base font-medium cursor-pointer"
+                                            >
+                                                {type.label}
+                                            </Label>
+                                            <p className="text-sm text-muted-foreground mt-1">
+                                                {type.description}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <Switch
+                                        id={type.key}
+                                        checked={localNotificationPreferences[type.key]}
+                                        onCheckedChange={() => handleNotificationToggle(type.key)}
+                                        disabled={notificationSaving}
+                                    />
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+
+                    {hasNotificationChanges && (
+                        <div className="flex justify-end gap-2 sticky bottom-4">
+                            <Button
+                                variant="outline"
+                                onClick={handleCancelNotifications}
+                                disabled={notificationSaving}
+                            >
+                                {t('profile.cancel', 'Cancel')}
+                            </Button>
+                            <Button
+                                onClick={handleSaveNotifications}
+                                disabled={notificationSaving}
+                                className="gap-2"
+                            >
+                                {notificationSaving ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        {t('profile.saving', 'Saving...')}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Check className="w-4 h-4" />
+                                        {t('profile.saveChanges', 'Save Changes')}
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    )}
+                </div>
+            )
+        },
+        {
+            value: 'about',
+            label: t('profile.tabs.about', 'About'),
+            content: (
+                <div className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Info className="w-5 h-5" />
+                                {t('profile.about.appInfo', 'Application Info')}
+                            </CardTitle>
+                            <CardDescription>
+                                {t('profile.about.description', 'Version and build information for Whagons')}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-sm text-muted-foreground">
+                                        {t('profile.about.version', 'Version')}
+                                    </Label>
+                                    <p className="text-lg font-semibold">{getVersionInfo().version}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-sm text-muted-foreground">
+                                        {t('profile.about.build', 'Build')}
+                                    </Label>
+                                    <p className="font-mono text-sm">{getVersionInfo().commit}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-sm text-muted-foreground">
+                                        {t('profile.about.buildTime', 'Build Time')}
+                                    </Label>
+                                    <p className="text-sm">{new Date(getVersionInfo().buildTime).toLocaleString()}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-sm text-muted-foreground">
+                                        {t('profile.about.fullVersion', 'Full Version')}
+                                    </Label>
+                                    <p 
+                                        className="font-mono text-sm cursor-default select-none"
+                                        onClick={handleHashClick}
+                                    >
+                                        {getVersionInfo().fullVersion}
+                                    </p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <RefreshCw className="w-5 h-5" />
+                                {t('profile.about.cacheManagement', 'Cache Management')}
+                            </CardTitle>
+                            <CardDescription>
+                                {t('profile.about.cacheDescription', 'Clear local data and resync from server. Use this if you experience data issues.')}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Button
+                                variant="destructive"
+                                onClick={handleClearCache}
+                                disabled={clearingCache}
+                                className="gap-2"
+                            >
+                                {clearingCache ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        {t('profile.about.clearing', 'Clearing...')}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Trash2 className="w-4 h-4" />
+                                        {t('profile.about.clearCache', 'Clear Cache & Resync')}
+                                    </>
+                                )}
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </div>
+            )
+        }
+    ];
+
+    return (
+        <div className="container mx-auto p-6 max-w-6xl space-y-6">
+            <UrlTabs
+                tabs={profileTabs}
+                defaultValue="profile"
+                basePath="/profile"
+            />
+            
+            {/* Secret Admin Activation Dialog */}
+            <Dialog open={showSecretInput} onOpenChange={(open) => {
+                if (!open) {
+                    setShowSecretInput(false);
+                    setSecretInput('');
+                    setSecretError(null);
+                }
+            }}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Terminal className="h-5 w-5" />
+                            Tech Support Access
+                        </DialogTitle>
+                        <DialogDescription>
+                            Enter the tech support secret to activate super admin mode for 15 minutes.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="secret">Secret</Label>
+                            <Input
+                                id="secret"
+                                type="password"
+                                value={secretInput}
+                                onChange={(e) => {
+                                    setSecretInput(e.target.value);
+                                    setSecretError(null);
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        handleSecretSubmit();
+                                    }
+                                }}
+                                placeholder="Enter tech support secret"
+                                autoFocus
+                            />
+                            {secretError && (
+                                <p className="text-sm text-destructive">{secretError}</p>
+                            )}
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => {
+                            setShowSecretInput(false);
+                            setSecretInput('');
+                            setSecretError(null);
+                        }}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSecretSubmit}>
+                            Activate
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

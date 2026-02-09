@@ -10,7 +10,9 @@ import { removeTaskAsync, restoreTaskAsync } from "@/store/reducers/tasksSlice";
 import { DeleteTaskDialog } from "@/components/tasks/DeleteTaskDialog";
 import toast from "react-hot-toast";
 import { useLanguage } from "@/providers/LanguageProvider";
+import { useSpotVisibility } from "@/hooks/useSpotVisibility";
 
+import { Logger } from '@/utils/logger';
 function createStatusMap(statuses: any[]) {
   const m: Record<number, any> = {};
   for (const s of statuses || []) m[Number(s.id)] = s;
@@ -35,6 +37,12 @@ function createCategoryMap(categories: any[]) {
   return m;
 }
 
+function createAssetMap(assets: any[]) {
+  const m: Record<number, any> = {};
+  for (const a of assets || []) m[Number(a.id)] = a;
+  return m;
+}
+
 export default function TaskListTab({
   workspaceId,
   searchText = "",
@@ -47,6 +55,7 @@ export default function TaskListTab({
   const priorities = useSelector((s: RootState) => (s as any).priorities.value as any[]);
   const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
   const categories = useSelector((s: RootState) => (s as any).categories.value as any[]);
+  const assetItems = useSelector((s: RootState) => (s as any).assetItems?.value as any[] || []);
   const dispatch = useDispatch<AppDispatch>();
   const [rows, setRows] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +80,10 @@ export default function TaskListTab({
   const priorityMap = useMemo(() => createPriorityMap(priorities || []), [priorities]);
   const spotMap = useMemo(() => createSpotMap(spots || []), [spots]);
   const categoryMap = useMemo(() => createCategoryMap(categories || []), [categories]);
+  const assetMap = useMemo(() => createAssetMap(assetItems || []), [assetItems]);
+
+  // Spot-based visibility filtering
+  const { isTaskVisible } = useSpotVisibility();
 
   useEffect(() => {
     let cancelled = false;
@@ -85,13 +98,16 @@ export default function TaskListTab({
         const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
         const total = countResp?.rowCount ?? 0;
         const rowsResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: Math.min(500, total) });
-        if (!cancelled) setRows(rowsResp?.rows || []);
+        const allRows = rowsResp?.rows || [];
+        // Apply spot-based visibility filter
+        const visibleRows = allRows.filter(isTaskVisible);
+        if (!cancelled) setRows(visibleRows);
       } catch (e: any) {
         if (!cancelled) setError(e?.message || "Failed to load tasks");
       }
     })();
     return () => { cancelled = true; };
-  }, [workspaceId, searchText]);
+  }, [workspaceId, searchText, isTaskVisible]);
 
   // status icon resolver is provided in WorkspaceTable; here we pass undefined so StatusBadge shows dot by color
   const getStatusIcon = undefined as any;
@@ -103,7 +119,7 @@ export default function TaskListTab({
   const handleDeleteTask = async (taskId: number) => {
     const numericId = Number(taskId);
     if (!Number.isFinite(numericId)) {
-      console.warn("Invalid task id for delete", taskId);
+      Logger.warn('tasks', "Invalid task id for delete", taskId);
       return;
     }
     
@@ -182,7 +198,7 @@ export default function TaskListTab({
       const status = e?.response?.status || e?.status;
       // Only log and show errors for non-403 errors (403 errors are handled by API interceptor)
       if (status !== 403) {
-        console.error("Failed to delete task", e);
+        Logger.error('tasks', "Failed to delete task", e);
         const errorMessage = e?.message || e?.response?.data?.message || e?.toString() || "Failed to delete task";
         setActionError(errorMessage);
         toast.error(errorMessage, { duration: 5000 });
@@ -236,10 +252,11 @@ export default function TaskListTab({
           priorityMap={priorityMap}
           spotMap={spotMap}
           categoryMap={categoryMap}
+          assetMap={assetMap}
           getStatusIcon={getStatusIcon}
           density={density}
           onDelete={() => handleDeleteTask(Number(task?.id))}
-          onLog={() => console.info("Log action selected (placeholder) for task", task?.id)}
+          onLog={() => Logger.info('tasks', "Log action selected (placeholder) for task", task?.id)}
           rowIndex={index}
         />
       ))}

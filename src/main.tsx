@@ -10,6 +10,9 @@ import { AuthProvider } from './providers/AuthProvider';
 import { ThemeProvider } from './providers/ThemeProvider';
 import { BrandingProvider } from './providers/BrandingProvider';
 import { LanguageProvider } from './providers/LanguageProvider';
+import { LaserPointerProvider } from './providers/LaserPointerProvider';
+import { LaserPointer } from './components/LaserPointer';
+import { LaserPointerToggle } from './components/LaserPointerToggle';
 import { Toaster } from 'react-hot-toast';
 import { Provider } from 'react-redux';
 import {store } from './store';
@@ -18,11 +21,11 @@ import {store } from './store';
 // import { DB } from './store/indexedDB/DB';
 // import * as CryptoAPI from './crypto/crypto';
 // import { genericActions } from './store/genericSlices';
-import { applyEncryptionConfig } from './config/encryptionConfig';
 import { initFontStyle } from './utils/fontStyle';
+import { Logger } from '@/utils/logger';
 
-// Initialize encryption configuration
-applyEncryptionConfig();
+// Install global error handlers first to catch any initialization errors
+Logger.installGlobalErrorHandlers();
 
 // Initialize font style
 initFontStyle();
@@ -33,9 +36,13 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         <ThemeProvider defaultTheme="light" storageKey="whagons-ui-theme">
           <LanguageProvider>
             <BrandingProvider>
-              <AuthProvider>
-                <App />
-                <Toaster 
+<AuthProvider>
+                <LaserPointerProvider>
+                  <App />
+                  <LaserPointer />
+                  <LaserPointerToggle />
+                </LaserPointerProvider>
+                <Toaster
                   position="bottom-right"
                   containerStyle={{
                     bottom: '20px',
@@ -60,16 +67,25 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
                         primary: '#ef4444',
                         secondary: '#fff',
                       },
-                    },
+},
                   }}
                 />
-              </AuthProvider>
+                </AuthProvider>
             </BrandingProvider>
           </LanguageProvider>
         </ThemeProvider>
     </Provider>
   // {/* </React.StrictMode>, */}
 );
+
+// Dev-only: expose the sandbox so you can test from the console quickly.
+if (import.meta.env.DEV) {
+  import('./sandbox/devExpose')
+    .then((m) => m.exposeSandboxToWindow())
+    .catch(() => {
+      // ignore
+    });
+}
 
 
 
@@ -79,7 +95,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
 //   const updateSW = registerSW({
 //     immediate: true,
 //     onRegistered(r) {
-//       console.log('[PWA] Service Worker registered');
+//       Logger.info('ui', '[PWA] Service Worker registered');
 //       // Check for updates every 5 minutes
 //       setInterval(() => {
 //         if (r) {
@@ -95,15 +111,15 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
 //       });
 //     },
 //     onRegisterError(error) {
-//       console.error('[PWA] Service Worker registration error', error);
+//       Logger.error('ui', '[PWA] Service Worker registration error', error);
 //     },
 //     onNeedRefresh() {
-//       console.log('[PWA] Update available, reloading page...');
+//       Logger.info('ui', '[PWA] Update available, reloading page...');
 //       // Automatically reload when update is ready (skipWaiting + reload)
 //       updateSW(true);
 //     },
 //     onOfflineReady() {
-//       console.log('[PWA] App ready to work offline');
+//       Logger.info('ui', '[PWA] App ready to work offline');
 //     },
 //   });
 // }

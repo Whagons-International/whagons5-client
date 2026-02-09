@@ -62,6 +62,7 @@ import { ImageField } from "./components/field-types/ImageField";
 import { FixedImageField } from "./components/field-types/FixedImageField";
 import StatusButton from "@/components/ui/StatusButton";
 
+import { Logger } from '@/utils/logger';
 function Forms() {
   // Bring in forms and versions for context rendering
   const { value: formVersions } = useSelector((state: RootState) => (state as any).formVersions || { value: [] });
@@ -262,7 +263,7 @@ function Forms() {
       setIsNewForm(false); // We're editing an existing form
       setSkipBuilderClearOnce(true); // Prevent a subsequent builder tab change from clearing
     } catch (error) {
-      console.error('Error loading form for editing:', error);
+      Logger.error('settings', 'Error loading form for editing:', error);
     }
   }, [formVersions, forms, readDraft]);
 
@@ -292,7 +293,7 @@ function Forms() {
         setIsPreviewOpen(true);
       }
     } catch (error) {
-      console.error('Error loading form for preview:', error);
+      Logger.error('settings', 'Error loading form for preview:', error);
       const form = forms.find(f => f.id === formId);
       setBuilderSchema({ fields: [], form_id: formId, title: form?.name || 'Untitled form', description: (form as any)?.description || '', isDraft: false });
       setIsPreviewOpen(true);
@@ -335,7 +336,7 @@ function Forms() {
     if (builderTab === 'builder' && !Number.isNaN(editId)) {
       // Open in edit mode for this form
       setSkipBuilderClearOnce(true);
-      loadFormForEditing(editId).catch(console.error);
+      loadFormForEditing(editId).catch((err) => Logger.error('forms', 'Failed to load form for editing:', err));
     } else if (builderTab === 'builder') {
       // Builder tab without an edit id → new form mode (restore draft if present)
       const draft = readDraft(null);
@@ -350,7 +351,7 @@ function Forms() {
 
   const saveDraft = useCallback(() => {
     // Placeholder: in future, create or update a draft formVersion with schema_data
-    console.log('save draft', builderSchema);
+    Logger.info('settings', 'save draft', builderSchema);
   }, [builderSchema]);
 
   // Custom renderer for description to handle HTML and vertical centering
@@ -529,7 +530,7 @@ function Forms() {
                       setSaveStatus("success");
                       setTimeout(() => setSaveStatus("idle"), 900);
                     } catch (e) {
-                      console.error('Error saving changes:', e);
+                      Logger.error('settings', 'Error saving changes:', e);
                       setSaveStatus("error");
                       setTimeout(() => setSaveStatus("idle"), 1200);
                     }
@@ -584,7 +585,7 @@ function Forms() {
                       setPublishStatus("success");
                       setTimeout(() => setPublishStatus("idle"), 900);
                     } catch (e) {
-                      console.error('Error publishing form:', e);
+                      Logger.error('settings', 'Error publishing form:', e);
                       setPublishStatus("error");
                       setTimeout(() => setPublishStatus("idle"), 1200);
                     }

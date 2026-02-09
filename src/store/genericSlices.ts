@@ -38,7 +38,7 @@ const genericSliceConfigs = [
     { name: 'statuses', table: 'wh_statuses', endpoint: '/statuses', store: 'statuses', hashFields: ['id','name','action','color','icon','system','initial','updated_at'] },
     { name: 'cleaningStatuses', table: 'wh_cleaning_statuses', endpoint: '/cleaning-statuses', store: 'cleaning_statuses', hashFields: ['id','name','code','color','icon','order','is_initial','is_clean_state','description','updated_at'] },
     { name: 'priorities', table: 'wh_priorities', endpoint: '/priorities', store: 'priorities', hashFields: ['id','name','color','category_id','updated_at'] },
-    { name: 'spots', table: 'wh_spots', endpoint: '/spots', store: 'spots', hashFields: ['id','name','parent_id','spot_type_id','is_branch','cleaning_status_id','current_cleaning_task_id','last_cleaned_by','last_cleaned_at','updated_at'] },
+    { name: 'spots', table: 'wh_spots', endpoint: '/spots', store: 'spots', hashFields: ['id','name','alias','parent_id','spot_type_id','is_branch','cleaning_status_id','current_cleaning_task_id','last_cleaned_by','last_cleaned_at','updated_at'] },
     { name: 'tags', table: 'wh_tags', endpoint: '/tags', store: 'tags', hashFields: ['id','name','color','icon','category_id','updated_at'] },
     { name: 'spotTypes', table: 'wh_spot_types', endpoint: '/spot-types', store: 'spot_types', hashFields: ['id','name','color','updated_at'] },
     { name: 'statusTransitions', table: 'wh_status_transitions', endpoint: '/status-transitions', store: 'status_transitions', hashFields: ['id','status_transition_group_id','from_status','to_status','initial','updated_at'] },
@@ -48,6 +48,7 @@ const genericSliceConfigs = [
     { name: 'slas', table: 'wh_slas', endpoint: '/slas', store: 'slas', hashFields: ['id','name', 'description', 'color', 'enabled', 'response_time','resolution_time','sla_policy_id','updated_at'] },
     { name: 'slaPolicies', table: 'wh_sla_policies', endpoint: '/sla-policies', store: 'sla_policies', hashFields: ['id','name','description','active','trigger_type','trigger_status_id','trigger_field_id','trigger_operator','trigger_value_text','trigger_value_number','trigger_value_boolean','grace_seconds','updated_at'] },
     { name: 'slaAlerts', table: 'wh_sla_alerts', endpoint: '/sla-alerts', store: 'sla_alerts', hashFields: ['id','sla_id','time','type','notify_to','updated_at'] },
+    { name: 'slaEscalationLevels', table: 'wh_sla_escalation_levels', endpoint: '/sla-escalation-levels', store: 'sla_escalation_levels', hashFields: ['id','sla_id','phase','level','delay_seconds','action','target_type','target_id','priority_id','status_id','tag_id','notify_to','instructions','updated_at'] },
     { name: 'approvals', table: 'wh_approvals', endpoint: '/approvals', store: 'approvals', hashFields: ['id','name','description','approval_type','require_all','minimum_approvals','trigger_type','trigger_conditions','require_rejection_comment','block_editing_during_approval','deadline_type','deadline_value','order_index','is_active','on_approved_actions','on_rejected_actions','trigger_status_id','updated_at'] },
     { name: 'approvalApprovers', table: 'wh_approval_approvers', endpoint: '/approval-approvers', store: 'approval_approvers', hashFields: ['id','approval_id','approver_type','approver_id','scope','scope_id','required','order_index','created_by','updated_at'] },
     { name: 'taskApprovalInstances', table: 'wh_task_approval_instances', endpoint: '/task-approval-instances', store: 'task_approval_instances', hashFields: ['id','task_id','approver_user_id','source_approver_id','order_index','is_required','status','notified_at','responded_at','response_comment','updated_at'] },
@@ -65,27 +66,29 @@ const genericSliceConfigs = [
     // File Management
     { name: 'taskAttachments', table: 'wh_task_attachments', endpoint: '/task-attachments', store: 'task_attachments', hashFields: ['id','uuid','task_id','type','file_path','file_name','file_extension','file_size','user_id','updated_at'] },
     { name: 'taskNotes', table: 'wh_task_notes', endpoint: '/task-notes', store: 'task_notes', hashFields: ['id','uuid','task_id','note','user_id','updated_at'] },
-    { name: 'taskRecurrences', table: 'wh_task_recurrences', endpoint: '/task-recurrences', store: 'task_recurrences', hashFields: ['id','updated_at'] },
+    { name: 'taskRecurrences', table: 'wh_task_recurrences', endpoint: '/task-recurrences', store: 'task_recurrences', hashFields: ['id','rrule','dtstart','duration_minutes','name','description','workspace_id','category_id','team_id','template_id','priority_id','status_id','user_ids','created_by','is_active','last_generated_at','count','occurrences_generated','custom_field_values','updated_at'] },
     { name: 'workspaceChat', table: 'wh_workspace_chat', endpoint: '/workspace-chat', store: 'workspace_chat', hashFields: ['id','uuid','workspace_id','message','user_id','updated_at'] },
+    { name: 'workspaceResources', table: 'wh_workspace_resources', endpoint: '/workspace-resources', store: 'workspace_resources', hashFields: ['id','uuid','workspace_id','file_path','file_url','file_name','file_extension','file_size','user_id','folder','updated_at'] },
 
     // Error Tracking
     { name: 'exceptions', table: 'wh_exceptions', endpoint: '/exceptions', store: 'exceptions', hashFields: ['id','workspace_id','user_id','role_id','updated_at'] },
 
     // Core Entities (converted from custom to generic)
-    { name: 'categories', table: 'wh_categories', endpoint: '/categories', store: 'categories', hashFields: ['id','name','description','color','icon','enabled','sla_id','approval_id','team_id','workspace_id','updated_at'] },
+    { name: 'categories', table: 'wh_categories', endpoint: '/categories', store: 'categories', hashFields: ['id','name','description','color','icon','enabled','sla_id','team_id','workspace_id','reporting_team_ids','celebration_effect','dialog_layout','updated_at'] },
     { name: 'categoryCustomFields', table: 'wh_category_custom_field', endpoint: '/category-custom-fields', store: 'category_custom_fields', hashFields: ['id','field_id','category_id','is_required','order','default_value','updated_at'] },
     { name: 'customFields', table: 'wh_custom_fields', endpoint: '/custom-fields', store: 'custom_fields', hashFields: ['id','name','field_type','options','validation_rules','updated_at'] },
     { name: 'teams', table: 'wh_teams', endpoint: '/teams', store: 'teams', hashFields: ['id','name','description','color','icon','is_active','parent_team_id','team_lead_id','updated_at'] },
-    { name: 'templates', table: 'wh_templates', endpoint: '/templates', store: 'templates', hashFields: ['id','name','description','instructions','category_id','priority_id','sla_id','approval_id','default_spot_id','spots_not_applicable','expected_duration','default_user_ids','form_id','enabled','is_private','updated_at'] },
+    { name: 'templates', table: 'wh_templates', endpoint: '/templates', store: 'templates', hashFields: ['id','name','alias','description','instructions','category_id','priority_id','sla_id','approval_id','default_spot_id','spots_not_applicable','expected_duration','default_user_ids','form_id','enabled','is_private','updated_at'] },
     { name: 'messages', table: 'wh_messages', endpoint: '/messages', store: 'messages', hashFields: ['id','title','content','workspace_id','team_id','spot_id','created_by','starts_at','ends_at','is_pinned','updated_at'] },
     { name: 'workflows', table: 'wh_workflows', endpoint: '/workflows', store: 'workflows', hashFields: ['id','name','description','workspace_id','is_active','current_version_id','created_by','updated_by','activated_at','updated_at'] },
     { name: 'workspaces', table: 'wh_workspaces', endpoint: '/workspaces', store: 'workspaces', hashFields: ['id','name','description','color','icon','teams','view_modes','allow_ad_hoc_tasks','type','category_id','spots','created_by','updated_at'] },
 
     // Boards (Communication Boards)
-    { name: 'boards', table: 'wh_boards', endpoint: '/boards', store: 'boards', hashFields: ['id','name','description','visibility','created_by','updated_at'] },
+    { name: 'boards', table: 'wh_boards', endpoint: '/boards', store: 'boards', hashFields: ['id','name','description','visibility','birthday_messages_enabled','birthday_message_template','created_by','updated_at'] },
     { name: 'boardMembers', table: 'wh_board_members', endpoint: '/board-members', store: 'board_members', hashFields: ['id','board_id','member_type','member_id','role','updated_at'] },
     { name: 'boardMessages', table: 'wh_board_messages', endpoint: '/board-messages', store: 'board_messages', hashFields: ['id','board_id','created_by','title','content','is_pinned','starts_at','ends_at','metadata','source_type','source_id','updated_at'] },
     { name: 'boardAttachments', table: 'wh_board_attachments', endpoint: '/board-attachments', store: 'board_attachments', hashFields: ['id','uuid','board_message_id','type','file_path','file_name','file_extension','file_size','user_id','updated_at'] },
+    { name: 'boardBirthdayImages', table: 'wh_board_birthday_images', endpoint: '/board-birthday-images', store: 'board_birthday_images', hashFields: ['id','board_id','file_path','file_name','uploaded_by','updated_at'] },
 
     // Job Positions
     { name: 'jobPositions', table: 'wh_job_positions', endpoint: '/job-positions', store: 'job_positions', hashFields: ['id','code','title','level','is_leadership','is_active','description','updated_at'] },
@@ -103,10 +106,35 @@ const genericSliceConfigs = [
     // KPI Cards (Custom dashboard metrics)
     { name: 'kpiCards', table: 'wh_kpi_cards', endpoint: '/kpi-cards', store: 'kpi_cards', hashFields: ['id','name','type','query_config','display_config','position','is_enabled','updated_at'] },
 
-    // Schedule Management
-    { name: 'scheduleTemplates', table: 'wh_schedule_templates', endpoint: '/schedule-templates', store: 'schedule_templates', hashFields: ['id','name','description','schedule_type','weekly_hours','updated_at'] },
-    { name: 'scheduleTemplateDays', table: 'wh_schedule_template_days', endpoint: '/schedule-template-days', store: 'schedule_template_days', hashFields: ['id','template_id','day_of_week','is_working_day','start_time','end_time','break_duration','break_start_time','updated_at'] },
-    { name: 'userSchedules', table: 'wh_user_schedules', endpoint: '/user-schedules', store: 'user_schedules', hashFields: ['id','user_id','template_id','effective_from','effective_to','timezone','updated_at'] },
+    // Documents & Protocols
+    { name: 'documents', table: 'wh_documents', endpoint: '/documents', store: 'documents', hashFields: ['id','uuid','workspace_id','title','description','document_type','file_path','file_url','file_name','file_extension','file_size','version','is_public','requires_acknowledgment','created_by','updated_at'] },
+    { name: 'documentAssociations', table: 'wh_document_associations', endpoint: '/document-associations', store: 'document_associations', hashFields: ['id','document_id','associable_type','associable_id','inherit_to_children','updated_at'] },
+    { name: 'documentAcknowledgments', table: 'wh_document_acknowledgments', endpoint: '/document-acknowledgments', store: 'document_acknowledgments', hashFields: ['id','document_id','user_id','acknowledged_at','ip_address','updated_at'] },
+
+    // Working Hours Plugin
+    { name: 'countryConfigs', table: 'wh_country_configs', endpoint: '/country-configs', store: 'country_configs', hashFields: ['id','country_code','country_name','default_weekly_hours','max_daily_hours','min_break_after_hours','min_break_duration_minutes','overtime_threshold_daily','overtime_threshold_weekly','settings','is_active','updated_at'] },
+    { name: 'overtimeRules', table: 'wh_overtime_rules', endpoint: '/overtime-rules', store: 'overtime_rules', hashFields: ['id','name','description','country_config_id','daily_threshold_hours','weekly_threshold_hours','require_approval','max_overtime_daily','max_overtime_weekly','is_active','updated_at'] },
+    { name: 'overtimeMultipliers', table: 'wh_overtime_multipliers', endpoint: '/overtime-multipliers', store: 'overtime_multipliers', hashFields: ['id','overtime_rule_id','multiplier_type','threshold_hours','multiplier','priority','is_active','updated_at'] },
+    { name: 'holidayCalendars', table: 'wh_holiday_calendars', endpoint: '/holiday-calendars', store: 'holiday_calendars', hashFields: ['id','name','country_config_id','region_code','calendar_year','source','last_synced_at','is_active','updated_at'] },
+    { name: 'holidays', table: 'wh_holidays', endpoint: '/holidays', store: 'holidays', hashFields: ['id','holiday_calendar_id','name','description','date','holiday_type','is_half_day','is_recurring','affects_overtime','is_active','updated_at'] },
+    { name: 'workingSchedules', table: 'wh_working_schedules', endpoint: '/working-schedules', store: 'working_schedules', hashFields: ['id','name','description','schedule_type','weekly_hours','country_config_id','holiday_calendar_id','overtime_rule_id','is_default','is_active','created_by','updated_at'] },
+    { name: 'scheduleAssignments', table: 'wh_schedule_assignments', endpoint: '/schedule-assignments', store: 'schedule_assignments', hashFields: ['id','working_schedule_id','assignable_type','assignable_id','priority','effective_from','effective_to','is_active','created_by','updated_at'] },
+    { name: 'timeOffTypes', table: 'wh_time_off_types', endpoint: '/time-off-types', store: 'time_off_types', hashFields: ['id','name','code','description','color','requires_approval','approval_id','max_days_per_year','is_paid','is_active','updated_at'] },
+    { name: 'timeOffRequests', table: 'wh_time_off_requests', endpoint: '/time-off-requests', store: 'time_off_requests', hashFields: ['id','user_id','time_off_type_id','start_date','end_date','start_half_day','end_half_day','total_days','reason','status','approved_by','approved_at','rejection_reason','created_by','updated_at'] },
+    { name: 'timeOffApprovalInstances', table: 'wh_time_off_approval_instances', endpoint: '/time-off-approval-instances', store: 'time_off_approval_instances', hashFields: ['id','time_off_request_id','approval_id','approver_user_id','source_approver_id','order_index','is_required','status','notified_at','responded_at','response_comment','updated_at'] },
+    { name: 'timeOffApprovalDecisions', table: 'wh_time_off_approval_decisions', endpoint: '/time-off-approval-decisions', store: 'time_off_approval_decisions', hashFields: ['id','time_off_request_id','approval_id','approver_user_id','decided_by_user_id','decision','comment','updated_at'] },
+
+    // Asset Management Plugin
+    { name: 'assetTypes', table: 'wh_asset_types', endpoint: '/asset-types', store: 'asset_types', hashFields: ['id','name','color','icon','updated_at'] },
+    { name: 'assetItems', table: 'wh_asset_items', endpoint: '/asset-items', store: 'asset_items', hashFields: ['id','name','parent_id','asset_type_id','spot_id','serial_number','model','manufacturer','purchase_date','purchase_cost','warranty_expiration','status','qr_code','notes','assigned_user_id','assigned_team_id','updated_at'] },
+    { name: 'assetMaintenanceSchedules', table: 'wh_asset_maintenance_schedules', endpoint: '/asset-maintenance-schedules', store: 'asset_maintenance_schedules', hashFields: ['id','asset_item_id','title','description','frequency_value','frequency_unit','next_due_date','last_performed_at','workspace_id','category_id','assigned_team_id','is_active','updated_at'] },
+    { name: 'assetMaintenanceLogs', table: 'wh_asset_maintenance_logs', endpoint: '/asset-maintenance-logs', store: 'asset_maintenance_logs', hashFields: ['id','asset_item_id','schedule_id','task_id','performed_by','performed_at','notes','cost','updated_at'] },
+    { name: 'assetCustomFields', table: 'wh_asset_custom_fields', endpoint: '/asset-custom-fields', store: 'asset_custom_fields', hashFields: ['id','name','field_type','options','validation_rules','asset_type_id','is_required','default_value','sort_order','updated_at'] },
+    { name: 'assetCustomFieldValues', table: 'wh_asset_custom_field_values', endpoint: '/asset-custom-field-values', store: 'asset_custom_field_values', hashFields: ['id','asset_item_id','field_id','name','type','value','value_numeric','value_date','value_json','updated_at'] },
+
+    // QR Code Plugin
+    { name: 'qrCodes', table: 'wh_qr_codes', endpoint: '/qr-codes', store: 'qr_codes', hashFields: ['id','uuid','entity_type','entity_id','action','content_format','is_active','is_public','updated_at'] },
+    { name: 'qrScanLogs', table: 'wh_qr_scan_logs', endpoint: '/qr-scan-logs', store: 'qr_scan_logs', hashFields: ['id','qr_code_id','user_id','ip_address','scanned_at'] },
 
     // Notifications (client-side only, no backend table)
     { name: 'notifications', table: '', endpoint: '', store: 'notifications', hashFields: [] },
@@ -144,6 +172,7 @@ export const {
     slas,
     slaPolicies,
     slaAlerts,
+    slaEscalationLevels,
     approvals,
     approvalApprovers,
     taskApprovalInstances,
@@ -157,6 +186,7 @@ export const {
     taskNotes,
     taskRecurrences,
     workspaceChat,
+    workspaceResources,
     exceptions,
     // Core entities (converted from custom)
     categories,
@@ -172,7 +202,12 @@ export const {
     boardMembers,
     boardMessages,
     boardAttachments,
+    boardBirthdayImages,
     jobPositions,
+    // Documents & Protocols
+    documents,
+    documentAssociations,
+    documentAcknowledgments,
     complianceStandards,
     complianceRequirements,
     complianceMappings,
@@ -180,9 +215,26 @@ export const {
     plugins,
     pluginRoutes,
     kpiCards,
-    scheduleTemplates,
-    scheduleTemplateDays,
-    userSchedules,
+    // Working Hours Plugin
+    countryConfigs,
+    overtimeRules,
+    overtimeMultipliers,
+    holidayCalendars,
+    holidays,
+    workingSchedules,
+    scheduleAssignments,
+    timeOffTypes,
+    timeOffRequests,
+    // Asset Management Plugin
+    assetTypes,
+    assetItems,
+    assetMaintenanceSchedules,
+    assetMaintenanceLogs,
+    assetCustomFields,
+    assetCustomFieldValues,
+    // QR Code Plugin
+    qrCodes,
+    qrScanLogs,
     notifications,
 } = genericSlices.slices;
 
@@ -224,6 +276,7 @@ export const genericEventNames = {
     slas: genericSlices.slices.slas.eventNames,
     slaPolicies: genericSlices.slices.slaPolicies.eventNames,
     slaAlerts: genericSlices.slices.slaAlerts.eventNames,
+    slaEscalationLevels: genericSlices.slices.slaEscalationLevels.eventNames,
     approvals: genericSlices.slices.approvals.eventNames,
     approvalApprovers: genericSlices.slices.approvalApprovers.eventNames,
     taskApprovalInstances: genericSlices.slices.taskApprovalInstances.eventNames,
@@ -237,6 +290,7 @@ export const genericEventNames = {
     taskNotes: genericSlices.slices.taskNotes.eventNames,
     taskRecurrences: genericSlices.slices.taskRecurrences.eventNames,
     workspaceChat: genericSlices.slices.workspaceChat.eventNames,
+    workspaceResources: genericSlices.slices.workspaceResources.eventNames,
     exceptions: genericSlices.slices.exceptions.eventNames,
     // Core entities (converted from custom)
     categories: genericSlices.slices.categories.eventNames,
@@ -252,7 +306,12 @@ export const genericEventNames = {
     boardMembers: genericSlices.slices.boardMembers.eventNames,
     boardMessages: genericSlices.slices.boardMessages.eventNames,
     boardAttachments: genericSlices.slices.boardAttachments.eventNames,
+    boardBirthdayImages: genericSlices.slices.boardBirthdayImages.eventNames,
     jobPositions: genericSlices.slices.jobPositions.eventNames,
+    // Documents & Protocols
+    documents: genericSlices.slices.documents.eventNames,
+    documentAssociations: genericSlices.slices.documentAssociations.eventNames,
+    documentAcknowledgments: genericSlices.slices.documentAcknowledgments.eventNames,
     complianceStandards: genericSlices.slices.complianceStandards.eventNames,
     complianceRequirements: genericSlices.slices.complianceRequirements.eventNames,
     complianceMappings: genericSlices.slices.complianceMappings.eventNames,
@@ -260,9 +319,26 @@ export const genericEventNames = {
     plugins: genericSlices.slices.plugins.eventNames,
     pluginRoutes: genericSlices.slices.pluginRoutes.eventNames,
     kpiCards: genericSlices.slices.kpiCards.eventNames,
-    scheduleTemplates: genericSlices.slices.scheduleTemplates.eventNames,
-    scheduleTemplateDays: genericSlices.slices.scheduleTemplateDays.eventNames,
-    userSchedules: genericSlices.slices.userSchedules.eventNames,
+    // Working Hours Plugin
+    countryConfigs: genericSlices.slices.countryConfigs.eventNames,
+    overtimeRules: genericSlices.slices.overtimeRules.eventNames,
+    overtimeMultipliers: genericSlices.slices.overtimeMultipliers.eventNames,
+    holidayCalendars: genericSlices.slices.holidayCalendars.eventNames,
+    holidays: genericSlices.slices.holidays.eventNames,
+    workingSchedules: genericSlices.slices.workingSchedules.eventNames,
+    scheduleAssignments: genericSlices.slices.scheduleAssignments.eventNames,
+    timeOffTypes: genericSlices.slices.timeOffTypes.eventNames,
+    timeOffRequests: genericSlices.slices.timeOffRequests.eventNames,
+    // Asset Management Plugin
+    assetTypes: genericSlices.slices.assetTypes.eventNames,
+    assetItems: genericSlices.slices.assetItems.eventNames,
+    assetMaintenanceSchedules: genericSlices.slices.assetMaintenanceSchedules.eventNames,
+    assetMaintenanceLogs: genericSlices.slices.assetMaintenanceLogs.eventNames,
+    assetCustomFields: genericSlices.slices.assetCustomFields.eventNames,
+    assetCustomFieldValues: genericSlices.slices.assetCustomFieldValues.eventNames,
+    // QR Code Plugin
+    qrCodes: genericSlices.slices.qrCodes.eventNames,
+    qrScanLogs: genericSlices.slices.qrScanLogs.eventNames,
     notifications: genericSlices.slices.notifications.eventNames,
 } as const;
 
@@ -306,6 +382,7 @@ export const genericInternalActions = {
     slas: genericSlices.slices.slas.actions,
     slaPolicies: genericSlices.slices.slaPolicies.actions,
     slaAlerts: genericSlices.slices.slaAlerts.actions,
+    slaEscalationLevels: genericSlices.slices.slaEscalationLevels.actions,
     approvals: genericSlices.slices.approvals.actions,
     approvalApprovers: genericSlices.slices.approvalApprovers.actions,
     taskApprovalInstances: genericSlices.slices.taskApprovalInstances.actions,
@@ -319,6 +396,7 @@ export const genericInternalActions = {
     taskNotes: genericSlices.slices.taskNotes.actions,
     taskRecurrences: genericSlices.slices.taskRecurrences.actions,
     workspaceChat: genericSlices.slices.workspaceChat.actions,
+    workspaceResources: genericSlices.slices.workspaceResources.actions,
     exceptions: genericSlices.slices.exceptions.actions,
     // Core entities (converted from custom)
     categories: genericSlices.slices.categories.actions,
@@ -334,7 +412,12 @@ export const genericInternalActions = {
     boardMembers: genericSlices.slices.boardMembers.actions,
     boardMessages: genericSlices.slices.boardMessages.actions,
     boardAttachments: genericSlices.slices.boardAttachments.actions,
+    boardBirthdayImages: genericSlices.slices.boardBirthdayImages.actions,
     jobPositions: genericSlices.slices.jobPositions.actions,
+    // Documents & Protocols
+    documents: genericSlices.slices.documents.actions,
+    documentAssociations: genericSlices.slices.documentAssociations.actions,
+    documentAcknowledgments: genericSlices.slices.documentAcknowledgments.actions,
     complianceStandards: genericSlices.slices.complianceStandards.actions,
     complianceRequirements: genericSlices.slices.complianceRequirements.actions,
     complianceMappings: genericSlices.slices.complianceMappings.actions,
@@ -342,9 +425,26 @@ export const genericInternalActions = {
     plugins: genericSlices.slices.plugins.actions,
     pluginRoutes: genericSlices.slices.pluginRoutes.actions,
     kpiCards: genericSlices.slices.kpiCards.actions,
-    scheduleTemplates: genericSlices.slices.scheduleTemplates.actions,
-    scheduleTemplateDays: genericSlices.slices.scheduleTemplateDays.actions,
-    userSchedules: genericSlices.slices.userSchedules.actions,
+    // Working Hours Plugin
+    countryConfigs: genericSlices.slices.countryConfigs.actions,
+    overtimeRules: genericSlices.slices.overtimeRules.actions,
+    overtimeMultipliers: genericSlices.slices.overtimeMultipliers.actions,
+    holidayCalendars: genericSlices.slices.holidayCalendars.actions,
+    holidays: genericSlices.slices.holidays.actions,
+    workingSchedules: genericSlices.slices.workingSchedules.actions,
+    scheduleAssignments: genericSlices.slices.scheduleAssignments.actions,
+    timeOffTypes: genericSlices.slices.timeOffTypes.actions,
+    timeOffRequests: genericSlices.slices.timeOffRequests.actions,
+    // Asset Management Plugin
+    assetTypes: genericSlices.slices.assetTypes.actions,
+    assetItems: genericSlices.slices.assetItems.actions,
+    assetMaintenanceSchedules: genericSlices.slices.assetMaintenanceSchedules.actions,
+    assetMaintenanceLogs: genericSlices.slices.assetMaintenanceLogs.actions,
+    assetCustomFields: genericSlices.slices.assetCustomFields.actions,
+    assetCustomFieldValues: genericSlices.slices.assetCustomFieldValues.actions,
+    // QR Code Plugin
+    qrCodes: genericSlices.slices.qrCodes.actions,
+    qrScanLogs: genericSlices.slices.qrScanLogs.actions,
     notifications: genericSlices.slices.notifications.actions,
 } as const;
 
@@ -380,6 +480,7 @@ export const genericActions = {
     slas: publicActions(genericInternalActions.slas),
     slaPolicies: publicActions(genericInternalActions.slaPolicies),
     slaAlerts: publicActions(genericInternalActions.slaAlerts),
+    slaEscalationLevels: publicActions(genericInternalActions.slaEscalationLevels),
     approvals: publicActions(genericInternalActions.approvals),
     approvalApprovers: publicActions(genericInternalActions.approvalApprovers),
     taskApprovalInstances: publicActions(genericInternalActions.taskApprovalInstances),
@@ -393,6 +494,7 @@ export const genericActions = {
     taskNotes: publicActions(genericInternalActions.taskNotes),
     taskRecurrences: publicActions(genericInternalActions.taskRecurrences),
     workspaceChat: publicActions(genericInternalActions.workspaceChat),
+    workspaceResources: publicActions(genericInternalActions.workspaceResources),
     exceptions: publicActions(genericInternalActions.exceptions),
     // Core entities (converted from custom)
     categories: publicActions(genericInternalActions.categories),
@@ -408,7 +510,12 @@ export const genericActions = {
     boardMembers: publicActions(genericInternalActions.boardMembers),
     boardMessages: publicActions(genericInternalActions.boardMessages),
     boardAttachments: publicActions(genericInternalActions.boardAttachments),
+    boardBirthdayImages: publicActions(genericInternalActions.boardBirthdayImages),
     jobPositions: publicActions(genericInternalActions.jobPositions),
+    // Documents & Protocols
+    documents: publicActions(genericInternalActions.documents),
+    documentAssociations: publicActions(genericInternalActions.documentAssociations),
+    documentAcknowledgments: publicActions(genericInternalActions.documentAcknowledgments),
     complianceStandards: publicActions(genericInternalActions.complianceStandards),
     complianceRequirements: publicActions(genericInternalActions.complianceRequirements),
     complianceMappings: publicActions(genericInternalActions.complianceMappings),
@@ -416,8 +523,25 @@ export const genericActions = {
     plugins: publicActions(genericInternalActions.plugins),
     pluginRoutes: publicActions(genericInternalActions.pluginRoutes),
     kpiCards: publicActions(genericInternalActions.kpiCards),
-    scheduleTemplates: publicActions(genericInternalActions.scheduleTemplates),
-    scheduleTemplateDays: publicActions(genericInternalActions.scheduleTemplateDays),
-    userSchedules: publicActions(genericInternalActions.userSchedules),
+    // Working Hours Plugin
+    countryConfigs: publicActions(genericInternalActions.countryConfigs),
+    overtimeRules: publicActions(genericInternalActions.overtimeRules),
+    overtimeMultipliers: publicActions(genericInternalActions.overtimeMultipliers),
+    holidayCalendars: publicActions(genericInternalActions.holidayCalendars),
+    holidays: publicActions(genericInternalActions.holidays),
+    workingSchedules: publicActions(genericInternalActions.workingSchedules),
+    scheduleAssignments: publicActions(genericInternalActions.scheduleAssignments),
+    timeOffTypes: publicActions(genericInternalActions.timeOffTypes),
+    timeOffRequests: publicActions(genericInternalActions.timeOffRequests),
+    // Asset Management Plugin
+    assetTypes: publicActions(genericInternalActions.assetTypes),
+    assetItems: publicActions(genericInternalActions.assetItems),
+    assetMaintenanceSchedules: publicActions(genericInternalActions.assetMaintenanceSchedules),
+    assetMaintenanceLogs: publicActions(genericInternalActions.assetMaintenanceLogs),
+    assetCustomFields: publicActions(genericInternalActions.assetCustomFields),
+    assetCustomFieldValues: publicActions(genericInternalActions.assetCustomFieldValues),
+    // QR Code Plugin
+    qrCodes: publicActions(genericInternalActions.qrCodes),
+    qrScanLogs: publicActions(genericInternalActions.qrScanLogs),
     notifications: publicActions(genericInternalActions.notifications),
 } as const;

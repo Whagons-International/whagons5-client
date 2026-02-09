@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 import { uploadFile, getFileUrl } from "@/api/assetApi";
 
+import { Logger } from '@/utils/logger';
 interface TaskNotesModalProps {}
 
 interface TaskNote {
@@ -76,7 +77,7 @@ export default function TaskNotesModal() {
     }
     
     if (!input.trim() || !taskId || !user) {
-        console.log("Send blocked:", { input: input.trim(), taskId, user });
+        Logger.info('tasks', "Send blocked:", { input: input.trim(), taskId, user });
         return;
     }
     
@@ -91,11 +92,11 @@ export default function TaskNotesModal() {
         user_id: Number(user.id)
       };
       
-      console.log("Sending note:", note);
+      Logger.info('tasks', "Sending note:", note);
       const result = await dispatch(genericActions.taskNotes.addAsync(note)).unwrap();
-      console.log("Note sent successfully:", result);
+      Logger.info('tasks', "Note sent successfully:", result);
     } catch (error: any) {
-      console.error("Failed to send note:", error);
+      Logger.error('tasks', "Failed to send note:", error);
       // Restore input on error
       setInput(noteText);
       
@@ -108,7 +109,7 @@ export default function TaskNotesModal() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !taskId || !user) {
-      console.log("File upload blocked:", { file: !!file, taskId, user: !!user });
+      Logger.info('tasks', "File upload blocked:", { file: !!file, taskId, user: !!user });
       return;
     }
 
@@ -137,7 +138,7 @@ export default function TaskNotesModal() {
     const fileExtension = file.name.split('.').pop() || '';
     
     try {
-        console.log("Uploading file to asset storage:", {
+        Logger.info('tasks', "Uploading file to asset storage:", {
           file_name: file.name,
           file_size: file.size,
           file_type: file.type
@@ -145,7 +146,7 @@ export default function TaskNotesModal() {
 
         // Step 1: Upload file to asset storage (same as profile pictures)
         const uploadedFile = await uploadFile(file);
-        console.log("File uploaded to asset storage:", uploadedFile);
+        Logger.info('tasks', "File uploaded to asset storage:", uploadedFile);
 
         // Step 2: Store the file URL/ID in the task attachment
         const fileUrl = uploadedFile.url || getFileUrl(uploadedFile.id);
@@ -161,13 +162,13 @@ export default function TaskNotesModal() {
             user_id: Number(user.id)
         };
 
-        console.log("Creating task attachment record:", attachment);
+        Logger.info('tasks', "Creating task attachment record:", attachment);
         const result_data = await dispatch(genericActions.taskAttachments.addAsync(attachment)).unwrap();
-        console.log("Attachment created successfully:", result_data);
+        Logger.info('tasks', "Attachment created successfully:", result_data);
     } catch (error: any) {
-        console.error("Failed to upload attachment:", error);
-        console.error("Full error object:", JSON.stringify(error, null, 2));
-        console.error("Error details:", {
+        Logger.error('tasks', "Failed to upload attachment:", error);
+        Logger.error('tasks', "Full error object:", JSON.stringify(error, null, 2));
+        Logger.error('tasks', "Error details:", {
             status: error?.response?.status,
             statusText: error?.response?.statusText,
             data: error?.response?.data,

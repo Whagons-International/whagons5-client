@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="box" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B6B"/>
+      <stop offset="100%" style="stop-color:#EE5A5A"/>
+    </linearGradient>
+    <linearGradient id="lid" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF8585"/>
+      <stop offset="100%" style="stop-color:#FF6B6B"/>
+    </linearGradient>
+    <linearGradient id="ribbon" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFE66D"/>
+      <stop offset="100%" style="stop-color:#FFD93D"/>
+    </linearGradient>
+  </defs>
+  <!-- Shadow -->
+  <ellipse cx="100" cy="180" rx="55" ry="8" fill="rgba(0,0,0,0.1)"/>
+  <!-- Gift box body -->
+  <rect x="45" y="85" width="110" height="90" rx="5" fill="url(#box)"/>
+  <!-- Polka dots on box -->
+  <circle cx="65" cy="110" r="5" fill="rgba(255,255,255,0.2)"/>
+  <circle cx="95" cy="130" r="5" fill="rgba(255,255,255,0.2)"/>
+  <circle cx="125" cy="105" r="5" fill="rgba(255,255,255,0.2)"/>
+  <circle cx="135" cy="145" r="5" fill="rgba(255,255,255,0.2)"/>
+  <circle cx="65" cy="155" r="5" fill="rgba(255,255,255,0.2)"/>
+  <!-- Gift box lid -->
+  <rect x="40" y="70" width="120" height="20" rx="4" fill="url(#lid)"/>
+  <!-- Vertical ribbon -->
+  <rect x="90" y="70" width="20" height="105" fill="url(#ribbon)"/>
+  <!-- Horizontal ribbon -->
+  <rect x="45" y="120" width="110" height="20" fill="url(#ribbon)"/>
+  <!-- Ribbon on lid -->
+  <rect x="90" y="70" width="20" height="20" fill="url(#ribbon)"/>
+  <!-- Bow -->
+  <ellipse cx="80" cy="55" rx="20" ry="15" fill="url(#ribbon)"/>
+  <ellipse cx="120" cy="55" rx="20" ry="15" fill="url(#ribbon)"/>
+  <ellipse cx="80" cy="55" rx="15" ry="10" fill="#FFD93D"/>
+  <ellipse cx="120" cy="55" rx="15" ry="10" fill="#FFD93D"/>
+  <!-- Bow center -->
+  <ellipse cx="100" cy="60" rx="12" ry="10" fill="url(#ribbon)"/>
+  <ellipse cx="100" cy="58" rx="8" ry="6" fill="#FFD93D"/>
+  <!-- Bow tails -->
+  <path d="M85 70 Q70 90 60 95" stroke="url(#ribbon)" stroke-width="10" fill="none" stroke-linecap="round"/>
+  <path d="M115 70 Q130 90 140 95" stroke="url(#ribbon)" stroke-width="10" fill="none" stroke-linecap="round"/>
+  <path d="M85 70 Q72 88 65 92" stroke="#FFD93D" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M115 70 Q128 88 135 92" stroke="#FFD93D" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <!-- Sparkles -->
+  <polygon points="30,45 32,50 37,50 33,53 35,58 30,55 25,58 27,53 23,50 28,50" fill="#4ECDC4"/>
+  <polygon points="170,50 172,55 177,55 173,58 175,63 170,60 165,63 167,58 163,55 168,55" fill="#A78BFA"/>
+  <polygon points="45,30 47,35 52,35 48,38 50,43 45,40 40,43 42,38 38,35 43,35" fill="#FFE66D"/>
+  <polygon points="155,25 157,30 162,30 158,33 160,38 155,35 150,38 152,33 148,30 153,30" fill="#FF6B6B"/>
+  <!-- Small sparkle circles -->
+  <circle cx="25" cy="80" r="3" fill="#4ECDC4"/>
+  <circle cx="175" cy="85" r="3" fill="#A78BFA"/>
+  <circle cx="35" cy="120" r="2" fill="#FFE66D"/>
+  <circle cx="165" cy="130" r="2" fill="#FF6B6B"/>
+</svg>

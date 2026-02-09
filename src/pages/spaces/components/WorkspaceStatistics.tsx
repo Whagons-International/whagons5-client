@@ -9,8 +9,10 @@ import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import { Badge } from "@/components/ui/badge";
 import { TasksCache } from "@/store/indexedDB/TasksCache";
+import { TaskEvents } from "@/store/eventEmiters/taskEvents";
 import { useLanguage } from "@/providers/LanguageProvider";
 
+import { Logger } from '@/utils/logger';
 interface WorkspaceStatisticsProps {
   workspaceId: string | undefined;
 }
@@ -52,11 +54,23 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
   const [statistics, setStatistics] = useState<WorkspaceStats | null>(null);
 
   const isCalculatingRef = useRef(false);
-  const lastCalculatedWorkspaceRef = useRef<string | undefined>(undefined);
   const [workspaceTasks, setWorkspaceTasks] = useState<Task[]>([]);
+
+  // Track the workspace we're currently loading for
+  const loadingWorkspaceRef = useRef<string | undefined>(undefined);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(true);
 
   // Load tasks from TasksCache (same as Workspace component)
   useEffect(() => {
+    let cancelled = false;
+    
+    // Reset state immediately when workspace changes
+    setWorkspaceTasks([]);
+    setStatistics(null);
+    setIsLoadingTasks(true);
+    isCalculatingRef.current = false;
+    loadingWorkspaceRef.current = workspaceId;
+    
     const loadTasks = async () => {
       try {
         // Initialize cache if needed
@@ -73,24 +87,58 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
           }
         }
         
+        Logger.info('workspaces', '[WorkspaceStatistics] Loading tasks with query:', query, 'workspaceId:', workspaceId);
+        
         // Query tasks from cache
         const result = await TasksCache.queryTasks(query);
         const loadedTasks = result?.rows || [];
-        setWorkspaceTasks(loadedTasks);
+        
+        Logger.info('workspaces', '[WorkspaceStatistics] Loaded tasks:', loadedTasks.length, 'for workspace:', workspaceId);
+        
+        // Only update if this is still the current workspace
+        if (!cancelled && loadingWorkspaceRef.current === workspaceId) {
+          setWorkspaceTasks(loadedTasks);
+          setIsLoadingTasks(false);
+        }
       } catch (error) {
-        console.error('[WorkspaceStatistics] Error loading tasks:', error);
-        setWorkspaceTasks([]);
+        Logger.error('workspaces', '[WorkspaceStatistics] Error loading tasks:', error);
+        if (!cancelled && loadingWorkspaceRef.current === workspaceId) {
+          setWorkspaceTasks([]);
+          setIsLoadingTasks(false);
+        }
       }
     };
     
     loadTasks();
+    
+    // Subscribe to task events to reload when cache updates
+    const unsubscribes = [
+      TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, loadTasks),
+      TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, loadTasks),
+      TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, loadTasks),
+      TaskEvents.on(TaskEvents.EVENTS.TASKS_BULK_UPDATE, loadTasks),
+      TaskEvents.on(TaskEvents.EVENTS.CACHE_INVALIDATE, loadTasks),
+    ];
+    
+    return () => {
+      cancelled = true;
+      unsubscribes.forEach((unsub) => {
+        try { unsub(); } catch {}
+      });
+    };
   }, [workspaceId]);
 
   // Calculate statistics
   const calculateStatistics = useCallback(async () => {
     if (isCalculatingRef.current) {
+      Logger.info('workspaces', '[WorkspaceStatistics] calculateStatistics: Already calculating, skipping...');
       return;
     }
+    
+    Logger.info('workspaces', '[WorkspaceStatistics] calculateStatistics: Starting calculation with', {
+      workspaceTasksCount: workspaceTasks.length,
+      workspaceId
+    });
     
     isCalculatingRef.current = true;
     setStatsLoading(true);
@@ -314,9 +362,18 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
         tasksBySpot
       };
       
+      Logger.info('workspaces', '[WorkspaceStatistics] calculateStatistics: Calculation complete:', {
+        totalTasks: finalStats.totalTasks,
+        totalCategories: finalStats.totalCategories,
+        totalTeams: finalStats.totalTeams,
+        urgentTasksCount: finalStats.urgentTasksCount,
+        overdueTasksCount: finalStats.overdueTasksCount,
+        completedTasksCount: finalStats.completedTasksCount
+      });
+      
       setStatistics(finalStats);
     } catch (error) {
-      console.error('[WorkspaceStatistics] Error calculating statistics:', error);
+      Logger.error('workspaces', '[WorkspaceStatistics] Error calculating statistics:', error);
       // Set empty statistics on error to prevent infinite loading
       setStatistics({
         totalTasks: 0,
@@ -343,26 +400,25 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
   }, [workspaceTasks, categories, teams, workspaces, priorities, statuses, templates, users, spots]);
 
   useEffect(() => {
-    // Skip if already calculated for this workspace and statistics exist
-    if (lastCalculatedWorkspaceRef.current === workspaceId && statistics && workspaceTasks.length > 0) {
+    // Don't calculate while still loading tasks
+    if (isLoadingTasks) {
+      Logger.info('workspaces', '[WorkspaceStatistics] Still loading tasks, waiting...');
       return;
     }
     
     // Don't calculate if already calculating
     if (isCalculatingRef.current) {
+      Logger.info('workspaces', '[WorkspaceStatistics] Already calculating, skipping...');
       return;
     }
     
-    // Reset and calculate for new workspace or if statistics don't exist
-    if (lastCalculatedWorkspaceRef.current !== workspaceId) {
-      setStatistics(null);
-      isCalculatingRef.current = false;
-    }
+    Logger.info('workspaces', '[WorkspaceStatistics] Tasks loaded, calculating statistics...', {
+      workspaceId,
+      workspaceTasksLength: workspaceTasks.length
+    });
     
-    // Always calculate to handle empty state properly
-    lastCalculatedWorkspaceRef.current = workspaceId;
     calculateStatistics();
-  }, [workspaceId, workspaceTasks, calculateStatistics]); // eslint-disable-line react-hooks-exhaustive-deps
+  }, [isLoadingTasks, workspaceTasks, calculateStatistics]);
 
   const renderStatCard = (
     title: string,
@@ -459,7 +515,7 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
     return () => clearTimeout(timeout);
   }, [statistics]);
 
-  if (!statistics || !showRealContent) {
+  if (isLoadingTasks || !statistics || !showRealContent) {
     return renderSkeletonLayout();
   }
 
@@ -1018,37 +1074,6 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
         )}
         </div>
 
-        {/* Latest Tasks List */}
-        <div style={{ opacity: hasNoData ? 0.4 : 1 }}>
-        {statistics.latestTasks.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">{t('workspace.statistics.latestTasks', 'Latest Tasks')}</CardTitle>
-              <CardDescription className="text-xs">{t('workspace.statistics.latestTasksDesc', 'Most recently created tasks')}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {statistics.latestTasks.map((task: Task) => {
-                  const category = (categories as Category[]).find((c: Category) => c.id === task.category_id);
-                  return (
-                    <div key={task.id} className="flex items-center justify-between p-2 border rounded-md hover:bg-accent/50">
-                      <div className="flex-1">
-                        <div className="text-sm font-medium">{task.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {category?.name || 'Uncategorized'} • {dayjs(task.created_at).format('MMM DD, YYYY HH:mm')}
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="ml-2">
-                        {task.status_id}
-                      </Badge>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-        </div>
 
       </div>
     </div>

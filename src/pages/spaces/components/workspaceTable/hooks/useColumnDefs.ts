@@ -42,6 +42,7 @@ export function useColumnDefs(opts: ColumnBuilderOptions & {
     opts.approvalApprovers,
     opts.taskApprovalInstances,
     opts.currentUserId,
+    opts.currentUserRoleIds,
     opts.slaMap,
     opts.slaMap,
     opts.visibleColumns,

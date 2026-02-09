@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 
+import { Logger } from '@/utils/logger';
 export function useTaskDialogComputed(params: any) {
   const {
     mode,
@@ -140,13 +141,13 @@ export function useTaskDialogComputed(params: any) {
           return allowedCategorySet.has(Number(cat.id));
         });
         
-        console.log('[useTaskDialogComputed] PROJECT workspace templates:', {
+        Logger.info('tasks', '[useTaskDialogComputed] PROJECT workspace templates:', {
           allowedCategoryIds,
           filteredCount: filtered.length,
           templateNames: filtered.map((t: any) => t.name)
         });
       } else {
-        console.log('[useTaskDialogComputed] Unknown workspace type:', currentWorkspaceData.type);
+        Logger.info('tasks', '[useTaskDialogComputed] Unknown workspace type:', currentWorkspaceData.type);
         return [];
       }
     }

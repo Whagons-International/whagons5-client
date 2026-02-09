@@ -101,7 +101,8 @@ export function AnimatedCheck({ active }: { active: boolean }) {
         d="M5 12.5 10 17 19 7"
         vectorEffect="non-scaling-stroke"
         pathLength={1}
-        style={{ strokeDasharray: 1 }}
+        style={{ strokeDasharray: 1, strokeDashoffset: active ? 0 : 1 }}
+        initial={{ strokeDashoffset: active ? 0 : 1 }}
         animate={{ strokeDashoffset: active ? 0 : 1, filter: active ? "blur(0px)" : "blur(2px)" }}
         transition={{ duration: 0.18, ease: "easeInOut" }}
       />

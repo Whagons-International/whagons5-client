@@ -9,6 +9,7 @@ import {
   ColorPicker,
   ColorPickerSelection,
   ColorPickerHue,
+  ColorPickerAlpha,
   ColorPickerEyeDropper,
   ColorPickerFormat,
   ColorPickerOutput,
@@ -16,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ColorPickerFieldProps } from "../types";
 
+import { Logger } from '@/utils/logger';
 export const ColorPickerField = ({ label, value, onChange, id, allowGradients = true }: ColorPickerFieldProps) => {
   const [open, setOpen] = useState(false);
   const isInternalUpdateRef = useRef(false);
@@ -168,11 +170,11 @@ export const ColorPickerField = ({ label, value, onChange, id, allowGradients = 
         onChange(oklch);
       } catch (e) {
         // Fallback to hex if conversion fails
-        console.warn('Failed to convert hex to OKLCH using colorizr:', hex, e);
+        Logger.warn('settings', 'Failed to convert hex to OKLCH using colorizr:', hex, e);
         onChange(hex);
       }
     } catch (e) {
-      console.warn('Failed to process color change:', e);
+      Logger.warn('settings', 'Failed to process color change:', e);
       onChange('#000000');
     }
   }, [onChange]);
@@ -264,7 +266,7 @@ export const ColorPickerField = ({ label, value, onChange, id, allowGradients = 
         }
       }
     } catch (e) {
-      console.warn('Failed to process gradient color change:', e);
+      Logger.warn('settings', 'Failed to process gradient color change:', e);
     }
   }, [onChange, getCssColor]);
 

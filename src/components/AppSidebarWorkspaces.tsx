@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useState, useRef, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import { WORKSPACE_TAB_PATHS, type WorkspaceTabKey } from '@/pages/spaces/workspace/constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   Plus,
   ChevronDown,
   Briefcase,
-  Layers,
   Inbox,
   Activity,
+  ListTodo,
 } from 'lucide-react';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
@@ -59,6 +60,7 @@ import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } 
 import { CSS } from '@dnd-kit/utilities';
 import { useLanguage } from '@/providers/LanguageProvider';
 
+import { Logger } from '@/utils/logger';
 const WS_ORDER_STORAGE = 'wh-workspace-order';
 
 const loadWorkspaceOrder = (): string[] => {
@@ -102,6 +104,7 @@ interface SortableWorkspaceItemProps {
   collapsed: boolean;
   getWorkspaceIcon: (iconName?: string) => any;
   taskCount?: number;
+  getWorkspacePath: (workspaceId: string | number) => string;
 }
 
 const WorkspaceIconBadge = ({
@@ -148,22 +151,40 @@ const WorkspaceLink = ({
     ? "bg-[var(--sidebar-selected-bg)] text-[var(--sidebar-primary)]" 
     : "text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]";
   
+  // Render icon with or without colored badge based on iconColor prop
+  const renderIcon = () => {
+    if (iconColor) {
+      // Render with colored badge
+      return (
+        <WorkspaceIconBadge color={iconColor} size={18}>
+          <Icon className="w-[11px] h-[11px]" style={{ color: '#ffffff' }} />
+        </WorkspaceIconBadge>
+      );
+    } else {
+      // Render plain icon without colored background
+      return (
+        <Icon className="w-[14px] h-[14px]" style={{ 
+          color: isActive ? 'var(--sidebar-primary)' : 'var(--sidebar-text-primary)',
+          flexShrink: 0
+        }} />
+      );
+    }
+  };
+  
   if (collapsed) {
     return (
       <Link
         to={to}
         className={`${baseClasses} ${activeClasses} justify-center`}
-        style={{ 
-          width: '32px', 
-          height: '32px',
+        style={{
+          width: '28px',
+          height: '28px',
           fontWeight: isActive ? 600 : 500,
-          boxShadow: isActive ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+          boxShadow: isActive ? 'inset 2px 0 0 var(--sidebar-primary)' : undefined,
         }}
         title={label}
       >
-        <WorkspaceIconBadge color={iconColor || 'var(--sidebar-primary)'}>
-          <Icon className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
-        </WorkspaceIconBadge>
+        {renderIcon()}
         <span className="sr-only">{label}</span>
       </Link>
     );
@@ -174,23 +195,21 @@ const WorkspaceLink = ({
       to={to}
       className={`${baseClasses} ${activeClasses} overflow-hidden`}
       style={{
-        height: '36px',
-        padding: '8px 12px',
-        gap: '10px',
+        height: '28px',
+        padding: '4px 8px',
+        gap: '6px',
         fontWeight: isActive ? 600 : 500,
-        fontSize: '15px',
-        boxShadow: isActive ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+        fontSize: '13px',
+        boxShadow: isActive ? 'inset 2px 0 0 var(--sidebar-primary)' : undefined,
       }}
     >
-      <WorkspaceIconBadge color={iconColor || 'var(--sidebar-primary)'}>
-        <Icon className="w-[14px] h-[14px]" style={{ color: '#ffffff' }} />
-      </WorkspaceIconBadge>
+      {renderIcon()}
       <span>{label}</span>
     </Link>
   );
 };
 
-function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIcon, taskCount }: SortableWorkspaceItemProps) {
+function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIcon, taskCount, getWorkspacePath }: SortableWorkspaceItemProps) {
   const {
     attributes,
     listeners,
@@ -208,7 +227,9 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
     zIndex: 'auto',
   };
 
-  const isActive = pathname === `/workspace/${workspace.id}`;
+  const workspacePath = `/workspace/${workspace.id}`;
+  const isActive = pathname === workspacePath || pathname.startsWith(`${workspacePath}/`);
+  const targetPath = getWorkspacePath(workspace.id);
   const buttonClass = collapsed
     ? `flex justify-center items-center ${isActive
         ? 'text-[var(--sidebar-primary)]'
@@ -241,7 +262,7 @@ function SortableWorkspaceItem({ workspace, pathname, collapsed, getWorkspaceIco
         }}
       >
         <Link
-          to={`/workspace/${workspace.id}`}
+          to={targetPath}
           data-workspace-id={String(workspace.id)}
           onClick={(e) => {
             if (isDragging) {
@@ -306,6 +327,36 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
   const collapsed = isCollapsedState && !isMobile;
   const { t } = useLanguage();
   const { user } = useAuth();
+  
+  // Get current tab from URL to preserve it when switching workspaces
+  const getCurrentTabFromUrl = useCallback((): WorkspaceTabKey | null => {
+    // Check if we're on a workspace page
+    const workspaceMatch = pathname.match(/^\/workspace\/[^/]+(.*)$/);
+    if (!workspaceMatch) return null;
+    
+    const tabPath = workspaceMatch[1] || '';
+    
+    // Find which tab matches the current path
+    for (const [tab, path] of Object.entries(WORKSPACE_TAB_PATHS)) {
+      if (path === tabPath) {
+        return tab as WorkspaceTabKey;
+      }
+    }
+    return 'grid'; // Default tab
+  }, [pathname]);
+  
+  // Build workspace path preserving current tab
+  const getWorkspacePath = useCallback((workspaceId: string | number): string => {
+    const currentTab = getCurrentTabFromUrl();
+    const basePath = `/workspace/${workspaceId}`;
+    
+    // If we're on a workspace page, preserve the current tab
+    if (currentTab && currentTab !== 'grid') {
+      return `${basePath}${WORKSPACE_TAB_PATHS[currentTab]}`;
+    }
+    
+    return basePath;
+  }, [getCurrentTabFromUrl]);
   
   // Filter out hidden workspaces
   const visibleWorkspaces = useMemo(() => {
@@ -399,6 +450,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
   const [workspaceType, setWorkspaceType] = useState('project');
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('none');
+  const [quickAccessOpen, setQuickAccessOpen] = useState(true);
 
   // Get teams and categories from Redux store
   const { value: teams } = useSelector((state: RootState) => state.teams) as { value: Team[] };
@@ -537,7 +589,7 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
       setSelectedCategoryId('none');
       setIsModalOpen(false);
     } catch (error: any) {
-      console.error('Error creating workspace:', error);
+      Logger.error('workspaces', 'Error creating workspace:', error);
       const errorMessage = error?.message || t('sidebar.failedToCreateWorkspace', 'Failed to create workspace. Please try again.');
       alert(errorMessage);
     }
@@ -545,32 +597,39 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
 
   return (
     <Collapsible defaultOpen className="group/collapsible">
-      {/* Virtual workspaces */}
+      {/* Quick Access - Virtual workspaces */}
       {showEverythingButton && (
-        <div className={collapsed ? 'px-2 flex flex-col items-center gap-2 mb-2' : 'space-y-2 mb-2'}>
-          <WorkspaceLink 
-            to="/activity" 
-            icon={Activity} 
-            label={t('sidebar.activityMonitor', 'Activity Monitor')} 
-            pathname={pathname} 
-            collapsed={collapsed}
-            iconColor="#8b5cf6"
-          />
-          <WorkspaceLink 
-            to="/workspace/all" 
-            icon={Layers} 
-            label={t('sidebar.everything', 'Everything')} 
-            pathname={pathname} 
-            collapsed={collapsed} 
-          />
-          <WorkspaceLink 
-            to="/shared-with-me" 
-            icon={Inbox} 
-            label={t('sidebar.sharedWithMe', 'Shared')} 
-            pathname={pathname} 
-            collapsed={collapsed} 
-          />
-        </div>
+        <Collapsible open={quickAccessOpen} onOpenChange={setQuickAccessOpen} className="group/quick-access">
+          <div className={collapsed ? 'px-2 flex flex-col items-center gap-1 mb-1' : 'space-y-0.5 mb-1'}>
+            <CollapsibleTrigger asChild>
+              <WorkspaceLink 
+                to="/activity" 
+                icon={Activity} 
+                label={t('sidebar.activityMonitor', 'Activity Monitor')} 
+                pathname={pathname} 
+                collapsed={collapsed}
+              />
+            </CollapsibleTrigger>
+            <CollapsibleContent keepRendered={true} forceVisible={collapsed}>
+              <div className={collapsed ? 'flex flex-col items-center gap-1' : 'space-y-0.5'}>
+                <WorkspaceLink 
+                  to="/workspace/all" 
+                  icon={ListTodo} 
+                  label={t('sidebar.todo', 'Todo')} 
+                  pathname={pathname} 
+                  collapsed={collapsed} 
+                />
+                <WorkspaceLink 
+                  to="/shared-with-me" 
+                  icon={Inbox} 
+                  label={t('sidebar.sharedWithMe', 'Shared')} 
+                  pathname={pathname} 
+                  collapsed={collapsed} 
+                />
+              </div>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
       )}
 
       <SidebarGroup>
@@ -629,15 +688,17 @@ export function AppSidebarWorkspaces({ workspaces, pathname, getWorkspaceIcon, s
                       collapsed={collapsed}
                       getWorkspaceIcon={getWorkspaceIcon}
                       taskCount={taskCounts[String(workspace.id)]}
+                      getWorkspacePath={getWorkspacePath}
                     />
                   ))}
                 </div>
               </SortableContext>
               <DragOverlay zIndex={10000}>
-                {activeId ? (() => {
+              {activeId ? (() => {
                   const w = localWorkspaces.find((x) => String(x.id) === String(activeId));
                   if (!w) return null;
-                  const isActive = pathname === `/workspace/${w.id}`;
+                  const dragWorkspacePath = `/workspace/${w.id}`;
+                  const isActive = pathname === dragWorkspacePath || pathname.startsWith(`${dragWorkspacePath}/`);
                   return (
                     <div
                       className="rounded-[8px] shadow-lg"

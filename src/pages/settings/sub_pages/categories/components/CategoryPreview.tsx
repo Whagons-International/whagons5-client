@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Category, Team } from "@/store/types";
 import { iconService } from '@/database/iconService';
 
+import { Logger } from '@/utils/logger';
 interface CategoryPreviewProps {
   category: Category;
   teams: Team[];
@@ -28,7 +29,7 @@ export const CategoryPreview = ({ category, teams, getCategoryTaskCount, transla
         const loadedIcon = await iconService.getIcon(iconName);
         setIcon(loadedIcon || faTags);
       } catch (error) {
-        console.error('Error loading category preview icon:', error);
+        Logger.error('settings', 'Error loading category preview icon:', error);
         setIcon(faTags);
       }
     };

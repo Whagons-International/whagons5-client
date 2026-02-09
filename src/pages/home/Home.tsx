@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,102 @@ import { useAuth } from "@/providers/AuthProvider";
 import WhagonsTitle from '@/assets/WhagonsTitle';
 import RotatingBackground from "@/components/marketing/RotatingBackground";
 import { HERO_BACKGROUND_IMAGES } from "@/assets/marketing/heroBackgrounds";
+import { api } from "@/store/api/internalApi";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faStopwatch,
+  faExclamationTriangle,
+  faCheckCircle,
+  faClock,
+} from "@fortawesome/free-solid-svg-icons";
+
+// SLA Dashboard Widget
+function SlaDashboardWidget({ t }: { t: (key: string, fallback?: string) => string }) {
+  const [slaData, setSlaData] = useState<any>(null);
+
+  useEffect(() => {
+    const from = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const to = new Date().toISOString().slice(0, 10);
+    api
+      .get("/analytics/sla/compliance-summary", { params: { from, to, group_by: "sla" } })
+      .then((r) => setSlaData(r.data?.data?.overview ?? r.data?.overview ?? null))
+      .catch(() => {});
+  }, []);
+
+  if (!slaData || slaData.total_tasks === 0) return null;
+
+  const formatDur = (s: number | null) => {
+    if (!s) return "-";
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center gap-2">
+          <FontAwesomeIcon icon={faStopwatch} className="text-teal-500" />
+          <CardTitle className="text-base">{t("home.slaCompliance", "SLA Compliance")}</CardTitle>
+        </div>
+        <CardDescription>{t("home.slaLast7Days", "Last 7 days")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-blue-500">{slaData.total_tasks}</div>
+            <div className="text-xs text-muted-foreground">{t("home.slaTasks", "SLA Tasks")}</div>
+          </div>
+          <div className="text-center">
+            <div className={`text-2xl font-bold ${
+              (slaData.response_compliance_pct ?? 100) >= 90 ? "text-green-500" : 
+              (slaData.response_compliance_pct ?? 100) >= 70 ? "text-yellow-500" : "text-red-500"
+            }`}>
+              {slaData.response_compliance_pct != null ? `${slaData.response_compliance_pct}%` : "-"}
+            </div>
+            <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+              <FontAwesomeIcon icon={faCheckCircle} className="text-[10px]" />
+              {t("home.slaResponseComp", "Response")}
+            </div>
+          </div>
+          <div className="text-center">
+            <div className={`text-2xl font-bold ${
+              (slaData.resolution_compliance_pct ?? 100) >= 90 ? "text-green-500" : 
+              (slaData.resolution_compliance_pct ?? 100) >= 70 ? "text-yellow-500" : "text-red-500"
+            }`}>
+              {slaData.resolution_compliance_pct != null ? `${slaData.resolution_compliance_pct}%` : "-"}
+            </div>
+            <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+              <FontAwesomeIcon icon={faCheckCircle} className="text-[10px]" />
+              {t("home.slaResolutionComp", "Resolution")}
+            </div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-red-500">
+              {(slaData.response_breaches ?? 0) + (slaData.resolution_breaches ?? 0)}
+            </div>
+            <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+              <FontAwesomeIcon icon={faExclamationTriangle} className="text-[10px]" />
+              {t("home.slaBreaches", "Breaches")}
+            </div>
+          </div>
+        </div>
+        {(slaData.avg_response_seconds || slaData.avg_resolution_seconds) && (
+          <div className="flex justify-center gap-6 mt-3 pt-3 border-t text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <FontAwesomeIcon icon={faClock} className="text-[10px]" />
+              Avg response: <strong>{formatDur(slaData.avg_response_seconds)}</strong>
+            </span>
+            <span className="flex items-center gap-1">
+              <FontAwesomeIcon icon={faClock} className="text-[10px]" />
+              Avg resolution: <strong>{formatDur(slaData.avg_resolution_seconds)}</strong>
+            </span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function Home() {
   const navigate = useNavigate();
@@ -25,7 +121,7 @@ function Home() {
     }
   });
   
-  const isSpanish = language === 'es-ES' || language.startsWith('es');
+  const isSpanish = language === 'es' || language.startsWith('es');
   
   const quotes = useMemo(() => {
     if (isSpanish) {
@@ -257,6 +353,9 @@ function Home() {
           </CardContent>
         </Card>
       </div>
+
+      {/* SLA Compliance Widget */}
+      <SlaDashboardWidget t={t} />
 
       {/* Tasks overview */}
       <Card>

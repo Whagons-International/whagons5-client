@@ -1,5 +1,5 @@
-# Use latest Bun image (includes Node 20+ required by Firebase packages)
-FROM oven/bun:latest
+# Stage 1: Build
+FROM oven/bun:latest AS builder
 
 WORKDIR /app
 
@@ -24,7 +24,8 @@ ENV VITE_DOMAIN=$VITE_DOMAIN
 ENV VITE_CACHE_ENCRYPTION=$VITE_CACHE_ENCRYPTION
 ENV VITE_ALLOW_UNVERIFIED_LOGIN=$VITE_ALLOW_UNVERIFIED_LOGIN
 ENV VITE_ALLOW_UNVERIFIED_EMAIL_REGEX=$VITE_ALLOW_UNVERIFIED_EMAIL_REGEX
-# Note: BRYNTUM_USERNAME and BRYNTUM_PASSWORD are used in RUN commands, not set as ENV
+# Use placeholder - will be replaced at runtime with SOURCE_COMMIT
+ENV VITE_GIT_COMMIT=__RUNTIME_COMMIT__
 
 # Copy package files
 COPY package.json bun.lock* bun.lockb* package-lock.json* pnpm-lock.yaml* ./
@@ -45,23 +46,56 @@ RUN set -ex && \
     echo "//npm.bryntum.com/:_authToken=$BRYNTUM_AUTH" >> .npmrc && \
     echo "=== Starting dependency installation ===" && \
     bun install && \
-    echo "=== Verifying installation ===" && \
-    ls -la node_modules/.bin/vite && \
-    ls -la node_modules/@firebase/auth && \
-    ls -la node_modules/firebase && \
     echo "=== Dependencies installed successfully ==="
 
 # Copy source code
 COPY . .
 
+# Increase Node.js memory limit for large builds
+ENV NODE_OPTIONS="--max-old-space-size=8192"
+
 # Build the application
 RUN bun run build
 
-# Expose port (Railway/Coolify will set PORT env var)
+# Stage 2: Serve with nginx (tiny image, ~25MB vs ~1GB)
+FROM nginx:alpine
+
+# Copy built assets
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# SPA fallback: all routes serve index.html
+RUN printf 'server {\n\
+    listen 3000;\n\
+    root /usr/share/nginx/html;\n\
+    index index.html;\n\
+\n\
+    # Enable gzip for all text assets\n\
+    gzip on;\n\
+    gzip_vary on;\n\
+    gzip_min_length 1024;\n\
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript image/svg+xml;\n\
+\n\
+    # Cache static assets aggressively (hashed filenames)\n\
+    location /assets/ {\n\
+        expires 1y;\n\
+        add_header Cache-Control "public, immutable";\n\
+    }\n\
+\n\
+    # SPA fallback\n\
+    location / {\n\
+        try_files $uri $uri/ /index.html;\n\
+    }\n\
+}\n' > /etc/nginx/conf.d/default.conf
+
+# Create startup script to inject SOURCE_COMMIT at runtime
+RUN printf '#!/bin/sh\n\
+COMMIT=${SOURCE_COMMIT:-unknown}\n\
+# Shorten to 7 chars if full hash\n\
+COMMIT=$(echo "$COMMIT" | cut -c1-7)\n\
+# Replace placeholder in all JS files\n\
+find /usr/share/nginx/html/assets -name "*.js" -exec sed -i "s/__RUNTIME_COMMIT__/$COMMIT/g" {} \\;\n\
+exec nginx -g "daemon off;"\n' > /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
+
 EXPOSE 3000
 
-# Use serve (via bunx) to serve static files from dist directory
-# Listen on port 3000 (serve defaults to 0.0.0.0)
-CMD ["bunx", "serve", "-s", "dist", "-l", "3000"]
-
-
+CMD ["/docker-entrypoint.sh"]

@@ -11,7 +11,7 @@ export const GRID_CONSTANTS = {
   ROW_HEIGHT: 64,
   HEADER_HEIGHT: 44,
   ROW_BUFFER: 20,
-  CLIENT_THRESHOLD: 1000,
+  CLIENT_THRESHOLD: 10000,
   CACHE_BLOCK_SIZE: 800,
   MAX_CONCURRENT_REQUESTS: 1,
   MAX_BLOCKS_IN_CACHE: 30,
@@ -50,7 +50,7 @@ export const createLoadingSpinner = () => (
   </div>
 );
 
-export const createGridContainer = (children: React.ReactNode) => {
+export const createGridContainer = (children: React.ReactNode, extraClass?: string) => {
   let densityClass = 'wh-density-comfortable';
   try {
     const v = (localStorage.getItem('wh_workspace_density') as any) || 'comfortable';
@@ -61,7 +61,7 @@ export const createGridContainer = (children: React.ReactNode) => {
   return (
     <div
       style={GRID_STYLES.container}
-      className={`ag-theme-quartz wh-workspace-grid wh-modern-grid wh-starwars-light-panel ${densityClass} h-full w-full`}
+      className={`ag-theme-quartz wh-workspace-grid wh-modern-grid wh-starwars-light-panel ${densityClass} h-full w-full ${extraClass || ''}`}
     >
       <div style={GRID_STYLES.grid}>
         {children}

@@ -2,12 +2,15 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Activity as ActivityIcon } from 'lucide-react';
-import { useSelector } from 'react-redux';
-import { RootState } from '@/store/store';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState, AppDispatch } from '@/store/store';
 import { RealTimeListener } from '@/store/realTimeListener/RTL';
 import { useAuth } from '@/providers/AuthProvider';
+import { useLanguage } from '@/providers/LanguageProvider';
+import { genericInternalActions } from '@/store/genericSlices';
 
 // Import visualization components
+import ActivityCosmos from './visualizations/ActivityCosmos';
 import ActivityRiver from './visualizations/ActivityRiver';
 import AnimatedKanban from './visualizations/AnimatedKanban';
 import NetworkGraph from './visualizations/NetworkGraph';
@@ -19,6 +22,7 @@ import MetroMap from './visualizations/MetroMap';
 import MusicVisualizer from './visualizations/MusicVisualizer';
 import CardWallPhysics from './visualizations/CardWallPhysics';
 
+import { Logger } from '@/utils/logger';
 // Types for activity data
 export interface ActivityEvent {
   id: string;
@@ -35,6 +39,7 @@ export interface ActivityEvent {
 }
 
 type VisualizationType = 
+  | 'cosmos'
   | 'river' 
   | 'kanban' 
   | 'network' 
@@ -46,18 +51,10 @@ type VisualizationType =
   | 'visualizer' 
   | 'physics';
 
-const visualizationOptions = [
-  { value: 'river', label: 'Activity River', description: 'Flowing cards showing live activity' },
-  { value: 'kanban', label: 'Animated Kanban', description: 'Cards moving between activity lanes' },
-  { value: 'network', label: 'Network Graph', description: 'Users connected by their actions' },
-  { value: 'timeline', label: 'Timeline Swim Lanes', description: 'Horizontal timeline with user lanes' },
-  { value: 'carousel', label: '3D Card Carousel', description: 'Rotating 3D activity cards' },
-  { value: 'heatmap', label: 'Activity Heat Map', description: 'Visual intensity grid of activity' },
-  { value: 'galaxy', label: 'Particle Galaxy', description: 'Beautiful space-themed activity view' },
-  { value: 'metro', label: 'Metro Map', description: 'Transit-style activity flow' },
-  { value: 'visualizer', label: 'Music Visualizer', description: 'Audio-reactive activity bars' },
-  { value: 'physics', label: 'Physics Card Wall', description: 'Cards with physics falling and stacking' },
-];
+const visualizationKeys = [
+  'cosmos', 'river', 'kanban', 'network', 'timeline', 
+  'carousel', 'heatmap', 'galaxy', 'metro', 'visualizer', 'physics'
+] as const;
 
 interface RTLMessage {
   type: 'ping' | 'system' | 'error' | 'echo' | 'database';
@@ -74,17 +71,30 @@ interface RTLMessage {
 }
 
 export default function ActivityMonitor() {
-  const [selectedVisualization, setSelectedVisualization] = useState<VisualizationType>('river');
+  const [selectedVisualization, setSelectedVisualization] = useState<VisualizationType>('cosmos');
   const [activities, setActivities] = useState<ActivityEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const { user } = useAuth();
+  const { t } = useLanguage();
+  const dispatch = useDispatch<AppDispatch>();
   const users = useSelector((s: RootState) => (s as any).users?.value as any[] || []);
   const priorities = useSelector((s: RootState) => (s as any).priorities?.value as any[] || []);
+  const taskLogs = useSelector((s: RootState) => (s as any).taskLogs?.value as any[] || []);
+
+  // Build visualization options with translations
+  const visualizationOptions = useMemo(() => 
+    visualizationKeys.map(key => ({
+      value: key,
+      label: t(`activity.visualizations.${key}.label`, key),
+      description: t(`activity.visualizations.${key}.description`, '')
+    })),
+    [t]
+  );
 
   // Convert RTL publication message to ActivityEvent
   const convertPublicationToActivity = useCallback((data: RTLMessage): ActivityEvent | null => {
     if (data.type !== 'database' || !data.table || !data.operation) {
-      console.debug('ActivityMonitor: Skipping non-database message', data.type);
+      Logger.debug('activity', 'ActivityMonitor: Skipping non-database message', data.type);
       return null;
     }
 
@@ -206,19 +216,19 @@ export default function ActivityMonitor() {
     }
 
     if (!activityType) {
-      console.debug('ActivityMonitor: No activity type determined', { table, operation });
+      Logger.debug('activity', 'ActivityMonitor: No activity type determined', { table, operation });
       return null;
     }
 
     // Use current user as fallback if no userId found
     if (!userId && user?.id) {
       userId = typeof user.id === 'number' ? user.id : Number(user.id);
-      console.debug('ActivityMonitor: Using current user as fallback', userId);
+      Logger.debug('activity', 'ActivityMonitor: Using current user as fallback', userId);
     }
 
     // If still no userId, we can't create an activity
     if (!userId) {
-      console.debug('ActivityMonitor: No userId found, skipping activity', { table, operation, newData });
+      Logger.debug('activity', 'ActivityMonitor: No userId found, skipping activity', { table, operation, newData });
       return null;
     }
 
@@ -248,7 +258,7 @@ export default function ActivityMonitor() {
       relatedUserId,
     };
 
-    console.debug('ActivityMonitor: Created activity', activity);
+    Logger.debug('activity', 'ActivityMonitor: Created activity', activity);
     return activity;
   }, [users, user, priorities]);
 
@@ -263,19 +273,20 @@ export default function ActivityMonitor() {
 
     // Handle publication messages
     const handlePublication = (data: RTLMessage) => {
-      console.debug('ActivityMonitor: Received publication', data);
+      Logger.debug('activity', 'ActivityMonitor: Received publication', data);
       const activity = convertPublicationToActivity(data);
       if (activity) {
-        console.debug('ActivityMonitor: Adding activity', activity);
+        Logger.debug('activity', 'ActivityMonitor: Adding activity', activity);
         setActivities(prev => [activity, ...prev].slice(0, 100)); // Keep last 100
       } else {
-        console.debug('ActivityMonitor: No activity created from publication', data);
+        Logger.debug('activity', 'ActivityMonitor: No activity created from publication', data);
       }
     };
 
     // Handle connection status
     const handleConnectionStatus = (status: any) => {
-      if (status.status === 'connected') {
+      Logger.info('activity', 'ActivityMonitor: Connection status:', status);
+      if (status.status === 'connected' || status.status === 'authenticated') {
         setIsConnected(true);
       } else if (status.status === 'disconnected' || status.status === 'failed') {
         setIsConnected(false);
@@ -287,7 +298,7 @@ export default function ActivityMonitor() {
 
     // Connect to RTE
     rtl.connectAndHold().catch((error) => {
-      console.error('Failed to connect to RTE:', error);
+      Logger.error('activity', 'Failed to connect to RTE:', error);
       setIsConnected(false);
     });
 
@@ -298,6 +309,73 @@ export default function ActivityMonitor() {
     };
   }, [user, convertPublicationToActivity]);
 
+  // Load historical task logs on mount
+  useEffect(() => {
+    if (!user) return;
+    // First try to get from IndexedDB (fast)
+    dispatch(genericInternalActions.taskLogs.getFromIndexedDB({}));
+    // Then fetch from API to ensure we have latest data
+    dispatch(genericInternalActions.taskLogs.fetchFromAPI({}));
+  }, [user, dispatch]);
+
+  // Debug: log taskLogs changes
+  useEffect(() => {
+    Logger.info('activity', 'ActivityMonitor: taskLogs updated, count:', taskLogs.length);
+  }, [taskLogs]);
+
+  // Convert task logs to activities for initial display
+  useEffect(() => {
+    if (taskLogs.length === 0 || users.length === 0) return;
+
+    const historicalActivities: ActivityEvent[] = taskLogs
+      .map((log: any) => {
+        const logUser = users.find((u: any) => u.id === log.user_id);
+        const userName = logUser?.name || logUser?.email || `User ${log.user_id}`;
+        
+        // Determine activity type from action
+        let activityType: ActivityEvent['type'] = 'task_updated';
+        if (log.action === 'created') activityType = 'task_created';
+        else if (log.action === 'status_changed') activityType = 'status_changed';
+        else if (log.action === 'assigned') activityType = 'user_assigned';
+        
+        // Build title based on action
+        let title = `Task ${log.action}`;
+        if (log.new_values?.name) {
+          title = `${log.action === 'created' ? 'Created' : 'Updated'} task: ${log.new_values.name}`;
+        }
+        
+        return {
+          id: log.uuid || `log-${log.id}`,
+          type: activityType,
+          userId: log.user_id,
+          userName,
+          timestamp: new Date(log.updated_at || log.created_at),
+          title,
+          description: log.new_values?.description || '',
+          priority: undefined,
+          metadata: {
+            task_id: log.task_id,
+            action: log.action,
+            old_values: log.old_values,
+            new_values: log.new_values,
+          },
+        };
+      })
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+      .slice(0, 100);
+
+    // Only set if we don't have real-time activities yet
+    setActivities(prev => {
+      if (prev.length === 0) {
+        return historicalActivities;
+      }
+      // Merge: keep real-time activities at the top, add historical ones that aren't duplicates
+      const existingIds = new Set(prev.map(a => a.id));
+      const newHistorical = historicalActivities.filter(a => !existingIds.has(a.id));
+      return [...prev, ...newHistorical].slice(0, 100);
+    });
+  }, [taskLogs, users]);
+
   const selectedOption = useMemo(
     () => visualizationOptions.find(opt => opt.value === selectedVisualization),
     [selectedVisualization]
@@ -305,6 +383,8 @@ export default function ActivityMonitor() {
 
   const renderVisualization = () => {
     switch (selectedVisualization) {
+      case 'cosmos':
+        return <ActivityCosmos activities={activities} />;
       case 'river':
         return <ActivityRiver activities={activities} />;
       case 'kanban':
@@ -326,20 +406,20 @@ export default function ActivityMonitor() {
       case 'physics':
         return <CardWallPhysics activities={activities} />;
       default:
-        return <ActivityRiver activities={activities} />;
+        return <ActivityCosmos activities={activities} />;
     }
   };
 
-  return (
+return (
     <div className="flex flex-col h-full bg-background">
       {/* Header with Visualization Selector */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-border/40 bg-background/95 backdrop-blur-sm">
         <div className="flex items-center gap-3">
           <ActivityIcon className="w-6 h-6 text-primary" />
           <div>
-            <h1 className="text-2xl font-bold">Activity Monitor</h1>
+            <h1 className="text-2xl font-bold">{t('activity.monitor.title', 'Activity Monitor')}</h1>
             <p className="text-sm text-muted-foreground">
-              Live view of what's happening • {activities.length} recent activities
+              {t('activity.monitor.subtitle', 'Live view of what\'s happening')} • {activities.length} {t('activity.monitor.recentActivities', 'recent activities')}
             </p>
           </div>
         </div>
@@ -349,18 +429,18 @@ export default function ActivityMonitor() {
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
             <span className="text-sm text-muted-foreground">
-              {isConnected ? 'Live' : 'Disconnected'}
+              {isConnected ? t('activity.monitor.live', 'Live') : t('activity.monitor.disconnected', 'Disconnected')}
             </span>
           </div>
 
           {/* Visualization selector */}
           <div className="flex items-center gap-3 pl-4 border-l border-border/40">
             <Label htmlFor="visualization-select" className="text-sm font-medium whitespace-nowrap">
-              View Style:
+              {t('activity.monitor.viewStyle', 'View Style:')}
             </Label>
             <Select value={selectedVisualization} onValueChange={(v) => setSelectedVisualization(v as VisualizationType)}>
               <SelectTrigger id="visualization-select" className="w-[280px]">
-                <SelectValue placeholder="Select visualization" />
+                <SelectValue placeholder={t('activity.monitor.selectVisualization', 'Select visualization')} />
               </SelectTrigger>
               <SelectContent>
                 {visualizationOptions.map((option) => (

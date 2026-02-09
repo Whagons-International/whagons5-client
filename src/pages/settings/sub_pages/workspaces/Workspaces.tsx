@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useSelector } from "react-redux";
+import { useLocation } from "react-router-dom";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDiagramProject, faPlus, faChartBar, faSpinner, faExclamationTriangle, faCheckCircle, faClock, faUsers, faLayerGroup, faTrash, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
@@ -24,6 +25,7 @@ import { useLanguage } from "@/providers/LanguageProvider";
 import { useAuth } from "@/providers/AuthProvider";
 import { actionsApi } from "@/api/whagonsActionsApi";
 
+import { Logger } from '@/utils/logger';
 // Custom cell renderer for workspace name with color indicator
 const WorkspaceNameCellRenderer = (props: ICellRendererParams) => {
   const workspace = props.data as Workspace;
@@ -53,6 +55,7 @@ function Workspaces() {
   const { t } = useLanguage();
   const tw = (key: string, fallback: string) => t(`settings.workspaces.${key}`, fallback);
   const { user, refetchUser, updateUser } = useAuth();
+  const location = useLocation();
   
   // Redux state for related data
   const { value: categories } = useSelector((state: RootState) => state.categories);
@@ -75,7 +78,7 @@ function Workspaces() {
   
   // Toggle workspace visibility with optimistic updates
   const handleToggleWorkspaceVisibility = useCallback(async (workspaceId: number, e?: React.MouseEvent) => {
-    console.log('Toggle visibility clicked for workspace:', workspaceId);
+    Logger.info('workspaces', 'Toggle visibility clicked for workspace:', workspaceId);
     
     // Prevent any default behavior or event propagation
     if (e) {
@@ -85,12 +88,12 @@ function Workspaces() {
     
     // Prevent multiple simultaneous toggles for the same workspace
     if (isTogglingRef.current.has(workspaceId)) {
-      console.log('Already toggling, ignoring');
+      Logger.info('workspaces', 'Already toggling, ignoring');
       return;
     }
     
     if (!user) {
-      console.warn('Cannot toggle workspace visibility: user not loaded');
+      Logger.warn('workspaces', 'Cannot toggle workspace visibility: user not loaded');
       return;
     }
     
@@ -102,7 +105,7 @@ function Workspaces() {
       const currentHidden = new Set(effectiveHiddenIds);
       const wasHidden = currentHidden.has(workspaceId);
       
-      console.log('Current state - isHidden:', wasHidden, 'effectiveHiddenIds:', Array.from(effectiveHiddenIds));
+      Logger.info('workspaces', 'Current state - isHidden:', wasHidden, 'effectiveHiddenIds:', Array.from(effectiveHiddenIds));
       
       if (wasHidden) {
         currentHidden.delete(workspaceId);
@@ -112,14 +115,14 @@ function Workspaces() {
       
       const newHiddenSet = new Set(currentHidden);
       
-      console.log('New state - hiddenWorkspaces:', Array.from(newHiddenSet));
+      Logger.info('workspaces', 'New state - hiddenWorkspaces:', Array.from(newHiddenSet));
       
       // Store the expected state for later comparison
       lastUpdateRef.current = newHiddenSet;
       
       // Update optimistic state immediately
       setOptimisticHiddenIds(newHiddenSet);
-      console.log('Optimistic state updated');
+      Logger.info('workspaces', 'Optimistic state updated');
       
       const newSettings = {
         ...(((user as any).settings || {}) as any),
@@ -127,53 +130,53 @@ function Workspaces() {
       };
       
       // Update server
-      console.log('Sending API request with settings:', newSettings);
+      Logger.info('workspaces', 'Sending API request with settings:', newSettings);
       const response = await actionsApi.patch('/users/me', { settings: newSettings });
-      console.log('API request successful', response.data);
+      Logger.info('workspaces', 'API request successful', response.data);
       
       // Verify the response contains the updated settings
       const updatedUser = response?.data?.data || response?.data;
-      console.log('API response user data:', updatedUser);
-      console.log('API response settings:', updatedUser?.settings);
+      Logger.info('workspaces', 'API response user data:', updatedUser);
+      Logger.info('workspaces', 'API response settings:', updatedUser?.settings);
       
       if ((updatedUser as any)?.settings?.hiddenWorkspaces) {
         const serverHiddenSet = new Set((((updatedUser as any).settings?.hiddenWorkspaces) || []) as number[]);
-        console.log('Server returned hiddenWorkspaces:', Array.from(serverHiddenSet));
+        Logger.info('workspaces', 'Server returned hiddenWorkspaces:', Array.from(serverHiddenSet));
         
         // Verify it matches what we sent
         if (serverHiddenSet.size === newHiddenSet.size && 
             Array.from(serverHiddenSet).every(id => newHiddenSet.has(id))) {
-          console.log('✅ Server response matches our update');
+          Logger.info('workspaces', '✅ Server response matches our update');
         } else {
-          console.warn('⚠️ Server response does not match our update!', {
+          Logger.warn('workspaces', '⚠️ Server response does not match our update!', {
             sent: Array.from(newHiddenSet),
             received: Array.from(serverHiddenSet)
           });
         }
       } else {
-        console.warn('⚠️ API response does not include hiddenWorkspaces in settings');
-        console.log('Full response:', JSON.stringify(response?.data, null, 2));
+        Logger.warn('workspaces', '⚠️ API response does not include hiddenWorkspaces in settings');
+        Logger.info('workspaces', 'Full response:', JSON.stringify(response?.data, null, 2));
       }
       
       // Update user state directly from API response without full refetch
       // This avoids the blank screen flash
       if (updatedUser) {
         updateUser(updatedUser);
-        console.log('User state updated directly from API response (no refresh)');
+        Logger.info('workspaces', 'User state updated directly from API response (no refresh)');
       } else {
         // Fallback: if response doesn't have user data, do a silent background refetch
         setTimeout(async () => {
           try {
             await refetchUser();
-            console.log('User state updated from background refetch');
+            Logger.info('workspaces', 'User state updated from background refetch');
           } catch (refetchError) {
-            console.warn('Failed to refetch user, but API update succeeded:', refetchError);
+            Logger.warn('workspaces', 'Failed to refetch user, but API update succeeded:', refetchError);
           }
         }, 1000); // Delay to avoid immediate refresh
       }
     } catch (error: any) {
-      console.error('Failed to update workspace visibility:', error);
-      console.error('Error details:', {
+      Logger.error('workspaces', 'Failed to update workspace visibility:', error);
+      Logger.error('workspaces', 'Error details:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status
@@ -185,7 +188,7 @@ function Workspaces() {
       
       // Show error without causing page refresh
       const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
-      console.error('Error message:', errorMessage);
+      Logger.error('workspaces', 'Error message:', errorMessage);
       // Use a non-blocking error notification instead of alert
       // alert() can sometimes cause issues, so we'll just log it for now
       // You can replace this with a toast notification if available
@@ -209,11 +212,11 @@ function Workspaces() {
           Array.from(expectedSet).every(id => serverHiddenSet.has(id));
       
       if (setsMatch) {
-        console.log('Server state matches optimistic state, clearing optimistic state');
+        Logger.info('workspaces', 'Server state matches optimistic state, clearing optimistic state');
         setOptimisticHiddenIds(null);
         lastUpdateRef.current = null;
       } else {
-        console.log('Server state does not match optimistic state yet', {
+        Logger.info('workspaces', 'Server state does not match optimistic state yet', {
           optimistic: Array.from(optimisticHiddenIds),
           expected: Array.from(expectedSet),
           server: Array.from(serverHiddenSet)
@@ -337,13 +340,45 @@ function Workspaces() {
   };
 
   // Track active tab to calculate stats when statistics tab is selected
-  const [activeTab, setActiveTab] = useState<string>('workspaces');
+  // Read from URL to ensure proper sync
+  const getActiveTabFromUrl = useCallback(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const tabFromUrl = urlParams.get('tab');
+    if (tabFromUrl === 'statistics') return 'statistics';
+    return 'workspaces';
+  }, [location.search]);
+  
+  const [activeTab, setActiveTab] = useState<string>(getActiveTabFromUrl());
   const isCalculatingRef = useRef(false);
+
+  // Update activeTab when URL changes
+  useEffect(() => {
+    const tabFromUrl = getActiveTabFromUrl();
+    if (tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [location.search, getActiveTabFromUrl, activeTab]);
 
   // Calculate statistics
   const calculateStatistics = useCallback(async () => {
     // Prevent concurrent calculations
-    if (isCalculatingRef.current) return;
+    if (isCalculatingRef.current) {
+      Logger.info('workspaces', 'Statistics calculation already in progress, skipping...');
+      return;
+    }
+    
+    // Ensure we have data arrays (they might be undefined initially)
+    const workspacesArray = Array.isArray(workspaces) ? workspaces : [];
+    const tasksArray = Array.isArray(tasks) ? tasks : [];
+    const categoriesArray = Array.isArray(categories) ? categories : [];
+    const teamsArray = Array.isArray(teams) ? teams : [];
+    
+    Logger.info('workspaces', 'Starting statistics calculation...', {
+      workspacesCount: workspacesArray.length,
+      tasksCount: tasksArray.length,
+      categoriesCount: categoriesArray.length,
+      teamsCount: teamsArray.length
+    });
     
     isCalculatingRef.current = true;
     setStatsLoading(true);
@@ -353,11 +388,17 @@ function Workspaces() {
 
     try {
       // Most active workspaces (by task count)
-      const workspaceStats = workspaces.map((workspace: Workspace) => ({
+      const workspaceStats = workspacesArray.map((workspace: Workspace) => ({
         workspace,
-        taskCount: getWorkspaceTaskCount(workspace.id),
-        categoryCount: getWorkspaceCategoryCount(workspace.id),
-        teamCount: getWorkspaceTeamCount(workspace.id)
+        taskCount: tasksArray.filter((task: Task) => task.workspace_id === workspace.id).length,
+        categoryCount: categoriesArray.filter((category: Category) => category.workspace_id === workspace.id).length,
+        teamCount: (() => {
+          const workspaceObj = workspacesArray.find((w: Workspace) => w.id === workspace.id);
+          if (workspaceObj && Array.isArray((workspaceObj as any).teams)) {
+            return (workspaceObj as any).teams.length;
+          }
+          return 0;
+        })()
       }));
 
       const mostActiveWorkspaces = [...workspaceStats]
@@ -365,7 +406,7 @@ function Workspaces() {
         .slice(0, 10);
 
       // Urgent tasks across all workspaces
-      const urgentTasksCount = (tasks as Task[]).filter((task: Task) => {
+      const urgentTasksCount = tasksArray.filter((task: Task) => {
         // Check if task is urgent based on priority or due date
         const dueDate = task.due_date ? new Date(task.due_date) : null;
         const now = new Date();
@@ -377,18 +418,18 @@ function Workspaces() {
       }).length;
 
       // Tasks with approvals
-      const tasksWithApprovalsCount = (tasks as Task[]).filter((task: Task) => 
+      const tasksWithApprovalsCount = tasksArray.filter((task: Task) => 
         task.approval_id !== null && task.approval_id !== undefined
       ).length;
 
       // Latest tasks (last 10)
-      const latestTasks = [...(tasks as Task[])]
+      const latestTasks = [...tasksArray]
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 10);
 
       // Workspaces by type
       const typeCounts = new Map<string, number>();
-      workspaces.forEach((workspace: Workspace) => {
+      workspacesArray.forEach((workspace: Workspace) => {
         const type = (workspace as any).type || 'standard';
         typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
       });
@@ -400,7 +441,7 @@ function Workspaces() {
       // Tasks over time (last 30 days)
       const tasksOverTimeMap = new Map<string, number>();
       
-      (tasks as Task[]).forEach((task: Task) => {
+      tasksArray.forEach((task: Task) => {
         const date = dayjs(task.created_at).format('YYYY-MM-DD');
         tasksOverTimeMap.set(date, (tasksOverTimeMap.get(date) || 0) + 1);
       });
@@ -410,20 +451,25 @@ function Workspaces() {
         .sort((a, b) => a.date.localeCompare(b.date))
         .slice(-30); // Last 30 days
 
-      setStatistics({
-        totalWorkspaces: workspaces.length,
-        totalTasks: (tasks as Task[]).length,
-        totalCategories: categories.length,
-        totalTeams: teams.length,
+      const statsData = {
+        totalWorkspaces: workspacesArray.length,
+        totalTasks: tasksArray.length,
+        totalCategories: categoriesArray.length,
+        totalTeams: teamsArray.length,
         mostActiveWorkspaces,
         urgentTasksCount,
         tasksWithApprovalsCount,
         latestTasks,
         workspacesByType,
         tasksOverTime
-      });
+      };
+      
+      Logger.info('workspaces', 'Statistics calculated successfully:', statsData);
+      setStatistics(statsData);
     } catch (error) {
-      console.error('Error calculating statistics:', error);
+      Logger.error('workspaces', 'Error calculating statistics:', error);
+      setStatsLoading(false);
+      isCalculatingRef.current = false;
     } finally {
       setStatsLoading(false);
       isCalculatingRef.current = false;
@@ -431,6 +477,8 @@ function Workspaces() {
   }, [workspaces, tasks, categories, teams]);
 
   useEffect(() => {
+    Logger.info('workspaces', 'Tab change detected:', { activeTab, loading, isCalculating: isCalculatingRef.current });
+    
     // Reset statistics when switching away from statistics tab
     if (activeTab !== 'statistics') {
       setStatistics(null);
@@ -438,11 +486,17 @@ function Workspaces() {
     }
     
     // Calculate statistics when switching to statistics tab
-    if (activeTab === 'statistics' && !isCalculatingRef.current) {
+    // Only calculate if not already loading and data is available
+    if (activeTab === 'statistics' && !isCalculatingRef.current && !loading) {
+      Logger.info('workspaces', 'Triggering statistics calculation...');
       setStatistics(null); // Clear old stats first
       calculateStatistics();
+    } else if (activeTab === 'statistics' && loading) {
+      Logger.info('workspaces', 'Waiting for data to load before calculating statistics...');
+    } else if (activeTab === 'statistics' && isCalculatingRef.current) {
+      Logger.info('workspaces', 'Statistics calculation already in progress...');
     }
-  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab, calculateStatistics, loading]);
 
   // Column definitions for AG Grid
   const colDefs = useMemo<ColDef[]>(() => [
@@ -508,7 +562,7 @@ function Workspaces() {
                 e.preventDefault();
                 e.stopPropagation();
                 (e.nativeEvent as any)?.stopImmediatePropagation?.();
-                console.log('Button clicked for workspace:', workspaceId);
+                Logger.info('workspaces', 'Button clicked for workspace:', workspaceId);
                 handleToggleWorkspaceVisibility(workspaceId, e);
               }}
               disabled={!user}
@@ -528,18 +582,8 @@ function Workspaces() {
       pinned: 'right',
       suppressMovable: true,
       cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' }
-    },
-    {
-      field: 'actions',
-      headerName: tw('grid.columns.actions', 'Actions'),
-      width: 100,
-      cellRenderer: () => null,
-      sortable: false,
-      filter: false,
-      resizable: false,
-      pinned: 'right'
     }
-  ], [categories, handleEdit, handleDeleteWorkspace, effectiveHiddenIds, handleToggleWorkspaceVisibility, user, tw]);
+  ], [categories, effectiveHiddenIds, handleToggleWorkspaceVisibility, user, tw]);
 
   // Form handlers
   const handleCreateSubmit = async (e: React.FormEvent) => {

@@ -1,34 +1,69 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useState, useCallback, useMemo, useRef, useEffect, lazy, Suspense } from "react";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store";
 
+import { Logger } from '@/utils/logger';
 // Lazy load AgGridReact component
 const AgGridReact = lazy(() => import('ag-grid-react').then(module => ({ default: module.AgGridReact })));
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  team_name: string;
-  organization_name: string;
-  created_at: string;
-  role: boolean;
-  has_active_subscription: boolean;
-}
 
 interface UsersTabProps {
   modulesLoaded: boolean;
   selectedTeamFilter: string | null;
   onClearTeamFilter: () => void;
+  workspaceTeamIds: number[];
 }
 
 function UsersTab({ 
   modulesLoaded, 
   selectedTeamFilter, 
-  onClearTeamFilter 
+  onClearTeamFilter,
+  workspaceTeamIds
 }: UsersTabProps) {
   const gridRef = useRef<any>(null);
   const rowCache = useRef(new Map<string, { rows: any[]; rowCount: number }>());
+
+  // Get users, teams, and userTeams from Redux store
+  const { value: allUsers } = useSelector((state: RootState) => (state as any).users as { value: any[] });
+  const { value: allTeams } = useSelector((state: RootState) => (state as any).teams as { value: any[] });
+  const { value: userTeams } = useSelector((state: RootState) => (state as any).userTeams as { value: any[] });
+
+  // Filter users that belong to teams with access to this workspace
+  const workspaceUsers = useMemo(() => {
+    if (!workspaceTeamIds || workspaceTeamIds.length === 0) return [];
+    if (!allUsers || !userTeams) return [];
+
+    // Get user IDs that belong to any of the workspace teams
+    const userIdsInWorkspaceTeams = new Set(
+      userTeams
+        .filter((ut: any) => workspaceTeamIds.includes(ut.team_id))
+        .map((ut: any) => ut.user_id)
+    );
+
+    // Get team lookup for display
+    const teamLookup = new Map(allTeams.map((t: any) => [t.id, t]));
+
+    // Filter users and add team info
+    return allUsers
+      .filter((user: any) => userIdsInWorkspaceTeams.has(user.id))
+      .map((user: any) => {
+        // Find the user's teams that are in the workspace
+        const userTeamIds = userTeams
+          .filter((ut: any) => ut.user_id === user.id && workspaceTeamIds.includes(ut.team_id))
+          .map((ut: any) => ut.team_id);
+        
+        const userTeamNames = userTeamIds
+          .map((teamId: number) => teamLookup.get(teamId)?.name)
+          .filter(Boolean);
+
+        return {
+          ...user,
+          team_name: userTeamNames.join(', ') || 'No team',
+          team_ids: userTeamIds
+        };
+      });
+  }, [allUsers, allTeams, userTeams, workspaceTeamIds]);
 
   // Generate cache key based on request parameters
   const getCacheKey = useCallback((params: any) => {
@@ -41,6 +76,7 @@ function UsersTab({
   const [userColumnDefs] = useState([
     {
       field: 'id',
+      headerName: 'ID',
       maxWidth: 80,
       cellRenderer: (params: any) => {
         if (params.value !== undefined) {
@@ -52,14 +88,27 @@ function UsersTab({
     },
     {
       field: 'name',
+      headerName: 'Name',
       minWidth: 150,
       cellRenderer: (params: any) => {
         if (params.data?.name) {
+          const avatarColor = params.data.color || '#6366f1';
           return (
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-medium">
-                {params.data.name.charAt(0).toUpperCase()}
-              </div>
+              {params.data.url_picture ? (
+                <img 
+                  src={params.data.url_picture} 
+                  alt={params.data.name}
+                  className="w-8 h-8 rounded-full object-cover"
+                />
+              ) : (
+                <div 
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium text-white"
+                  style={{ backgroundColor: avatarColor }}
+                >
+                  {params.data.name.charAt(0).toUpperCase()}
+                </div>
+              )}
               <span>{params.data.name}</span>
             </div>
           );
@@ -69,37 +118,37 @@ function UsersTab({
     },
     {
       field: 'email',
+      headerName: 'Email',
       minWidth: 200,
     },
     {
       field: 'team_name',
+      headerName: 'Teams',
       minWidth: 150,
       cellRenderer: (params: any) => {
         if (params.value) {
-          return <Badge variant="secondary">{params.value}</Badge>;
+          const teams = params.value.split(', ');
+          if (teams.length === 1) {
+            return <Badge variant="secondary">{params.value}</Badge>;
+          }
+          return (
+            <div className="flex flex-wrap gap-1">
+              {teams.slice(0, 2).map((team: string, i: number) => (
+                <Badge key={i} variant="secondary" className="text-xs">{team}</Badge>
+              ))}
+              {teams.length > 2 && (
+                <Badge variant="outline" className="text-xs">+{teams.length - 2}</Badge>
+              )}
+            </div>
+          );
         }
         return null;
       },
     },
     {
-      field: 'organization_name',
-      minWidth: 150,
-    },
-    {
-      field: 'role',
+      field: 'is_active',
+      headerName: 'Status',
       maxWidth: 120,
-      cellRenderer: (params: any) => {
-        if (params.value === true) {
-          return <Badge variant="default">Admin</Badge>;
-        } else if (params.value === false) {
-          return <Badge variant="outline">User</Badge>;
-        }
-        return null;
-      },
-    },
-    {
-      field: 'has_active_subscription',
-      maxWidth: 200,
       cellRenderer: (params: any) => {
         if (params.value === true) {
           return <Badge variant="default" className="bg-green-500">Active</Badge>;
@@ -111,6 +160,7 @@ function UsersTab({
     },
     {
       field: 'created_at',
+      headerName: 'Joined',
       minWidth: 120,
       cellRenderer: (params: any) => {
         if (params.value) {
@@ -138,49 +188,41 @@ function UsersTab({
 
       // Check if data is already cached
       if (rowCache.current.has(cacheKey)) {
-        console.log(`Cache hit for users range ${params.startRow} to ${params.endRow}`);
+        Logger.info('ui', `Cache hit for users range ${params.startRow} to ${params.endRow}`);
         const cachedData = rowCache.current.get(cacheKey)!;
         params.successCallback(cachedData.rows, cachedData.rowCount);
         return;
       }
 
-      console.log('Fetching users for range', params.startRow, 'to', params.endRow, 'with team filter:', selectedTeamFilter);
+      Logger.info('ui', 'Fetching users for range', params.startRow, 'to', params.endRow, 'with team filter:', selectedTeamFilter);
 
       try {
-        // Mock data for now - replace with actual API call
-        let mockUsers: User[] = Array.from({ length: 100 }, (_, i) => ({
-          id: `user_${i + 1}`,
-          name: `User ${i + 1}`,
-          email: `user${i + 1}@example.com`,
-          team_name: i % 3 === 0 ? 'Engineering Team' : i % 3 === 1 ? 'Marketing Team' : 'Operations Team',
-          organization_name: i % 2 === 0 ? 'TechCorp Inc.' : 'Partner Corp',
-          created_at: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString(),
-          role: i % 10 === 0,
-          has_active_subscription: i % 4 !== 0,
-        }));
+        let filteredUsers = [...workspaceUsers];
 
         // Apply team filter if selected
         if (selectedTeamFilter) {
-          mockUsers = mockUsers.filter(user => user.team_name === selectedTeamFilter);
+          filteredUsers = filteredUsers.filter(user => 
+            user.team_name.includes(selectedTeamFilter)
+          );
         }
 
         const start = params.startRow || 0;
-        const end = params.endRow || mockUsers.length;
-        const rowsThisPage = mockUsers.slice(start, end);
+        const end = params.endRow || filteredUsers.length;
+        const rowsThisPage = filteredUsers.slice(start, end);
 
         // Cache the result
         rowCache.current.set(cacheKey, {
           rows: rowsThisPage,
-          rowCount: mockUsers.length,
+          rowCount: filteredUsers.length,
         });
 
-        params.successCallback(rowsThisPage, mockUsers.length);
+        params.successCallback(rowsThisPage, filteredUsers.length);
       } catch (error) {
-        console.error('Failed to fetch users:', error);
+        Logger.error('ui', 'Failed to fetch users:', error);
         params.failCallback();
       }
     },
-    [getCacheKey, selectedTeamFilter]
+    [getCacheKey, selectedTeamFilter, workspaceUsers]
   );
 
   const onGridReady = useCallback(
@@ -197,10 +239,10 @@ function UsersTab({
   const containerStyle = useMemo(() => ({ width: '100%', height: '100%' }), []);
   const gridStyle = useMemo(() => ({ height: '100%', width: '100%' }), []);
 
-  // Clear cache when team filter changes
+  // Clear cache when team filter or workspace users change
   useEffect(() => {
     rowCache.current.clear();
-  }, [selectedTeamFilter]);
+  }, [selectedTeamFilter, workspaceUsers]);
 
   return (
     <div className="flex flex-col h-full">

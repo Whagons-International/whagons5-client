@@ -1,0 +1,11 @@
+# Production Logging Configuration
+# Minimal logging - only errors are shown (always enabled regardless of config)
+
+# Set to 'all' to enable all categories, 'none' to disable all
+mode: none
+
+# Or specify individual categories to enable in production
+# Uncomment categories you want to see in production logs
+# categories:
+#   - auth
+#   - api

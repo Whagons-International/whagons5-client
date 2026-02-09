@@ -18,6 +18,7 @@ import CreationTab from "./CreationTab";
 import { motion } from "motion/react";
 import { WORKSPACE_SETTINGS_TAB_ANIMATION, getWorkspaceSettingsTabInitialX } from "@/config/tabAnimation";
 
+import { Logger } from '@/utils/logger';
 // Simplified module loading
 const loadRequiredModules = async () => {
   const {
@@ -183,7 +184,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
       .then(() => {
         setModulesLoaded(true);
       })
-      .catch(console.error);
+      .catch((err) => Logger.error('settings', 'Failed to load AG Grid modules:', err));
   }, []);
 
   // Sync activeTab with URL on initial load
@@ -258,7 +259,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
 
         setWorkspaceOverview(mockOverview);
       } catch (error) {
-        console.error('Failed to fetch workspace overview:', error);
+        Logger.error('settings', 'Failed to fetch workspace overview:', error);
       } finally {
         setLoading(false);
       }
@@ -308,7 +309,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
 
         setWorkspaceFilters(mockFilters);
       } catch (error) {
-        console.error('Failed to fetch workspace filters:', error);
+        Logger.error('settings', 'Failed to fetch workspace filters:', error);
       } finally {
         setFiltersLoading(false);
       }
@@ -477,7 +478,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
     } catch (error: any) {
       // Error is already handled by API interceptor (shows toast for 403)
       // But we log it here for debugging
-      console.error('Failed to update workspace:', error);
+      Logger.error('settings', 'Failed to update workspace:', error);
       // The optimistic update will be rolled back automatically by the thunk
     }
   }, [currentWorkspace, dispatch]);
@@ -553,6 +554,21 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
                 <ToggleGroupItem value="comfortable" aria-label={t('workspace.settings.display.comfortableDensity', 'Comfortable density')} className="h-8 px-3 text-xs">{t('workspace.settings.display.comfortable', 'Comfortable')}</ToggleGroupItem>
                 <ToggleGroupItem value="spacious" aria-label={t('workspace.settings.display.spaciousDensity', 'Spacious density')} className="h-8 px-3 text-xs">{t('workspace.settings.display.spacious', 'Spacious')}</ToggleGroupItem>
               </ToggleGroup>
+            </div>
+          </div>
+          <div className="mb-4 p-3 border rounded-md bg-background">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium">{t('workspace.settings.display.showDescriptionBelowName', 'Show description below name')}</div>
+                <div className="text-xs text-muted-foreground">{t('workspace.settings.display.showDescriptionBelowNameDesc', 'Display task description inline below the task name. When off, description is shown on hover only.')}</div>
+              </div>
+              <Switch
+                defaultChecked={(typeof window !== 'undefined' && (localStorage.getItem(`wh_workspace_show_description_${workspaceId || 'all'}`) ?? 'false') === 'true')}
+                onCheckedChange={(checked) => {
+                  try { localStorage.setItem(`wh_workspace_show_description_${workspaceId || 'all'}`, String(checked)); } catch {}
+                  try { window.dispatchEvent(new CustomEvent('wh:displayOptionsChanged', { detail: { showDescription: checked, workspaceId: workspaceId || 'all' } })); } catch {}
+                }}
+              />
             </div>
           </div>
           <div className="mb-4 p-3 border rounded-md bg-background">
@@ -639,7 +655,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
                     window.dispatchEvent(new CustomEvent('wh:tabOrderReset', { detail: { workspaceId: workspaceId || 'all' } }));
                     window.location.reload();
                   } catch (error) {
-                    console.error('Failed to reset tab order:', error);
+                    Logger.error('settings', 'Failed to reset tab order:', error);
                   }
                 }}
               >
@@ -749,6 +765,7 @@ function Settings({ workspaceId }: { workspaceId?: string }) {
             modulesLoaded={modulesLoaded}
             selectedTeamFilter={selectedTeamFilter}
             onClearTeamFilter={handleClearTeamFilter}
+            workspaceTeamIds={Array.isArray(currentWorkspace?.teams) ? currentWorkspace.teams : []}
           />
         </motion.div>
       )

@@ -99,6 +99,18 @@ export function CreateTemplateDialog({
                   required 
                 />
               </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="alias" className="text-right">{tt('fields.alias', 'Alias')}</Label>
+                <Input 
+                  id="alias" 
+                  name="alias" 
+                  value={formData.alias}
+                  onChange={(e) => setFormData(prev => ({ ...prev, alias: e.target.value }))}
+                  placeholder="e.g. HVAC-101"
+                  maxLength={100}
+                  className="col-span-3" 
+                />
+              </div>
               <div className="grid grid-cols-4 items-start gap-4">
                 <Label htmlFor="description" className="text-right pt-2">{tt('fields.description', 'Description')}</Label>
                 <textarea 

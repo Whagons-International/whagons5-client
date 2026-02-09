@@ -7,6 +7,7 @@ import { useDispatch } from 'react-redux';
 import { genericActions } from '@/store/genericSlices';
 import { uploadFile, getFileUrl } from '@/api/assetApi';
 
+import { Logger } from '@/utils/logger';
 interface PostComposerProps {
   user: {
     id: number;
@@ -89,18 +90,18 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
       // Step 1: Create the board message first (allow empty content if images exist)
       // Send at least a space if content is empty to satisfy backend validation
       const messageContent = content.trim() || (selectedImages.length > 0 ? ' ' : '');
-      console.log('Posting message with content length:', messageContent.length, 'and', selectedImages.length, 'images');
+      Logger.info('boards', 'Posting message with content length:', messageContent.length, 'and', selectedImages.length, 'images');
       
       let messageResult;
       try {
         messageResult = await onPost({ content: messageContent });
-        console.log('Message post result:', messageResult);
+        Logger.info('boards', 'Message post result:', messageResult);
         
         // Wait a tiny bit to ensure Redux state is fully updated
         await new Promise(resolve => setTimeout(resolve, 100));
       } catch (error: any) {
-        console.error('Failed to create message:', error);
-        console.error('Error details:', {
+        Logger.error('boards', 'Failed to create message:', error);
+        Logger.error('boards', 'Error details:', {
           message: error?.message,
           payload: error?.payload,
           response: error?.response?.data
@@ -111,19 +112,19 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
       }
       
       if (!messageResult) {
-        console.error('Failed to create message - no result returned');
+        Logger.error('boards', 'Failed to create message - no result returned');
         alert('Failed to create message. Please try again.');
         return;
       }
       
       const messageId = messageResult?.id;
-      console.log('Extracted message ID:', messageId, 'Type:', typeof messageId, 'Is positive:', messageId > 0);
+      Logger.info('boards', 'Extracted message ID:', messageId, 'Type:', typeof messageId, 'Is positive:', messageId > 0);
       
       // Validate we have a real positive ID (not the temporary optimistic negative ID)
       if (!messageId || typeof messageId !== 'number' || messageId <= 0) {
-        console.error('Invalid message ID - got temporary/optimistic ID or invalid value.');
-        console.error('Full result:', JSON.stringify(messageResult, null, 2));
-        console.error('This usually means the message creation failed or returned an optimistic update');
+        Logger.error('boards', 'Invalid message ID - got temporary/optimistic ID or invalid value.');
+        Logger.error('boards', 'Full result:', JSON.stringify(messageResult, null, 2));
+        Logger.error('boards', 'This usually means the message creation failed or returned an optimistic update');
         alert('Message was created but we could not get the message ID. Please refresh the page.');
         return;
       }
@@ -131,16 +132,22 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
       // Step 2: Upload images and create attachments
       if (selectedImages.length > 0 && user) {
         const uploadPromises = selectedImages.map(async (file) => {
+          let attachment: any = null;
           try {
             // Upload file to asset storage
+            Logger.info('boards', 'Uploading file:', file.name);
             const uploadedFile = await uploadFile(file);
+            Logger.info('boards', 'File uploaded successfully:', uploadedFile);
+            
+            // Use the URL returned by the server, or construct one from the ID
             const fileUrl = uploadedFile.url || getFileUrl(uploadedFile.id);
+            Logger.info('boards', 'File URL:', fileUrl);
             
             // Get file extension
             const fileExtension = file.name.split('.').pop() || '';
             
-            // Create board attachment
-            const attachment = {
+            // Create board attachment record
+            attachment = {
               uuid: crypto.randomUUID(),
               board_message_id: messageId,
               type: 'IMAGE' as const,
@@ -150,13 +157,14 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
               file_size: file.size,
               user_id: Number(user.id)
             };
+            Logger.info('boards', 'Creating attachment:', attachment);
 
             const attachmentResult = await dispatch(genericActions.boardAttachments.addAsync(attachment) as any).unwrap();
-            console.log('Attachment created successfully:', attachmentResult);
-            return true;
+            Logger.info('boards', 'Attachment created successfully:', attachmentResult);
+            return { success: true, attachment: attachmentResult };
           } catch (error: any) {
-            console.error('Failed to upload image:', error);
-            console.error('Attachment error details:', {
+            Logger.error('boards', 'Failed to upload image:', file.name, error);
+            Logger.error('boards', 'Attachment error details:', {
               message: error?.message,
               payload: error?.payload,
               response: error?.response?.data,
@@ -166,12 +174,16 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
             if (error?.response?.data?.error?.includes('Tenant database not ready')) {
               alert('Your workspace is still being set up. Please wait a moment and try again.');
             }
-            return false;
+            return { success: false, error: error?.message || 'Upload failed' };
           }
         });
         
         // Wait for all uploads to complete
-        await Promise.all(uploadPromises);
+        const results = await Promise.all(uploadPromises);
+        const failures = results.filter(r => !r.success);
+        if (failures.length > 0) {
+          Logger.warn('boards', `${failures.length} of ${results.length} image uploads failed`);
+        }
         
         // Attachments are written via `addAsync` and will also sync via realtime/background validation.
       }
@@ -186,7 +198,7 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
         textareaRef.current.style.height = 'auto';
       }
     } catch (error) {
-      console.error('Failed to post message:', error);
+      Logger.error('boards', 'Failed to post message:', error);
     }
   };
 

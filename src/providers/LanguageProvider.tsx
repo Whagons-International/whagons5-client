@@ -11,15 +11,16 @@ import {
 import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS } from "@/config/languages";
 import { esTranslations } from "@/locales/es";
 import { enTranslations } from "@/locales/en";
-import { boardsTranslations, boardsTranslationsES } from "@/locales/boards";
+import { ptTranslations } from "@/locales/pt";
+import { boardsTranslations, boardsTranslationsES, boardsTranslationsPT } from "@/locales/boards";
 
+import { Logger } from '@/utils/logger';
 type TranslationDictionary = Record<string, string>;
 
 const TRANSLATION_REGISTRY: Record<string, TranslationDictionary> = {
-  "en-US": { ...enTranslations, ...boardsTranslations },
-  "en-GB": { ...enTranslations, ...boardsTranslations },
+  en: { ...enTranslations, ...boardsTranslations },
   es: { ...esTranslations, ...boardsTranslationsES },
-  "es-ES": { ...esTranslations, ...boardsTranslationsES },
+  pt: { ...ptTranslations, ...boardsTranslationsPT },
 };
 
 const STORAGE_KEY = "whagons-preferred-language";
@@ -94,6 +95,22 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
 export const useLanguage = () => {
   const context = useContext(LanguageContext);
   if (!context) {
+    // During HMR or concurrent rendering, context might be temporarily unavailable
+    // Provide a fallback to prevent crashes
+    if (import.meta.env.DEV) {
+      Logger.warn('ui', "useLanguage called outside LanguageProvider, using fallback");
+      const fallbackLanguage = getInitialLanguage();
+      const fallbackTranslate = (key: string, fallback?: string) => {
+        const dictionary =
+          TRANSLATION_REGISTRY[fallbackLanguage] ?? TRANSLATION_REGISTRY[fallbackLanguage.split("-")[0]] ?? {};
+        return dictionary[key] ?? fallback ?? key;
+      };
+      return {
+        language: fallbackLanguage,
+        setLanguage: () => {},
+        t: fallbackTranslate,
+      };
+    }
     throw new Error("useLanguage must be used within a LanguageProvider");
   }
   return {

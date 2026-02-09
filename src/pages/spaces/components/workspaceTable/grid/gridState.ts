@@ -9,6 +9,7 @@ import { GRID_CONSTANTS } from './gridConfig';
 import { refreshClientSideGrid } from './dataSource';
 import type React from 'react';
 
+import { Logger } from '@/utils/logger';
 export interface GridStateOptions {
   workspaceId: string;
   searchText?: string;
@@ -24,6 +25,8 @@ export const useGridReduxState = () => {
   const categories = useSelector((s: RootState) => (s as any).categories.value as any[]);
   const templates = useSelector((s: RootState) => (s as any).templates?.value as any[] || []);
   const forms = useSelector((s: RootState) => (s as any).forms?.value as any[] || []);
+  const formVersions = useSelector((s: RootState) => (s as any).formVersions?.value as any[] || []);
+  const taskForms = useSelector((s: RootState) => (s as any).taskForms?.value as any[] || []);
   const statusTransitions = useSelector((s: RootState) => (s as any).statusTransitions.value as any[]);
   const approvals = useSelector((s: RootState) => (s as any).approvals?.value as any[] || []);
   const approvalApprovers = useSelector((s: RootState) => (s as any).approvalApprovers?.value as any[] || []);
@@ -37,6 +40,8 @@ export const useGridReduxState = () => {
   const taskCustomFieldValues = useSelector((s: RootState) => (s as any).taskCustomFieldValues?.value as any[] || []);
   const taskNotes = useSelector((s: RootState) => (s as any).taskNotes?.value as any[] || []);
   const taskAttachments = useSelector((s: RootState) => (s as any).taskAttachments?.value as any[] || []);
+  const roles = useSelector((s: RootState) => (s as any).roles?.value as any[] || []);
+  const assetItems = useSelector((s: RootState) => (s as any).assetItems?.value as any[] || []);
 
   return {
     statuses,
@@ -47,6 +52,8 @@ export const useGridReduxState = () => {
     categories,
     templates,
     forms,
+    formVersions,
+    taskForms,
     statusTransitions,
     approvals,
     approvalApprovers,
@@ -60,6 +67,8 @@ export const useGridReduxState = () => {
     taskCustomFieldValues,
     taskNotes,
     taskAttachments,
+    roles,
+    assetItems,
   };
 };
 
@@ -105,7 +114,7 @@ export const useGridModeDecision = (workspaceId: string, searchText: string) => 
           totalFiltered,
         };
       } catch (e) {
-        console.warn('decideMode failed', e);
+        Logger.warn('workspaces', 'decideMode failed', e);
         return {
           useClientSide: false,
           totalFiltered: 0,
@@ -118,14 +127,15 @@ export const useGridModeDecision = (workspaceId: string, searchText: string) => 
 };
 
 export const useMetadataLoadedFlags = (reduxState: ReturnType<typeof useGridReduxState>) => {
-  const { statuses, priorities, spots, users } = reduxState;
+  const { statuses, priorities, spots, users, assetItems } = reduxState;
 
   return useMemo(() => ({
     statusesLoaded: !!(statuses && statuses.length > 0),
     prioritiesLoaded: !!(priorities && priorities.length > 0),
     spotsLoaded: !!(spots && spots.length > 0),
     usersLoaded: !!(users && users.length > 0),
-  }), [statuses, priorities, spots, users]);
+    assetsLoaded: !!(assetItems && assetItems.length > 0),
+  }), [statuses, priorities, spots, users, assetItems]);
 };
 
 export interface WorkspaceTableModeParams {
@@ -141,26 +151,43 @@ export interface WorkspaceTableModeParams {
   userMapRef: React.MutableRefObject<any>;
   tagMapRef: React.MutableRefObject<any>;
   taskTagsRef: React.MutableRefObject<any>;
+  spotVisibilityFilterRef?: React.MutableRefObject<(task: any) => boolean>;
 }
 
 /**
- * Enforces current mode behavior:
- * - Grouping => client-side row model (load all rows)
- * - No grouping => infinite row model (do not load all rows)
+ * Decides row model based on task count and grouping:
+ * - Grouping enabled => client-side row model (required for AG Grid grouping)
+ * - Row count <= CLIENT_THRESHOLD => client-side row model (faster for local IndexedDB data)
+ * - Row count > CLIENT_THRESHOLD => infinite row model (better for very large datasets)
  */
 export const useWorkspaceTableMode = (params: WorkspaceTableModeParams) => {
-  const [useClientSide, setUseClientSide] = useState(false);
+  const [useClientSide, setUseClientSide] = useState(true);
   const [clientRows, setClientRows] = useState<any[]>([]);
 
   useEffect(() => {
     const run = async () => {
-      // When grouping is enabled we must use client-side row model
-      if (params.groupBy && params.groupBy !== 'none') {
-        setUseClientSide(true);
-        try {
-          if (!TasksCache.initialized) await TasksCache.init();
-          const sortModel = [{ colId: 'created_at', sort: 'desc' }];
-          const { rows, totalFiltered } = await refreshClientSideGrid(params.gridApi, TasksCache, {
+      try {
+        if (!TasksCache.initialized) await TasksCache.init();
+
+        // First, get the total count for this workspace/search
+        const baseParams: any = { search: params.searchText };
+        if (params.workspaceRef.current === 'shared') {
+          baseParams.shared_with_me = true;
+        } else if (params.workspaceRef.current !== 'all') {
+          baseParams.workspace_id = params.workspaceRef.current;
+        }
+
+        const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
+        const totalFiltered = countResp?.rowCount ?? 0;
+
+        // Use client-side mode if grouping is enabled OR row count is under threshold
+        const shouldUseClientSide = (params.groupBy && params.groupBy !== 'none') || 
+                                     totalFiltered <= GRID_CONSTANTS.CLIENT_THRESHOLD;
+
+        if (shouldUseClientSide) {
+          setUseClientSide(true);
+          const sortModel = [{ colId: 'id', sort: 'desc' }];
+          const { rows } = await refreshClientSideGrid(params.gridApi, TasksCache, {
             search: params.searchText,
             workspaceRef: params.workspaceRef,
             statusMapRef: params.statusMapRef,
@@ -170,27 +197,21 @@ export const useWorkspaceTableMode = (params: WorkspaceTableModeParams) => {
             tagMapRef: params.tagMapRef,
             taskTagsRef: params.taskTagsRef,
             sortModel,
+            spotVisibilityFilterRef: params.spotVisibilityFilterRef,
           });
           setClientRows(rows || []);
-          try {
-            params.onModeChange?.({ useClientSide: true, totalFiltered });
-          } catch {
-            // ignore
-          }
-        } catch (e) {
-          console.warn('Failed to load client-side rows for grouping', e);
+          params.onModeChange?.({ useClientSide: true, totalFiltered });
+        } else {
+          // Large dataset: use infinite row model
+          setUseClientSide(false);
           setClientRows([]);
+          params.onModeChange?.({ useClientSide: false, totalFiltered });
         }
-        return;
-      }
-
-      // No grouping: always use infinite row model to avoid client-side filter quirks
-      setUseClientSide(false);
-      setClientRows([]);
-      try {
-        params.onModeChange?.({ useClientSide: false, totalFiltered: 0 });
-      } catch {
-        // ignore
+      } catch (e) {
+        Logger.warn('workspaces', 'Failed to determine row model mode', e);
+        // Fallback to infinite mode on error
+        setUseClientSide(false);
+        setClientRows([]);
       }
     };
 
@@ -208,6 +229,7 @@ export const useWorkspaceTableMode = (params: WorkspaceTableModeParams) => {
     params.userMapRef,
     params.workspaceId,
     params.workspaceRef,
+    params.spotVisibilityFilterRef,
   ]);
 
   return { useClientSide, clientRows, setClientRows, setUseClientSide };

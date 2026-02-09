@@ -5,6 +5,7 @@ import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import { iconService } from '@/database/iconService';
 import { faTags } from "@fortawesome/free-solid-svg-icons";
 
+import { Logger } from '@/utils/logger';
 interface IconCellProps extends ICellRendererParams {
   iconField?: string;
   colorField?: string;
@@ -37,7 +38,7 @@ export const IconCell = ({
         const loadedIcon = await iconService.getIcon(last);
         setIcon(loadedIcon || fallbackIcon);
       } catch (error) {
-        console.error('Error loading icon:', error);
+        Logger.error('settings', 'Error loading icon:', error);
         setIcon(fallbackIcon);
       }
     };

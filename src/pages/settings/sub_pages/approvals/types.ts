@@ -2,7 +2,7 @@ import type { ApprovalCondition } from "@/store/types";
 
 export type TriggerType = "ON_CREATE" | "MANUAL" | "CONDITIONAL" | "ON_COMPLETE";
 export type ApprovalFlowType = "SEQUENTIAL" | "PARALLEL";
-export type DeadlineType = "hours" | "date";
+export type DeadlineType = "none" | "hours" | "date";
 export type ConditionValueType = "string" | "number" | "boolean" | "date" | "option";
 export type ConditionOperator = ApprovalCondition["operator"];
 

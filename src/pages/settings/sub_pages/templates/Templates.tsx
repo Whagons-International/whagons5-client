@@ -20,6 +20,7 @@ import { useTemplateStatistics } from "./hooks/useTemplateStatistics";
 import { useTemplateForm } from "./hooks/useTemplateForm";
 import { renderTemplatePreview } from "./utils/renderHelpers";
 
+import { Logger } from '@/utils/logger';
 function Templates() {
   const { t } = useLanguage();
   const tt = (key: string, fallback: string) => t(`settings.templates.${key}`, fallback);
@@ -232,7 +233,7 @@ function Templates() {
       a.click();
       a.remove();
     })
-    .catch(err => console.error('SOP Download failed', err));
+    .catch(err => Logger.error('settings', 'SOP Download failed', err));
   };
 
   // Form handlers
@@ -252,6 +253,7 @@ function Templates() {
 
       const templateData: any = {
         name: createFormData.name.trim(),
+        alias: createFormData.alias?.trim() || null,
         description: createFormData.description || null,
         category_id: parseInt(createFormData.category_id),
         priority_id: createFormData.priority_id ? parseInt(createFormData.priority_id) : null,
@@ -293,6 +295,7 @@ function Templates() {
 
       const updates: any = {
         name: editFormData.name.trim(),
+        alias: editFormData.alias?.trim() || null,
         description: editFormData.description || null,
         category_id: parseInt(editFormData.category_id),
         priority_id: editFormData.priority_id ? parseInt(editFormData.priority_id) : null,
@@ -311,7 +314,7 @@ function Templates() {
       await updateItem(editingTemplate.id, updates);
       (window as any).__settings_error = null;
     } catch (err: any) {
-      console.error('Edit template submit failed:', err);
+      Logger.error('settings', 'Edit template submit failed:', err);
       setEffectiveFormError(err?.message || tt('validation.genericError', 'An error occurred while updating the template'));
     }
   };

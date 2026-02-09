@@ -28,7 +28,9 @@ export const uploadFile = async (file: File): Promise<UploadedFile> => {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await api.post<UploadResponse>('/assets/upload', formData);
+  const response = await api.post<UploadResponse>('/assets/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
 
   // The backend wraps the response in { data, message, status }
   // The actual file object is in response.data.data

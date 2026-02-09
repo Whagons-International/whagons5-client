@@ -1,6 +1,7 @@
 import { DB } from "./DB";
 import { api } from "@/store/api/internalApi";
 
+import { Logger } from '@/utils/logger';
 type IdType = number | string;
 
 export interface GenericCacheOptions {
@@ -51,7 +52,7 @@ export class GenericCache {
 	}
 
 	private dlog(...args: any[]) {
-		if (this.debug) console.log(`[GenericCache:${this.store}]`, ...args);
+		if (this.debug) Logger.info('cache', `[GenericCache:${this.store}]`, ...args);
 	}
 
 	// Heuristic: verify row shape roughly matches this cache using hashFields presence
@@ -114,19 +115,19 @@ export class GenericCache {
 				await DB.delete(this.store, idVal as any);
 				return;
 			} catch (error) {
-				console.warn(`GenericCache.add: attempted to remove soft-deleted row in ${this.store} but failed`, { error, idVal });
+				Logger.warn('cache', `GenericCache.add: attempted to remove soft-deleted row in ${this.store} but failed`, { error, idVal });
 				return;
 			}
 		}
 		if (idVal === undefined || idVal === null) {
-			console.error(`GenericCache.add: Row missing ID field '${this.idField}'`, row);
+			Logger.error('cache', `GenericCache.add: Row missing ID field '${this.idField}'`, row);
 			return;
 		}
 
 		try {
 			await DB.put(this.store, row);
 		} catch (error) {
-			console.error(`GenericCache.add: Failed to add to ${this.store}`, {
+			Logger.error('cache', `GenericCache.add: Failed to add to ${this.store}`, {
 				error,
 				row,
 				idVal,
@@ -141,7 +142,7 @@ export class GenericCache {
 		try {
 			const dbg = localStorage.getItem('wh-debug-cache') === 'true';
 			if (dbg) {
-				console.log(`GenericCache.update: store=${this.store}`, {
+				Logger.info('cache', `GenericCache.update: store=${this.store}`, {
 					incomingIdParam: _id,
 					rowHasId: row && (row.id !== undefined && row.id !== null),
 					rowId: row?.id,
@@ -156,7 +157,7 @@ export class GenericCache {
 			}
 			await DB.put(this.store, row);
 		} catch (e) {
-			console.error(`GenericCache.update: failed for ${this.store}`, { error: e, _id, row });
+			Logger.error('cache', `GenericCache.update: failed for ${this.store}`, { error: e, _id, row });
 			throw e;
 		}
 	}
@@ -180,12 +181,12 @@ export class GenericCache {
 			
 			const result = this.unwrapSingleEntity(resp.data);
 			if (!result) {
-				console.error(`[GenericCache:${this.store}] createRemote: No data in response`, resp.data);
+				Logger.error('cache', `[GenericCache:${this.store}] createRemote: No data in response`, resp.data);
 				throw new Error(`Server response missing data for ${this.store}`);
 			}
 			return result;
 		} catch (error: any) {
-			console.error(`[GenericCache:${this.store}] createRemote error:`, {
+			Logger.error('cache', `[GenericCache:${this.store}] createRemote error:`, {
 				message: error?.message,
 				response: error?.response?.data,
 				status: error?.response?.status,
@@ -237,14 +238,14 @@ export class GenericCache {
 			const rows = (resp.data?.rows ?? resp.data?.data ?? resp.data) as any[];
 			
 			if (!Array.isArray(rows)) {
-				console.error(`[GenericCache:${this.store}] Response is not an array:`, typeof rows, rows);
+				Logger.error('cache', `[GenericCache:${this.store}] Response is not an array:`, typeof rows, rows);
 				return false;
 			}
 			
 			// Only proceed with pruning/updating if we got a successful response (200-299)
 			// This prevents clearing local data on API errors or malformed responses
 			if (resp.status < 200 || resp.status >= 300) {
-				console.warn(`[GenericCache:${this.store}] Non-success status code: ${resp.status}, skipping update`);
+				Logger.warn('cache', `[GenericCache:${this.store}] Non-success status code: ${resp.status}, skipping update`);
 				return false;
 			}
 			
@@ -274,7 +275,7 @@ export class GenericCache {
 			}
 			return true;
 		} catch (e) {
-			console.error(`[GenericCache:${this.store}] fetchAll error:`, this.endpoint, e);
+			Logger.error('cache', `[GenericCache:${this.store}] fetchAll error:`, this.endpoint, e);
 			// Don't clear local data on error - preserve existing cache
 			return false;
 		}
@@ -319,7 +320,7 @@ export class GenericCache {
 						this.validating = false;
 						return true;
 					}
-					console.warn(`[GenericCache:${this.store}] Bootstrap fetchAll failed`, e);
+					Logger.warn('cache', `[GenericCache:${this.store}] Bootstrap fetchAll failed`, e);
 				}
 				this.validating = false; 
 				return true;
@@ -331,7 +332,7 @@ export class GenericCache {
 			const sample = preRows.slice(0, Math.min(10, preRows.length));
 			const invalid = sample.filter((r) => !this.rowLooksLikeThisStore(r)).length;
 			if (invalid > sample.length / 2) {
-				console.warn(`[GenericCache:${this.store}] detected mismatched rows; clearing store and refetching`, { store: this.store, sampleSize: sample.length, invalid, sample: sample[0] });
+				Logger.warn('cache', `[GenericCache:${this.store}] detected mismatched rows; clearing store and refetching`, { store: this.store, sampleSize: sample.length, invalid, sample: sample[0] });
 				if (!DB.inited) await DB.init();
 				await DB.clear(this.store as any);
 				await this.fetchAll();
@@ -356,7 +357,7 @@ export class GenericCache {
 				
 				// If response data is null or doesn't have global_hash, integrity hashing isn't set up
 				if (!responseData || responseData === null || !responseData.global_hash) {
-					console.log(`[GenericCache:${this.store}] Integrity hashing not set up for table; skipping validation`, { table: this.table, responseData });
+					Logger.info('cache', `[GenericCache:${this.store}] Integrity hashing not set up for table; skipping validation`, { table: this.table, responseData });
 					this.validating = false;
 					return true; // Skip validation, keep existing data
 				}
@@ -368,12 +369,12 @@ export class GenericCache {
 			} catch (e: any) {
 				// If integrity endpoint returns 404 or 400, table doesn't have integrity hashing
 				if (e?.response?.status === 404 || (e?.response?.status >= 400 && e?.response?.status < 500)) {
-					console.log(`[GenericCache:${this.store}] Integrity endpoint not available; skipping validation (table may not have integrity hashing)`, { table: this.table, status: e?.response?.status });
+					Logger.info('cache', `[GenericCache:${this.store}] Integrity endpoint not available; skipping validation (table may not have integrity hashing)`, { table: this.table, status: e?.response?.status });
 					this.validating = false;
 					return true; // Skip validation, keep existing data
 				}
 				// For other errors (network, 500, etc), continue with validation
-				console.warn(`[GenericCache:${this.store}] Integrity check failed but continuing validation`, { table: this.table, error: e });
+				Logger.warn('cache', `[GenericCache:${this.store}] Integrity check failed but continuing validation`, { table: this.table, error: e });
 			}
 		} else {
 			// Server hash was provided by batch call - skip individual fetch
@@ -536,7 +537,7 @@ export class GenericCache {
 									} catch { /* ignore */ }
 								}
 							}
-						} catch (e) { console.warn('validate: batch fetch failed', e); }
+						} catch (e) { Logger.warn('cache', 'validate: batch fetch failed', e); }
 					}
 					
 					// Delete local rows that were requested but not returned (deleted on server)
@@ -562,7 +563,7 @@ export class GenericCache {
 			this.validating = false;
 			return true;
 		} catch (error) {
-			console.error('GenericCache.validate', { table: this.table, endpoint: this.endpoint, error });
+			Logger.error('cache', 'GenericCache.validate', { table: this.table, endpoint: this.endpoint, error });
 			this.validating = false;
 			return false;
 		}
@@ -593,13 +594,13 @@ export class GenericCache {
 			} catch (e: any) {
 				// Handle transient DB errors - skip this cache but continue with others
 				if (e?.name === 'InvalidStateError' || e?.message?.includes('connection is closing')) {
-					console.warn(`GenericCache.validateMultiple: DB error for ${c.getTableName()}, SKIPPING THIS CACHE`, e?.message);
+					Logger.warn('cache', `GenericCache.validateMultiple: DB error for ${c.getTableName()}, SKIPPING THIS CACHE`, e?.message);
 					// Don't add to locals, so it won't be validated
 					continue;
 				}
 				// For OTHER errors (like encryption errors), still add to locals with empty hash
 				// so validate() can try to fetch
-				console.warn(`GenericCache.validateMultiple: Non-DB error for ${c.getTableName()}, adding to locals anyway`, e?.message);
+				Logger.warn('cache', `GenericCache.validateMultiple: Non-DB error for ${c.getTableName()}, adding to locals anyway`, e?.message);
 				locals.push({ cache: c, table: c.getTableName(), localGlobal: '', blockCount: 0 });
 			}
 		}
@@ -611,7 +612,7 @@ export class GenericCache {
 			const resp = await api.get('/integrity/global/batch', { params: { tables: tables.join(',') } });
 			serverMap = (resp.data?.data || {}) as typeof serverMap;
 		} catch (_e) {
-			console.warn(`[GenericCache.validateMultiple] Batch call failed:`, _e);
+			Logger.warn('cache', `[GenericCache.validateMultiple] Batch call failed:`, _e);
 			// Fallback: empty map -> all will individually validate
 		}
 
@@ -763,5 +764,3 @@ export class GenericCache {
 		return sha256(text).toString(encHex);
 	}
 }
-
-

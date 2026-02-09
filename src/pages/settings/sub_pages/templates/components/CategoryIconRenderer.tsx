@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTags } from "@fortawesome/free-solid-svg-icons";
 import { iconService } from '@/database/iconService';
 
+import { Logger } from '@/utils/logger';
 export const CategoryIconRenderer = ({ iconClass }: { iconClass?: string }) => {
   const [icon, setIcon] = useState<any>(faTags);
 
@@ -19,7 +20,7 @@ export const CategoryIconRenderer = ({ iconClass }: { iconClass?: string }) => {
         const loadedIcon = await iconService.getIcon(last);
         setIcon(loadedIcon || faTags);
       } catch (error) {
-        console.error('Error loading category icon:', error);
+        Logger.error('settings', 'Error loading category icon:', error);
         setIcon(faTags);
       }
     };

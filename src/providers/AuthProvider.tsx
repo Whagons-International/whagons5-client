@@ -15,16 +15,13 @@ import { getTasksFromIndexedDB } from '../store/reducers/tasksSlice';
 import { fetchNotificationPreferences } from '../store/reducers/notificationPreferencesSlice';
 
 // Custom caches with advanced features
-import { RealTimeListener } from '@/store/realTimeListener/RTL';
-import {
-  CryptoHandler,
-  hasKEK,
-  zeroizeKeys,
-} from '@/crypto/crypto';
+import { RealTimeListener, setGlobalRtl } from '@/store/realTimeListener/RTL';
 import { DB } from '@/store/indexedDB/DB';
 import { DataManager } from '@/store/DataManager';
 import { requestNotificationPermission, setupForegroundMessageHandler, unregisterToken } from '@/firebase/fcmHelper';
+import { setSpotVisibilityState } from '@/store/spotVisibilityState';
 
+import { Logger } from '@/utils/logger';
 // Define context types
 interface AuthContextType {
   firebaseUser: FirebaseUser | null;
@@ -45,117 +42,6 @@ const POST_ONBOARDING_BOOTSTRAP_KEY = 'wh_post_onboarding_bootstrap_pending';
 const POST_ONBOARDING_BOOTSTRAP_PENDING_EVENT = 'wh:postOnboardingBootstrapPending';
 const POST_ONBOARDING_BOOTSTRAP_DONE_EVENT = 'wh:postOnboardingBootstrapDone';
 
-const CORE_ENCRYPTED_STORES: readonly string[] = [
-  'workspaces',
-  'teams',
-  'categories',
-  'templates',
-  'statuses',
-  'status_transitions',
-  'status_transition_groups',
-  'priorities',
-  'slas',
-  'approvals',
-  'approval_approvers',
-  'task_approval_instances',
-  'spots',
-  'spot_types',
-  'users',
-  'user_teams',
-  'invitations',
-  'job_positions',
-  'forms',
-  'form_versions',
-  'custom_fields',
-  'category_custom_fields',
-];
-
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-interface WaitForKekOptions {
-  maxAttempts?: number;
-  baseDelayMs?: number;
-  label?: string;
-}
-
-async function waitForKEKReady(options: WaitForKekOptions = {}): Promise<boolean> {
-  const { maxAttempts = 40, baseDelayMs = 250, label = 'AuthProvider.waitForKEKReady' } = options;
-  const start = performance.now();
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const ready = await hasKEK();
-    if (ready) {
-      if (attempt > 1) {
-        console.info(`${label}: KEK ready after ${attempt} attempts (${Math.round(performance.now() - start)}ms)`);
-      }
-      return true;
-    }
-    const elapsed = Math.round(performance.now() - start);
-    console.debug(`${label}: waiting for KEK (attempt ${attempt}/${maxAttempts}, elapsed ${elapsed}ms)`);
-    await wait(baseDelayMs * attempt);
-  }
-  console.error(`${label}: KEK not provisioned after ${maxAttempts} attempts (~${Math.round(performance.now() - start)}ms)`);
-  return false;
-}
-
-async function ensureStoreCEK(store: string, maxAttempts = 10): Promise<boolean> {
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const ok = await DB.ensureCEKForStore(store);
-    if (ok) return true;
-    await wait(250 * (attempt + 1));
-  }
-  console.warn(`AuthProvider: CEK still not ready for ${store} after retries`);
-  return false;
-}
-
-type CryptoInitFailureReason = 'init_failed' | 'kek_timeout';
-type EnsureCryptoResult =
-  | { ok: true }
-  | { ok: false; reason: CryptoInitFailureReason; error: Error };
-
-async function runCryptoInitAttempt(label: string): Promise<EnsureCryptoResult> {
-  try {
-    await CryptoHandler.init();
-  } catch (error) {
-    return { ok: false, reason: 'init_failed', error: error as Error };
-  }
-
-  const kekReady = await waitForKEKReady({ label });
-  if (!kekReady) {
-    return {
-      ok: false,
-      reason: 'kek_timeout',
-      error: new Error('KEK not provisioned after retries'),
-    };
-  }
-
-  return { ok: true };
-}
-
-async function ensureCoreCryptoReady(): Promise<EnsureCryptoResult> {
-  let initResult = await runCryptoInitAttempt('AuthProvider.waitForKEKReady#1');
-
-  if (!initResult.ok) {
-    console.warn('AuthProvider: crypto init attempt failed, retrying once', initResult.reason, initResult.error);
-    CryptoHandler.reset();
-    initResult = await runCryptoInitAttempt('AuthProvider.waitForKEKReady#retry');
-    if (!initResult.ok) {
-      return initResult;
-    }
-  }
-
-  const pendingStores: string[] = [];
-  for (const store of CORE_ENCRYPTED_STORES) {
-    const storeReady = await ensureStoreCEK(store);
-    if (!storeReady) {
-      pendingStores.push(store);
-    }
-  }
-  if (pendingStores.length) {
-    console.warn('AuthProvider: CEK still pending for stores (will retry lazily)', pendingStores);
-  }
-
-  return { ok: true };
-}
 
 // AuthProvider component to wrap the app and provide user state
 interface AuthProviderProps {
@@ -228,7 +114,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setupForegroundMessageHandler();
       }
     } catch (error) {
-      console.error('❌ FCM initialization error:', error);
+      Logger.error('auth', '❌ FCM initialization error:', error);
       // Don't crash app if FCM fails
     }
   };
@@ -245,7 +131,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Use window.location.pathname since AuthProvider is outside Router context
     const isInvitationPage = window.location.pathname.startsWith('/auth/invitation/');
     if (isInvitationPage) {
-      console.log('Skipping user fetch on invitation page');
+      Logger.info('auth', 'Skipping user fetch on invitation page');
       setUser(null);
       setUserLoading(false);
       return;
@@ -270,17 +156,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           ] = `Bearer ${storedToken}`;
         } else if (attempt < maxRetries) {
           // Token not available yet, wait and retry (backend login might be in progress)
-          console.log(`AuthProvider: Token not available yet, waiting for backend login (attempt ${attempt + 1}/${maxRetries + 1})`);
+          Logger.info('auth', `AuthProvider: Token not available yet, waiting for backend login (attempt ${attempt + 1}/${maxRetries + 1})`);
           await new Promise(resolve => setTimeout(resolve, retryDelay));
           continue;
         }
 
-        // console.log('AuthContext: Fetching user data...');
+        // Logger.info('auth', 'AuthContext: Fetching user data...');
         const response = await apiClient.get('/users/me');
         if (response.status === 200) {
           const userData = response.data.data || response.data;
           setUser(userData);
-          // console.log('AuthContext: User data loaded successfully');
+          // Update spot visibility state for non-React contexts (CacheRegistry, etc.)
+          setSpotVisibilityState({
+            userSpots: userData?.spots,
+            isAdmin: !!userData?.is_admin,
+          });
+          // Logger.info('auth', 'AuthContext: User data loaded successfully');
 
           // Initialize FCM for push notifications BEFORE hydration
           // This runs for all logged-in users, not just those with tenants
@@ -288,7 +179,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             try {
               await initializeFCM(userData, firebaseUser);
             } catch (error) {
-              console.error('FCM initialization failed:', error);
+              Logger.error('auth', 'FCM initialization failed:', error);
             }
           })();
 
@@ -308,18 +199,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               }
               setBootstrapComplete(!shouldBlockWelcome);
               if (!userData?.tenant_domain_prefix) {
-                // Ensure crypto knows we're not in tenant mode
-                CryptoHandler.setTenantMode(false);
                 setBootstrapComplete(true);
                 return;
               }
-              // Enable tenant mode for crypto operations
-              CryptoHandler.setTenantMode(true);
-              console.log(firebaseUser.uid);
+              Logger.info('auth', firebaseUser.uid);
               const result = await DB.init(firebaseUser.uid);
-              console.log('DB.init: result', result);
+              Logger.info('auth', 'DB.init: result', result);
               if (!result) {
-                console.warn('DB failed to initialize, deferring cache hydration');
+                Logger.warn('auth', 'DB failed to initialize, deferring cache hydration');
                 // Keep the bootstrap gate in place; user can refresh to retry.
                 return;
               }
@@ -327,18 +214,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               // Explicitly wait for DB readiness to avoid races during first login
               const ready = await DB.whenReady();
               if (!ready) {
-                console.warn('DB not ready after init, deferring cache hydration');
-                return;
-              }
-
-              const cryptoStatus = await ensureCoreCryptoReady();
-              if (!cryptoStatus.ok) {
-                const friendlyMessage =
-                  cryptoStatus.reason === 'kek_timeout'
-                    ? 'Still preparing encrypted cache. Please refresh the page to retry.'
-                    : 'Secure storage initialization failed. Please reload and try again.';
-                setHydrationError(friendlyMessage);
-                console.error('AuthProvider: ensureCoreCryptoReady failed', cryptoStatus);
+                Logger.warn('auth', 'DB not ready after init, deferring cache hydration');
                 return;
               }
 
@@ -346,24 +222,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               try {
                 await dataManager.loadCoreFromIndexedDB();
               } catch (err) {
-                console.warn('AuthProvider: loadCoreFromIndexedDB failed (continuing to network hydration)', err);
+                Logger.warn('auth', 'AuthProvider: loadCoreFromIndexedDB failed (continuing to network hydration)', err);
               }
               if (shouldBlockWelcome) {
                 // First load after onboarding: block the Welcome "Get Started" button
                 // until the initial validation + refresh finishes.
                 try {
-                  await dataManager.validateAndRefresh();
+                  await Promise.race([
+                    dataManager.bootstrapAndSync(),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('bootstrap sync timeout')), 60_000)),
+                  ]);
                 } catch (e) {
-                  console.warn('AuthProvider: validation failed', e);
+                  Logger.warn('auth', 'AuthProvider: validation failed', e);
                 }
                 setHydrationError(null);
-
-                // Verify manifest (best-effort)
-                try {
-                  await dataManager.verifyManifest();
-                } catch (e) {
-                  console.warn('Manifest fetch/verify failed (continuing):', e);
-                }
 
                 try {
                   localStorage.removeItem(POST_ONBOARDING_BOOTSTRAP_KEY);
@@ -374,21 +246,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 setBootstrapComplete(true);
               } else {
                 // Normal loads: keep validation in background.
-                (async () => {
-                  try {
-                    await dataManager.validateAndRefresh();
-                  } catch (e) {
-                    console.warn('AuthProvider: validation failed', e);
-                  }
-                })();
+                try {
+                  await dataManager.bootstrapAndSync();
+                } catch (e) {
+                  Logger.warn('auth', 'AuthProvider: validation failed', e);
+                }
                 setHydrationError(null);
 
-                // Verify manifest (best-effort)
-                try {
-                  await dataManager.verifyManifest();
-                } catch (e) {
-                  console.warn('Manifest fetch/verify failed (continuing):', e);
-                }
                 setBootstrapComplete(true);
               }
 
@@ -398,9 +262,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 //   debug: true,
                 // }
               );
+              setGlobalRtl(rtl);
               rtl.connectAndHold();
+
+              // Enable error telemetry after RTL is connected
+              rtl.on('connection:status', (data: { status: string }) => {
+                if (data.status === 'authenticated') {
+                  Logger.enableTelemetry().catch(() => {
+                    // Ignore telemetry init failures
+                  });
+                }
+              });
             } catch (err) {
-              console.warn('AuthProvider: background hydration failed', err);
+              Logger.warn('auth', 'AuthProvider: background hydration failed', err);
             } finally {
               setHydrating(false);
             }
@@ -416,7 +290,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (err?.response?.status === 401 && attempt < maxRetries) {
           const storedToken = getTokenForUser(firebaseUser.uid);
           if (!storedToken) {
-            console.log(`AuthProvider: 401 without token, retrying after delay (attempt ${attempt + 1}/${maxRetries + 1})`);
+            Logger.info('auth', `AuthProvider: 401 without token, retrying after delay (attempt ${attempt + 1}/${maxRetries + 1})`);
             await new Promise(resolve => setTimeout(resolve, retryDelay));
             continue;
           }
@@ -424,13 +298,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         // If this is the last attempt or a non-retryable error, log and exit
         if (attempt === maxRetries) {
-          console.error('AuthContext: Error fetching user data after retries:', err);
+          Logger.error('auth', 'AuthContext: Error fetching user data after retries:', err);
           setUser(null);
           setUserLoading(false);
           return;
         } else {
           // For other errors, break and exit
-          console.error('AuthContext: Error fetching user data:', err);
+          Logger.error('auth', 'AuthContext: Error fetching user data:', err);
           setUser(null);
           setUserLoading(false);
           return;
@@ -451,7 +325,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Update user state directly without full refetch (for optimistic updates)
   const updateUser = (updates: Partial<User>) => {
     if (user) {
-      setUser({ ...user, ...updates });
+      const updatedUser = { ...user, ...updates };
+      setUser(updatedUser);
+      // Keep spot visibility state in sync for non-React contexts
+      if ('spots' in updates || 'is_admin' in updates) {
+        setSpotVisibilityState({
+          userSpots: updatedUser.spots,
+          isAdmin: !!updatedUser.is_admin,
+        });
+      }
     }
   };
 
@@ -465,16 +347,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     window.addEventListener(POST_ONBOARDING_BOOTSTRAP_PENDING_EVENT, onPostOnboardingBootstrapPending as EventListener);
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      // console.log('AuthContext: Auth state changed:', currentUser?.uid);
+      // Logger.info('auth', 'AuthContext: Auth state changed:', currentUser?.uid);
       setFirebaseUser(currentUser);
 
       if (currentUser) {
         // User logged in - fetch their data (will skip if on invitation page)
         await fetchUser(currentUser);
       } else {
-        // User logged out - clear user data, crypto keys, IndexedDB and Redux state
+        // User logged out - clear user data, IndexedDB and Redux state
         setUser(null);
-        CryptoHandler.setTenantMode(false);
         setHydrating(false);
         setBootstrapComplete(true);
         setHydrationError(null);
@@ -483,12 +364,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
           await unregisterToken();
         } catch (err) {
-          console.warn('AuthProvider: failed to unregister FCM token on logout', err);
+          Logger.warn('auth', 'AuthProvider: failed to unregister FCM token on logout', err);
         }
         
-        try {
-          await zeroizeKeys();
-        } catch {}
         try {
           const uid: string | undefined =
             (currentUser ? (currentUser as FirebaseUser).uid : undefined) ??
@@ -499,12 +377,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             await DB.deleteDatabase(uid);
           }
         } catch (err) {
-          console.warn('AuthProvider: failed to delete IndexedDB on logout', err);
+          Logger.warn('auth', 'AuthProvider: failed to delete IndexedDB on logout', err);
         }
         try {
           dispatch({ type: 'auth/logout/reset' });
         } catch (err) {
-          console.warn('AuthProvider: failed to reset Redux store on logout', err);
+          Logger.warn('auth', 'AuthProvider: failed to reset Redux store on logout', err);
         }
       }
 
@@ -517,10 +395,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []); // Note: fetchUser checks window.location.pathname dynamically, so no need to re-run on route change
 
-  // Note: userTeams is now validated via DataManager.validateAndRefresh() 
+  // Note: userTeams is now hydrated via DataManager.bootstrapAndSync()
   // which uses batch integrity checking - no need for separate fetch here
 
-  // Refresh tasks when the user's team memberships change so stale team tasks disappear from local cache
+  // Refresh Redux from cache when user's team memberships change.
+  // Sync stream (DataManager) handles task visibility changes automatically.
   useEffect(() => {
     if (loading || userLoading || hydrating || !firebaseUser) {
       prevTeamKeyRef.current = null;
@@ -540,11 +419,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     (async () => {
       try {
-        await TasksCache.init();
-        await TasksCache.fetchTasks();
         await dispatch(getTasksFromIndexedDB());
       } catch (err) {
-        console.warn('AuthProvider: failed to refresh tasks after team change', err);
+        Logger.warn('auth', 'AuthProvider: failed to refresh tasks after team change', err);
       }
     })();
   }, [teamKey, loading, userLoading, hydrating, firebaseUser, dispatch]);

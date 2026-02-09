@@ -16,6 +16,8 @@ export interface ColumnBuilderOptions {
   getUsersFromIds: (ids: any[], userMap: Record<number, any>) => any[];
   spotMap: Record<number, any>;
   spotsLoaded: boolean;
+  assetMap: Record<number, any>;
+  assetsLoaded: boolean;
   userMap: Record<number, any>;
   groupField?: string;
   showDescriptions: boolean;
@@ -35,12 +37,25 @@ export interface ColumnBuilderOptions {
   taskAttachments: any[];
   approvalApprovers: any[];
   currentUserId?: number;
+  currentUserRoleIds?: number[];
   approvalMap: Record<number, any>;
   taskApprovalInstances: any[];
   onDeleteTask?: (id: number) => void;
   onLogTask?: (id: number) => void;
   slaMap: Record<number, any>;
+  roleMap: Record<number, any>;
   getDoneStatusId: () => number | undefined;
   formatDueDate: (date: string | null) => string;
   t?: (key: string, fallback?: string) => string;
+  // Form filling props
+  taskFormsMap: Map<number, any>;  // Map<task_id, TaskForm>
+  formVersionMap: Record<number, any>;
+  onOpenFormDialog?: (params: {
+    taskId: number;
+    taskName?: string;
+    formId: number;
+    formVersionId: number;
+    existingTaskFormId?: number;
+    existingData?: Record<string, any>;
+  }) => void;
 }

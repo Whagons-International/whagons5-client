@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { iconService } from '@/database/iconService';
 
+import { Logger } from '@/utils/logger';
 /**
  * Hook to load status icons and provide a getter function
  */
@@ -19,7 +20,7 @@ export function useStatusIcons(statuses: any[]) {
         const icon = await iconService.getIcon('circle');
         setDefaultStatusIcon(icon);
       } catch (error) {
-        console.error('Error loading default status icon:', error);
+        Logger.error('workspaces', 'Error loading default status icon:', error);
         setDefaultStatusIcon('fa-circle');
       }
     };
@@ -40,7 +41,7 @@ export function useStatusIcons(statuses: any[]) {
           const icons = await iconService.loadIcons(iconNames);
           setStatusIcons(icons);
         } catch (error) {
-          console.error('Error loading status icons:', error);
+          Logger.error('workspaces', 'Error loading status icons:', error);
         }
       }
     };

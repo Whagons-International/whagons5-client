@@ -1,0 +1,667 @@
+import { useMemo, useState, useEffect } from "react";
+import { useSelector } from "react-redux";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faCalendarDays,
+  faPlus,
+  faClock,
+  faCheck,
+  faTimes,
+  faHourglass,
+  faUserCheck,
+  faGavel
+} from "@fortawesome/free-solid-svg-icons";
+import { RootState } from "@/store/store";
+import { useDispatch } from "react-redux";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useLanguage } from "@/providers/LanguageProvider";
+import { genericActions } from "@/store/genericSlices";
+import { TimeOffRequest, TimeOffType, TimeOffBalance, TimeOffApprovalInstance } from "@/pages/settings/sub_pages/working-hours/types";
+import { decideTimeOffApprovalAndSync } from "@/store/actions/approvalDecisions";
+import dayjs from "dayjs";
+
+interface TimeOffRequestsProps {
+  userId?: number;
+}
+
+function TimeOffRequests({ userId }: TimeOffRequestsProps) {
+  const { t } = useLanguage();
+  const dispatch = useDispatch();
+  const tt = (key: string, fallback: string) => t(`timeOff.${key}`, fallback);
+
+  // Redux state
+  const currentUser = useSelector((state: RootState) => state.auth.user);
+  const { value: requests, loading: requestsLoading } = useSelector(
+    (state: RootState) => state.timeOffRequests
+  ) as { value: TimeOffRequest[]; loading: boolean };
+  const { value: types } = useSelector(
+    (state: RootState) => state.timeOffTypes
+  ) as { value: TimeOffType[]; loading: boolean };
+  const { value: approvalInstances } = useSelector(
+    (state: RootState) => state.timeOffApprovalInstances
+  ) as { value: TimeOffApprovalInstance[]; loading: boolean };
+  const { value: users } = useSelector(
+    (state: RootState) => state.users
+  ) as { value: any[]; loading: boolean };
+
+  // Filter requests for current user
+  const myRequests = useMemo(() => {
+    const targetUserId = userId || currentUser?.id;
+    if (!targetUserId) return [];
+    return requests
+      .filter(r => r.user_id === targetUserId)
+      .sort((a, b) => dayjs(b.start_date).valueOf() - dayjs(a.start_date).valueOf());
+  }, [requests, userId, currentUser?.id]);
+
+  // Requests pending my approval (where I am an approver)
+  const pendingMyApproval = useMemo(() => {
+    if (!currentUser?.id) return [];
+    const myPendingInstanceRequestIds = approvalInstances
+      .filter(i => i.approver_user_id === currentUser.id && i.status === 'pending')
+      .map(i => i.time_off_request_id);
+    
+    return requests
+      .filter(r => myPendingInstanceRequestIds.includes(r.id) && r.status === 'pending')
+      .sort((a, b) => dayjs(b.start_date).valueOf() - dayjs(a.start_date).valueOf());
+  }, [requests, approvalInstances, currentUser?.id]);
+
+  // Calculate balances
+  const balances = useMemo(() => {
+    const currentYear = dayjs().year();
+    const targetUserId = userId || currentUser?.id;
+    if (!targetUserId) return [];
+
+    return types
+      .filter(type => type.is_active)
+      .map(type => {
+        const usedDays = myRequests
+          .filter(r => 
+            r.time_off_type_id === type.id && 
+            r.status === 'approved' &&
+            dayjs(r.start_date).year() === currentYear
+          )
+          .reduce((sum, r) => sum + r.total_days, 0);
+
+        return {
+          type_id: type.id,
+          type_name: type.name,
+          type_code: type.code,
+          year: currentYear,
+          max_days: type.max_days_per_year || 0,
+          used_days: usedDays,
+          remaining_days: type.max_days_per_year ? Math.max(0, type.max_days_per_year - usedDays) : Infinity,
+          has_limit: !!type.max_days_per_year,
+          color: type.color
+        };
+      });
+  }, [types, myRequests, userId, currentUser?.id]);
+
+  // Dialog state
+  const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    time_off_type_id: '',
+    start_date: '',
+    end_date: '',
+    start_half_day: false,
+    end_half_day: false,
+    reason: ''
+  });
+
+  // Decision dialog state
+  const [decisionDialog, setDecisionDialog] = useState<{
+    open: boolean;
+    requestId: number | null;
+    decision: 'approved' | 'rejected' | null;
+  }>({ open: false, requestId: null, decision: null });
+  const [decisionComment, setDecisionComment] = useState('');
+  const [isDeciding, setIsDeciding] = useState(false);
+
+  // Reset form
+  const resetForm = () => {
+    setFormData({
+      time_off_type_id: '',
+      start_date: '',
+      end_date: '',
+      start_half_day: false,
+      end_half_day: false,
+      reason: ''
+    });
+    setFormError(null);
+  };
+
+  // Calculate total days
+  const calculateTotalDays = () => {
+    if (!formData.start_date || !formData.end_date) return 0;
+    const start = dayjs(formData.start_date);
+    const end = dayjs(formData.end_date);
+    let days = end.diff(start, 'day') + 1;
+    if (formData.start_half_day) days -= 0.5;
+    if (formData.end_half_day) days -= 0.5;
+    return Math.max(0, days);
+  };
+
+  // Handle submit
+  const handleSubmit = async () => {
+    if (!formData.time_off_type_id) {
+      setFormError(tt('error.typeRequired', 'Please select a time-off type'));
+      return;
+    }
+    if (!formData.start_date || !formData.end_date) {
+      setFormError(tt('error.datesRequired', 'Please select start and end dates'));
+      return;
+    }
+    if (dayjs(formData.end_date).isBefore(dayjs(formData.start_date))) {
+      setFormError(tt('error.invalidDates', 'End date must be after start date'));
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await dispatch(genericActions.timeOffRequests.addAsync({
+        time_off_type_id: Number(formData.time_off_type_id),
+        start_date: formData.start_date,
+        end_date: formData.end_date,
+        start_half_day: formData.start_half_day,
+        end_half_day: formData.end_half_day,
+        reason: formData.reason || null
+      }));
+      setIsRequestDialogOpen(false);
+      resetForm();
+    } catch (err: any) {
+      setFormError(err.message || tt('error.generic', 'Failed to submit request'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle cancel request
+  const handleCancelRequest = async (requestId: number) => {
+    await dispatch(genericActions.timeOffRequests.updateAsync({
+      id: requestId,
+      updates: { status: 'cancelled' }
+    }));
+  };
+
+  // Handle approval decision
+  const handleDecision = async () => {
+    if (!decisionDialog.requestId || !decisionDialog.decision) return;
+    setIsDeciding(true);
+    try {
+      await decideTimeOffApprovalAndSync({
+        time_off_request_id: decisionDialog.requestId,
+        decision: decisionDialog.decision,
+        comment: decisionComment || null,
+      });
+      setDecisionDialog({ open: false, requestId: null, decision: null });
+      setDecisionComment('');
+    } catch (err: any) {
+      console.error('Failed to record decision:', err);
+    } finally {
+      setIsDeciding(false);
+    }
+  };
+
+  // Get user name by id
+  const getUserName = (userId: number): string => {
+    const user = users.find(u => u.id === userId);
+    return user?.name || `User #${userId}`;
+  };
+
+  // Get approval instances for a request
+  const getRequestInstances = (requestId: number): TimeOffApprovalInstance[] => {
+    return approvalInstances
+      .filter(i => i.time_off_request_id === requestId)
+      .sort((a, b) => a.order_index - b.order_index);
+  };
+
+  // Check if current user can approve a request
+  const canApprove = (requestId: number): boolean => {
+    if (!currentUser?.id) return false;
+    return approvalInstances.some(
+      i => i.time_off_request_id === requestId &&
+           i.approver_user_id === currentUser.id &&
+           i.status === 'pending'
+    );
+  };
+
+  // Status badge
+  const getStatusBadge = (status: TimeOffRequest['status']) => {
+    const config = {
+      pending: { icon: faHourglass, class: 'bg-yellow-100 text-yellow-800', label: tt('status.pending', 'Pending') },
+      approved: { icon: faCheck, class: 'bg-green-100 text-green-800', label: tt('status.approved', 'Approved') },
+      rejected: { icon: faTimes, class: 'bg-red-100 text-red-800', label: tt('status.rejected', 'Rejected') },
+      cancelled: { icon: faTimes, class: 'bg-gray-100 text-gray-600', label: tt('status.cancelled', 'Cancelled') }
+    };
+    const c = config[status];
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${c.class}`}>
+        <FontAwesomeIcon icon={c.icon} className="h-3 w-3" />
+        {c.label}
+      </span>
+    );
+  };
+
+  // Approval instance status badge
+  const getInstanceStatusBadge = (status: string) => {
+    const config: Record<string, { class: string; label: string }> = {
+      pending: { class: 'bg-yellow-50 text-yellow-700 border-yellow-200', label: tt('status.pending', 'Pending') },
+      approved: { class: 'bg-green-50 text-green-700 border-green-200', label: tt('status.approved', 'Approved') },
+      rejected: { class: 'bg-red-50 text-red-700 border-red-200', label: tt('status.rejected', 'Rejected') },
+      cancelled: { class: 'bg-gray-50 text-gray-500 border-gray-200', label: tt('status.cancelled', 'Cancelled') },
+    };
+    const c = config[status] || config.pending;
+    return (
+      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] border ${c.class}`}>
+        {c.label}
+      </span>
+    );
+  };
+
+  // Render approval instances for a request
+  const renderApprovalInstances = (requestId: number) => {
+    const instances = getRequestInstances(requestId);
+    if (instances.length === 0) return null;
+
+    return (
+      <div className="mt-2 flex flex-wrap gap-2">
+        {instances.map(instance => (
+          <div key={instance.id} className="flex items-center gap-1 text-xs text-muted-foreground">
+            <FontAwesomeIcon icon={faUserCheck} className="h-3 w-3" />
+            <span>{getUserName(instance.approver_user_id)}</span>
+            {getInstanceStatusBadge(instance.status)}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Render request row
+  const renderRequestRow = (request: TimeOffRequest, showUser = false) => {
+    const type = types.find(t => t.id === request.time_off_type_id);
+    const showApproveReject = canApprove(request.id) && request.status === 'pending';
+
+    return (
+      <div
+        key={request.id}
+        className="flex items-start justify-between p-4 border rounded-lg"
+      >
+        <div className="flex items-start gap-4 flex-1">
+          <div
+            className="w-4 h-4 rounded-full mt-1 shrink-0"
+            style={{ backgroundColor: type?.color || '#6B7280' }}
+          />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              {showUser && (
+                <span className="font-medium">{getUserName(request.user_id)} - </span>
+              )}
+              <span className="font-medium">{type?.name || 'Unknown Type'}</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {dayjs(request.start_date).format('MMM D, YYYY')}
+              {request.start_half_day && ' (PM)'}
+              {' - '}
+              {dayjs(request.end_date).format('MMM D, YYYY')}
+              {request.end_half_day && ' (AM)'}
+              {' · '}
+              {request.total_days} {request.total_days === 1 ? 'day' : 'days'}
+            </p>
+            {request.reason && (
+              <p className="text-sm text-muted-foreground italic mt-1">
+                {request.reason}
+              </p>
+            )}
+            {request.rejection_reason && (
+              <p className="text-sm text-red-600 mt-1">
+                {tt('fields.rejectionReason', 'Reason')}: {request.rejection_reason}
+              </p>
+            )}
+            {renderApprovalInstances(request.id)}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0 ml-4">
+          {getStatusBadge(request.status)}
+          {request.status === 'pending' && request.user_id === currentUser?.id && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-red-500"
+              onClick={() => handleCancelRequest(request.id)}
+            >
+              {tt('actions.cancel', 'Cancel')}
+            </Button>
+          )}
+          {showApproveReject && (
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-green-600 border-green-300 hover:bg-green-50"
+                onClick={() => setDecisionDialog({ open: true, requestId: request.id, decision: 'approved' })}
+              >
+                <FontAwesomeIcon icon={faCheck} className="h-3 w-3 mr-1" />
+                {tt('actions.approve', 'Approve')}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-red-600 border-red-300 hover:bg-red-50"
+                onClick={() => setDecisionDialog({ open: true, requestId: request.id, decision: 'rejected' })}
+              >
+                <FontAwesomeIcon icon={faTimes} className="h-3 w-3 mr-1" />
+                {tt('actions.reject', 'Reject')}
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <FontAwesomeIcon icon={faCalendarDays} className="text-blue-500" />
+            {tt('title', 'Time Off')}
+          </h1>
+          <p className="text-muted-foreground">
+            {tt('description', 'Request and manage your time off')}
+          </p>
+        </div>
+        <Button onClick={() => setIsRequestDialogOpen(true)}>
+          <FontAwesomeIcon icon={faPlus} className="mr-2" />
+          {tt('actions.request', 'Request Time Off')}
+        </Button>
+      </div>
+
+      {/* Balances */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {balances.map(balance => (
+          <Card key={balance.type_id}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: balance.color || '#6B7280' }}
+                />
+                {balance.type_name}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {balance.has_limit ? (
+                  <>
+                    {balance.remaining_days} <span className="text-sm font-normal text-muted-foreground">/ {balance.max_days}</span>
+                  </>
+                ) : (
+                  <span className="text-lg">{tt('balance.unlimited', 'Unlimited')}</span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {tt('balance.remaining', 'days remaining in')} {balance.year}
+              </p>
+              {balance.has_limit && (
+                <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 transition-all"
+                    style={{ width: `${Math.min(100, (balance.used_days / balance.max_days) * 100)}%` }}
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Pending My Approval */}
+      {pendingMyApproval.length > 0 && (
+        <Card className="border-orange-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-orange-600">
+              <FontAwesomeIcon icon={faGavel} />
+              {tt('approvals.title', 'Pending Your Approval')}
+              <span className="ml-auto text-sm bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+                {pendingMyApproval.length}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {pendingMyApproval.map(request => renderRequestRow(request, true))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* My Requests List */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FontAwesomeIcon icon={faClock} className="text-blue-500" />
+            {tt('requests.title', 'My Requests')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {myRequests.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              {tt('requests.empty', 'No time-off requests yet')}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {myRequests.map(request => renderRequestRow(request))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Request Dialog */}
+      <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>{tt('dialog.title', 'Request Time Off')}</DialogTitle>
+            <DialogDescription>
+              {tt('dialog.description', 'Submit a new time-off request')}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {formError && (
+              <div className="p-3 bg-red-50 text-red-700 rounded-md text-sm">
+                {formError}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>{tt('fields.type', 'Type')}</Label>
+              <Select
+                value={formData.time_off_type_id}
+                onValueChange={(value) => setFormData({ ...formData, time_off_type_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={tt('fields.selectType', 'Select a type')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {types.filter(t => t.is_active).map(type => (
+                    <SelectItem key={type.id} value={String(type.id)}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: type.color || '#6B7280' }}
+                        />
+                        {type.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>{tt('fields.startDate', 'Start Date')}</Label>
+                <Input
+                  type="date"
+                  value={formData.start_date}
+                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                />
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="start_half_day"
+                    checked={formData.start_half_day}
+                    onCheckedChange={(checked) => setFormData({ ...formData, start_half_day: !!checked })}
+                  />
+                  <label htmlFor="start_half_day" className="text-sm">
+                    {tt('fields.halfDayPM', 'Start at noon (PM)')}
+                  </label>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>{tt('fields.endDate', 'End Date')}</Label>
+                <Input
+                  type="date"
+                  value={formData.end_date}
+                  onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                />
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="end_half_day"
+                    checked={formData.end_half_day}
+                    onCheckedChange={(checked) => setFormData({ ...formData, end_half_day: !!checked })}
+                  />
+                  <label htmlFor="end_half_day" className="text-sm">
+                    {tt('fields.halfDayAM', 'End at noon (AM)')}
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {formData.start_date && formData.end_date && (
+              <div className="p-3 bg-blue-50 rounded-md">
+                <p className="text-sm text-blue-700">
+                  <strong>{calculateTotalDays()}</strong> {calculateTotalDays() === 1 ? 'day' : 'days'} {tt('fields.selected', 'selected')}
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>{tt('fields.reason', 'Reason (optional)')}</Label>
+              <Textarea
+                value={formData.reason}
+                onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                placeholder={tt('fields.reasonPlaceholder', 'Add a note for your manager...')}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsRequestDialogOpen(false); resetForm(); }}>
+              {tt('actions.cancel', 'Cancel')}
+            </Button>
+            <Button onClick={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting ? tt('actions.submitting', 'Submitting...') : tt('actions.submit', 'Submit Request')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Decision Dialog */}
+      <Dialog open={decisionDialog.open} onOpenChange={(open) => {
+        if (!open) {
+          setDecisionDialog({ open: false, requestId: null, decision: null });
+          setDecisionComment('');
+        }
+      }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>
+              {decisionDialog.decision === 'approved'
+                ? tt('decision.approveTitle', 'Approve Request')
+                : tt('decision.rejectTitle', 'Reject Request')}
+            </DialogTitle>
+            <DialogDescription>
+              {decisionDialog.decision === 'approved'
+                ? tt('decision.approveDesc', 'Are you sure you want to approve this time-off request?')
+                : tt('decision.rejectDesc', 'Please provide a reason for rejecting this request.')}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>
+                {tt('decision.comment', 'Comment')}
+                {decisionDialog.decision === 'rejected' && (
+                  <span className="text-red-500 ml-1">*</span>
+                )}
+              </Label>
+              <Textarea
+                value={decisionComment}
+                onChange={(e) => setDecisionComment(e.target.value)}
+                placeholder={
+                  decisionDialog.decision === 'approved'
+                    ? tt('decision.commentPlaceholderApprove', 'Optional comment...')
+                    : tt('decision.commentPlaceholderReject', 'Reason for rejection...')
+                }
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDecisionDialog({ open: false, requestId: null, decision: null });
+                setDecisionComment('');
+              }}
+            >
+              {tt('actions.cancel', 'Cancel')}
+            </Button>
+            <Button
+              onClick={handleDecision}
+              disabled={isDeciding || (decisionDialog.decision === 'rejected' && !decisionComment.trim())}
+              className={
+                decisionDialog.decision === 'approved'
+                  ? 'bg-green-600 hover:bg-green-700'
+                  : 'bg-red-600 hover:bg-red-700'
+              }
+            >
+              {isDeciding
+                ? tt('actions.processing', 'Processing...')
+                : decisionDialog.decision === 'approved'
+                  ? tt('actions.confirmApprove', 'Approve')
+                  : tt('actions.confirmReject', 'Reject')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+export default TimeOffRequests;

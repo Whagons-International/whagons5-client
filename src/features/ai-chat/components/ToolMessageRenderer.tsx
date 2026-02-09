@@ -2,7 +2,9 @@ import { useState, useEffect, useMemo } from "react";
 import { Message } from "../models";
 import JsonSyntaxHighlighter from "./JsonSyntaxHighlighter";
 import { useTheme } from "@/providers/ThemeProvider";
+import { LoadingWidget } from "./LoadingWidget";
 
+import { Logger } from '@/utils/logger';
 const MAX_RENDER_CHARS = 20000;
 
 function extractFirstImageUrlFromText(text: string): string | null {
@@ -143,7 +145,7 @@ function ToolMessageRenderer({
             }
           }
         } catch (e) {
-          console.error("Error extracting tool_call_id from result message:", e);
+          Logger.error('assistant', "Error extracting tool_call_id from result message:", e);
         }
 
         if (extractedToolCallId) {
@@ -191,7 +193,7 @@ function ToolMessageRenderer({
               toolName: genericToolName,
               formattedToolName: genericToolName
             }
-            console.warn("Could not find corresponding tool_call for result:", message);
+            Logger.warn('assistant', "Could not find corresponding tool_call for result:", message);
           }
         }
 
@@ -220,7 +222,7 @@ function ToolMessageRenderer({
           setParsedToolResultContent(parsedContent);
           setHasError(!!(parsedContent as any)?.error); 
         } catch (error) {
-          console.error("Error parsing tool result content:", error);
+          Logger.error('assistant', "Error parsing tool result content:", error);
           const result = message.content;
           if (typeof result === 'object' && result !== null && extractedToolCallId) {
             if (!('tool_call_id' in result)) {
@@ -258,7 +260,7 @@ function ToolMessageRenderer({
       stringified = JSON.stringify(content, null, 2);
       count = stringified.length;
     } catch (e) {
-      console.error("Error stringifying content for size check:", e);
+      Logger.error('assistant', "Error stringifying content for size check:", e);
       stringified = String(content);
       count = stringified.length;
       originalContent = stringified;
@@ -315,7 +317,7 @@ function ToolMessageRenderer({
         setTimeout(() => setCopiedResult(false), 2000);
       }
     } catch (err) {
-      console.error('Failed to copy text: ', err);
+      Logger.error('assistant', 'Failed to copy text: ', err);
     }
   };
 
@@ -324,12 +326,13 @@ function ToolMessageRenderer({
   return (
     <>
       {isToolCall && isLastMessage && (
-        <div className="md:max-w-[900px] w-full flex justify-start min-h-full">
-          <span className="loading-dots ml-5 pl-4">
-            <span></span>
-            <span></span>
-            <span></span>
-          </span>
+        <div className="md:max-w-[900px] w-full flex items-center justify-start min-h-full ml-5 pl-4">
+          <LoadingWidget
+            size={24}
+            strokeWidthRatio={10}
+            color="currentColor"
+            cycleDuration={0.9}
+          />
           <span className="ml-2 text-sm text-muted-foreground">
             {((message.content as any)?.name as string) || "processing..."}
           </span>
@@ -433,8 +436,10 @@ function ToolMessageRenderer({
                   maxHeight: isOpen ? "1000px" : "0",
                   opacity: isOpen ? 1 : 0,
                   visibility: isOpen ? "visible" : "hidden",
-                  border: isOpen ? "1px solid hsl(var(--border))" : "none",
                   borderTop: "none",
+                  borderRight: isOpen ? "1px solid hsl(var(--border))" : "none",
+                  borderBottom: isOpen ? "1px solid hsl(var(--border))" : "none",
+                  borderLeft: isOpen ? "1px solid hsl(var(--border))" : "none",
                 }}
               >
                 {isOpen && (
@@ -559,12 +564,13 @@ function ToolMessageRenderer({
       })()}
 
       {isToolResult && isLastMessage && (
-        <div className="md:max-w-[900px] w-full flex justify-start min-h-full">
-          <span className="loading-dots ml-5 pl-4">
-            <span></span>
-            <span></span>
-            <span></span>
-          </span>
+        <div className="md:max-w-[900px] w-full flex items-center justify-start min-h-full ml-5 pl-4">
+          <LoadingWidget
+            size={24}
+            strokeWidthRatio={10}
+            color="currentColor"
+            cycleDuration={0.9}
+          />
           <span className="ml-2 text-sm text-muted-foreground">processing...</span>
         </div>
       )}

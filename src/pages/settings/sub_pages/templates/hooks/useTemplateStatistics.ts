@@ -3,6 +3,7 @@ import { Template, Task, Category, Priority } from "@/store/types";
 import { TemplateStatistics } from "@/pages/settings/sub_pages/templates/types";
 import dayjs from "dayjs";
 
+import { Logger } from '@/utils/logger';
 interface UseTemplateStatisticsProps {
   templates: Template[];
   tasks: Task[];
@@ -111,7 +112,7 @@ export const useTemplateStatistics = ({
         tasksOverTime
       });
     } catch (error) {
-      console.error('Error calculating statistics:', error);
+      Logger.error('settings', 'Error calculating statistics:', error);
     } finally {
       setStatsLoading(false);
       isCalculatingRef.current = false;

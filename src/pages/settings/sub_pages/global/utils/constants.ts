@@ -9,6 +9,11 @@ export const RETRO_SURFACE_PATTERN =
 export const RETRO_SIDEBAR_PATTERN =
   "repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.08) 0 6px, transparent 6px 12px), radial-gradient(circle at 10px 10px, rgba(255, 255, 255, 0.08) 1.5px, transparent 0)";
 
+export const CYBER_SURFACE_PATTERN =
+  "repeating-linear-gradient(0deg, rgba(0, 255, 140, 0.03) 0 1px, transparent 1px 40px), repeating-linear-gradient(90deg, rgba(0, 255, 140, 0.03) 0 1px, transparent 1px 40px)";
+export const CYBER_SIDEBAR_PATTERN =
+  "repeating-linear-gradient(0deg, rgba(255, 0, 200, 0.06) 0 1px, transparent 1px 24px), repeating-linear-gradient(90deg, rgba(255, 0, 200, 0.04) 0 1px, transparent 1px 24px)";
+
 export const PRESET_THEMES: ThemePreset[] = [
   {
     id: "jade-ops",
@@ -133,35 +138,65 @@ export const PRESET_THEMES: ThemePreset[] = [
     sidebarTone: "light"
   },
   {
-    id: "night-ops",
-    label: "Night Ops",
-    description: "Teal gradients with a dark command-center sidebar.",
+    id: "ocean-breeze",
+    label: "Ocean Breeze",
+    description: "Cool ocean blue with warm coral highlights for a balanced professional look",
     light: {
-      gradient: "linear-gradient(130deg, oklch(0.72 0.12 175) 0%, oklch(0.55 0.22 264) 100%)",
+      gradient: "linear-gradient(130deg, oklch(0.58 0.18 240) 0%, oklch(0.70 0.16 25) 100%)",
       palette: {
-        primary: "oklch(0.72 0.12 175)",
-        accent: "oklch(0.78 0.15 210)",
-        background: "oklch(0.99 0.01 175)",
-        text: "oklch(0.20 0.02 250)",
-        neutral: "oklch(0.94 0.03 175)",
-        sidebar: SIDEBAR_DARK,
-        navbar: SIDEBAR_DARK
+        primary: "oklch(0.58 0.18 240)",
+        accent: "oklch(0.70 0.16 25)",
+        background: "oklch(0.99 0.01 240)",
+        text: "oklch(0.22 0.02 240)",
+        neutral: "oklch(0.95 0.02 230)",
+        sidebar: SIDEBAR_LIGHT,
+        navbar: SIDEBAR_LIGHT
       }
     },
     dark: {
-      gradient: "linear-gradient(130deg, oklch(0.80 0.16 180) 0%, oklch(0.75 0.18 200) 100%)",
+      gradient: "linear-gradient(130deg, oklch(0.65 0.20 235) 0%, oklch(0.72 0.18 20) 100%)",
       palette: {
-        primary: "oklch(0.80 0.16 180)",
-        accent: "oklch(0.75 0.18 200)",
-        background: "oklch(0.08 0.01 190)",
-        text: "oklch(0.94 0.01 180)",
-        neutral: "oklch(0.15 0.01 190)",
-        sidebar: "oklch(0.05 0 0)",
-        navbar: "oklch(0.05 0 0)"
+        primary: "oklch(0.65 0.20 235)",
+        accent: "oklch(0.72 0.18 20)",
+        background: "oklch(0.12 0.01 235)",
+        text: "oklch(0.96 0.01 230)",
+        neutral: "oklch(0.20 0.02 235)",
+        sidebar: "oklch(0.10 0.01 235)",
+        navbar: "oklch(0.10 0.01 235)"
       }
     },
-    badge: "Dark sidebar",
-    sidebarTone: "dark"
+    sidebarTone: "light"
+  },
+  {
+    id: "cherry-blossom",
+    label: "Cherry Blossom",
+    description: "Soft rose primary with rich plum accents for a modern elegant feel",
+    light: {
+      gradient: "linear-gradient(130deg, oklch(0.72 0.14 350) 0%, oklch(0.55 0.20 320) 100%)",
+      palette: {
+        primary: "oklch(0.72 0.14 350)",
+        accent: "oklch(0.55 0.20 320)",
+        background: "oklch(0.99 0.01 350)",
+        text: "oklch(0.22 0.02 320)",
+        neutral: "oklch(0.95 0.03 345)",
+        sidebar: SIDEBAR_LIGHT,
+        navbar: SIDEBAR_LIGHT
+      }
+    },
+    dark: {
+      gradient: "linear-gradient(130deg, oklch(0.75 0.18 348) 0%, oklch(0.62 0.24 318) 100%)",
+      palette: {
+        primary: "oklch(0.75 0.18 348)",
+        accent: "oklch(0.62 0.24 318)",
+        background: "oklch(0.12 0.02 340)",
+        text: "oklch(0.96 0.01 350)",
+        neutral: "oklch(0.19 0.03 340)",
+        sidebar: "oklch(0.10 0.02 340)",
+        navbar: "oklch(0.10 0.02 340)"
+      }
+    },
+    badge: "New",
+    sidebarTone: "light"
   },
   {
     id: "retro-grid",
@@ -201,40 +236,46 @@ export const PRESET_THEMES: ThemePreset[] = [
     }
   },
   {
-    id: "hipster-vibes",
-    label: "Hipster Vibes",
-    description: "Muted earthy tones with vintage mustard and dusty rose accents",
+    id: "cyberpunk",
+    label: "Cyberpunk",
+    description: "Electric magenta and neon green on dark surfaces with grid overlays",
     light: {
-      gradient: "linear-gradient(130deg, oklch(0.73 0.08 65) 0%, oklch(0.65 0.10 35) 50%, oklch(0.72 0.05 130) 100%)",
+      gradient: "linear-gradient(130deg, oklch(0.65 0.28 330) 0%, oklch(0.82 0.25 145) 100%)",
       palette: {
-        primary: "oklch(0.73 0.08 65)",
-        accent: "oklch(0.65 0.10 35)",
-        background: "oklch(0.98 0.01 65)",
-        text: "oklch(0.32 0.02 50)",
-        neutral: "oklch(0.90 0.03 60)",
-        sidebar: "oklch(0.96 0.01 60)",
-        navbar: "oklch(0.96 0.01 60)"
+        primary: "oklch(0.65 0.28 330)",
+        accent: "oklch(0.82 0.25 145)",
+        background: "oklch(0.98 0.01 330)",
+        text: "oklch(0.20 0.03 330)",
+        neutral: "oklch(0.93 0.02 330)",
+        sidebar: "oklch(0.15 0.04 300)",
+        navbar: "oklch(0.15 0.04 300)"
       }
     },
     dark: {
-      gradient: "linear-gradient(130deg, oklch(0.70 0.12 70) 0%, oklch(0.62 0.15 25) 50%, oklch(0.65 0.09 120) 100%)",
+      gradient: "linear-gradient(130deg, oklch(0.72 0.30 328) 0%, oklch(0.85 0.28 142) 100%)",
       palette: {
-        primary: "oklch(0.70 0.12 70)",
-        accent: "oklch(0.62 0.15 25)",
-        background: "oklch(0.14 0.01 45)",
-        text: "oklch(0.94 0.02 65)",
-        neutral: "oklch(0.21 0.02 50)",
-        sidebar: "oklch(0.12 0.01 45)",
-        navbar: "oklch(0.12 0.01 45)"
+        primary: "oklch(0.72 0.30 328)",
+        accent: "oklch(0.85 0.28 142)",
+        background: "oklch(0.08 0.02 300)",
+        text: "oklch(0.95 0.02 330)",
+        neutral: "oklch(0.14 0.03 305)",
+        sidebar: "oklch(0.06 0.02 300)",
+        navbar: "oklch(0.06 0.02 300)"
       }
     },
-    badge: "Hipster",
-    sidebarTone: "light"
+    badge: "Neon",
+    sidebarTone: "dark",
+    patterns: {
+      surface: CYBER_SURFACE_PATTERN,
+      sidebar: CYBER_SIDEBAR_PATTERN,
+      surfaceSize: "40px 40px",
+      sidebarSize: "24px 24px"
+    }
   },
   {
-    id: "star-wars",
-    label: "Star Wars",
-    description: "Deep space theme with Rebel Alliance blue and iconic yellow accents",
+    id: "galactic",
+    label: "Galactic",
+    description: "Deep space theme with cosmic blue and iconic gold accents",
     light: {
       gradient: "linear-gradient(130deg, oklch(0.63 0.15 250) 0%, oklch(0.92 0.18 95) 100%)",
       palette: {
@@ -259,7 +300,7 @@ export const PRESET_THEMES: ThemePreset[] = [
         navbar: "oklch(0.05 0 0)"
       }
     },
-    badge: "Star Wars",
+    badge: "Space",
     sidebarTone: "dark",
     patterns: {
       surface: "radial-gradient(circle at 2px 2px, rgba(74, 144, 226, 0.08) 1px, transparent 0)",
@@ -267,6 +308,37 @@ export const PRESET_THEMES: ThemePreset[] = [
       surfaceSize: "40px 40px",
       sidebarSize: "20px 20px"
     }
+  },
+  {
+    id: "monochrome",
+    label: "Monochrome",
+    description: "Clean white-to-black gradient topbar with elegant grayscale palette",
+    light: {
+      gradient: "linear-gradient(130deg, oklch(0.99 0 0) 0%, oklch(0.70 0 0) 50%, oklch(0.20 0 0) 100%)",
+      palette: {
+        primary: "oklch(0.35 0 0)",
+        accent: "oklch(0.50 0 0)",
+        background: "oklch(0.99 0 0)",
+        text: "oklch(0.15 0 0)",
+        neutral: "oklch(0.94 0 0)",
+        sidebar: "oklch(0.97 0 0)",
+        navbar: "oklch(0.97 0 0)"
+      }
+    },
+    dark: {
+      gradient: "linear-gradient(130deg, oklch(0.95 0 0) 0%, oklch(0.50 0 0) 50%, oklch(0.10 0 0) 100%)",
+      palette: {
+        primary: "oklch(0.85 0 0)",
+        accent: "oklch(0.65 0 0)",
+        background: "oklch(0.12 0 0)",
+        text: "oklch(0.95 0 0)",
+        neutral: "oklch(0.20 0 0)",
+        sidebar: "oklch(0.08 0 0)",
+        navbar: "oklch(0.08 0 0)"
+      }
+    },
+    badge: "Minimal",
+    sidebarTone: "light"
   }
 ];
 
@@ -336,24 +408,67 @@ export const ASSET_CONFIG: Array<{
   }
 ];
 
-// Motivational quotes array
-export const MOTIVATIONAL_QUOTES = [
-  "Success is not final, failure is not fatal: it is the courage to continue that counts.",
-  "The only way to do great work is to love what you do.",
-  "Innovation distinguishes between a leader and a follower.",
-  "The future belongs to those who believe in the beauty of their dreams.",
-  "Excellence is not a skill, it's an attitude.",
-  "Don't watch the clock; do what it does. Keep going.",
-  "The only limit to our realization of tomorrow will be our doubts of today.",
-  "Success usually comes to those who are too busy to be looking for it.",
-  "The way to get started is to quit talking and begin doing.",
-  "Innovation is the ability to see change as an opportunity, not a threat.",
-  "Your limitation—it's only your imagination.",
-  "Great things never come from comfort zones.",
-  "Dream it. Wish it. Do it.",
-  "Success doesn't just find you. You have to go out and get it.",
-  "The harder you work for something, the greater you'll feel when you achieve it.",
-];
+// Motivational quotes by language
+export const MOTIVATIONAL_QUOTES: Record<string, string[]> = {
+  en: [
+    "Success is not final, failure is not fatal: it is the courage to continue that counts.",
+    "The only way to do great work is to love what you do.",
+    "Innovation distinguishes between a leader and a follower.",
+    "The future belongs to those who believe in the beauty of their dreams.",
+    "Excellence is not a skill, it's an attitude.",
+    "Don't watch the clock; do what it does. Keep going.",
+    "The only limit to our realization of tomorrow will be our doubts of today.",
+    "Success usually comes to those who are too busy to be looking for it.",
+    "The way to get started is to quit talking and begin doing.",
+    "Innovation is the ability to see change as an opportunity, not a threat.",
+    "Your limitation—it's only your imagination.",
+    "Great things never come from comfort zones.",
+    "Dream it. Wish it. Do it.",
+    "Success doesn't just find you. You have to go out and get it.",
+    "The harder you work for something, the greater you'll feel when you achieve it.",
+  ],
+  es: [
+    "El éxito no es definitivo, el fracaso no es fatal: es el valor para continuar lo que cuenta.",
+    "La única forma de hacer un gran trabajo es amar lo que haces.",
+    "La innovación distingue a un líder de un seguidor.",
+    "El futuro pertenece a quienes creen en la belleza de sus sueños.",
+    "La excelencia no es una habilidad, es una actitud.",
+    "No mires el reloj; haz lo que hace. Sigue adelante.",
+    "El único límite para nuestra realización del mañana serán nuestras dudas de hoy.",
+    "El éxito generalmente llega a quienes están demasiado ocupados para buscarlo.",
+    "La forma de empezar es dejar de hablar y comenzar a hacer.",
+    "La innovación es la capacidad de ver el cambio como una oportunidad, no como una amenaza.",
+    "Tu limitación es solo tu imaginación.",
+    "Las grandes cosas nunca vienen de las zonas de confort.",
+    "Sueña. Deséalo. Hazlo.",
+    "El éxito no te encuentra. Tienes que salir y conseguirlo.",
+    "Cuanto más trabajes por algo, mayor será la satisfacción cuando lo logres.",
+  ],
+  pt: [
+    "O sucesso não é final, o fracasso não é fatal: é a coragem de continuar que conta.",
+    "A única forma de fazer um grande trabalho é amar o que você faz.",
+    "A inovação distingue um líder de um seguidor.",
+    "O futuro pertence àqueles que acreditam na beleza de seus sonhos.",
+    "A excelência não é uma habilidade, é uma atitude.",
+    "Não observe o relógio; faça o que ele faz. Continue.",
+    "O único limite para nossa realização de amanhã serão nossas dúvidas de hoje.",
+    "O sucesso geralmente vem para aqueles que estão muito ocupados para procurá-lo.",
+    "A maneira de começar é parar de falar e começar a fazer.",
+    "Inovação é a capacidade de ver a mudança como uma oportunidade, não como uma ameaça.",
+    "Sua limitação é apenas sua imaginação.",
+    "Grandes coisas nunca vêm das zonas de conforto.",
+    "Sonhe. Deseje. Faça.",
+    "O sucesso não apenas te encontra. Você tem que sair e conseguir.",
+    "Quanto mais você trabalha por algo, maior será a satisfação quando conseguir.",
+  ],
+};
+
+// Helper function to get quotes for a specific language (defaults to English)
+export const getMotivationalQuotes = (language: string = 'en'): string[] => {
+  // Extract short language code (e.g., 'en' from 'en-US')
+  const shortCode = language.split('-')[0];
+  return MOTIVATIONAL_QUOTES[language] || MOTIVATIONAL_QUOTES[shortCode] || MOTIVATIONAL_QUOTES.en;
+};
 
 // Random hero images from Unsplash
 export const HERO_IMAGES = [

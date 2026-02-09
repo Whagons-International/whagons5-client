@@ -7,6 +7,7 @@ import { useLanguage } from '@/providers/LanguageProvider';
 import { checkTenantAvailability, clearAvailability } from '@/store/reducers/tenantAvailabilitySlice';
 import type { RootState, AppDispatch } from '@/store/store';
 
+import { Logger } from '@/utils/logger';
 // Normalize an organization name into a safe tenant slug:
 // - lowercase
 // - only a-z, 0-9 and hyphens
@@ -64,7 +65,7 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
 
   // Dynamic loading messages
   const loadingMessages = useMemo(() => {
-    const isSpanish = language === 'es-ES' || language.startsWith('es');
+    const isSpanish = language === 'es' || language.startsWith('es');
     
     if (isSpanish) {
       return [
@@ -115,7 +116,7 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
       await dispatch(checkTenantAvailability(cleanedName)).unwrap();
       setRetryCount(0); // Reset retry count on success
     } catch (error) {
-      console.error('Availability check failed:', error);
+      Logger.error('auth', 'Availability check failed:', error);
       // Error is already set in Redux state
     }
   }, [dispatch]);
@@ -173,7 +174,7 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error('Failed to copy:', error);
+      Logger.error('auth', 'Failed to copy:', error);
     }
   };
 
@@ -244,7 +245,7 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
         }
       } catch (error) {
         // If check fails, allow submission but show warning
-        console.warn('Availability check failed, proceeding anyway:', error);
+        Logger.warn('auth', 'Availability check failed, proceeding anyway:', error);
       }
     }
 
@@ -582,7 +583,7 @@ const OrganizationNameStep: React.FC<OrganizationNameStepProps> = ({
                     className="text-xs bg-primary text-white px-4 py-2 rounded-full hover:bg-primary/90 transition-all duration-200 hover:scale-105 shadow-md"
                     onClick={() => {
                       // TODO: Navigate to subscription page
-                      console.log('Navigate to subscription page');
+                      Logger.info('auth', 'Navigate to subscription page');
                     }}
                   >
                     {t('onboarding.organization.upgrade', 'Upgrade')}

@@ -3,12 +3,13 @@ import { getMessagingInstance } from "./firebaseConfig";
 import { api } from "@/api/whagonsApi";
 import { showNotificationToast, getNotificationIcon } from "@/components/ui/NotificationToast";
 
+import { Logger } from '@/utils/logger';
 // VAPID key from Firebase Console > Project Settings > Cloud Messaging > Web Push certificates
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || "";
 
 if (!VAPID_KEY) {
-  console.warn('⚠️  [FCM] VITE_FIREBASE_VAPID_KEY is not set. Push notifications will not work.');
-  console.warn('Get your VAPID key from: Firebase Console > Project Settings > Cloud Messaging > Web Push certificates');
+  Logger.warn('notifications', '⚠️  [FCM] VITE_FIREBASE_VAPID_KEY is not set. Push notifications will not work.');
+  Logger.warn('notifications', 'Get your VAPID key from: Firebase Console > Project Settings > Cloud Messaging > Web Push certificates');
 }
 
 // Module-level flags to track FCM state
@@ -35,7 +36,7 @@ export async function requestNotificationPermission(): Promise<string | null> {
   const messaging = await getMessagingInstance();
   
   if (!messaging) {
-    console.warn('⚠️  [FCM] Messaging not supported in this browser');
+    Logger.warn('notifications', '⚠️  [FCM] Messaging not supported in this browser');
     return null;
   }
 
@@ -68,7 +69,7 @@ export async function requestNotificationPermission(): Promise<string | null> {
     });
     
     if (!token) {
-      console.error('Failed to get FCM token');
+      Logger.error('notifications', 'Failed to get FCM token');
       return null;
     }
 
@@ -80,7 +81,7 @@ export async function requestNotificationPermission(): Promise<string | null> {
     
     return token;
   } catch (error) {
-    console.error('Error in FCM registration:', error);
+    Logger.error('notifications', 'Error in FCM registration:', error);
     return null;
   }
 }
@@ -111,7 +112,7 @@ async function registerTokenWithBackend(
       localStorage.setItem('wh-fcm-token', fcmToken);
       localStorage.setItem('wh-fcm-registered', 'true');
     } else {
-      console.error('❌ Failed to register FCM token:', error);
+      Logger.error('notifications', '❌ Failed to register FCM token:', error);
       throw error;
     }
   }
@@ -126,7 +127,7 @@ export async function unregisterToken() {
     try {
       messageHandlerUnsubscribe();
     } catch (error) {
-      console.warn('Failed to unsubscribe FCM message handler:', error);
+      Logger.warn('notifications', 'Failed to unsubscribe FCM message handler:', error);
     }
     messageHandlerUnsubscribe = null;
   }
@@ -145,7 +146,7 @@ export async function unregisterToken() {
     localStorage.removeItem('wh-fcm-token');
     localStorage.removeItem('wh-fcm-registered');
   } catch (error) {
-    console.error('❌ Failed to unregister FCM token:', error);
+    Logger.error('notifications', '❌ Failed to unregister FCM token:', error);
   }
 }
 
@@ -159,7 +160,7 @@ async function storeNotification(payload: any) {
     const { genericActions } = await import('@/store/genericSlices');
     
     if (!DB.inited || !DB.db) {
-      console.warn('⚠️ DB not initialized, skipping notification storage');
+      Logger.warn('notifications', '⚠️ DB not initialized, skipping notification storage');
       return;
     }
 
@@ -181,7 +182,7 @@ async function storeNotification(payload: any) {
     // Update Redux state
     store.dispatch(genericActions.notifications.addAsync(notification) as any);
   } catch (error) {
-    console.error('❌ Error storing notification:', error);
+    Logger.error('notifications', '❌ Error storing notification:', error);
   }
 }
 

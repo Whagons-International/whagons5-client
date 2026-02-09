@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUser, faChartBar, faEnvelope } from "@fortawesome/free-solid-svg-icons";
-import { Check, Copy as CopyIcon, Plus, Trash } from "lucide-react";
+import { Check, Copy as CopyIcon, Plus, Trash, Crown, Shield } from "lucide-react";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import { AppDispatch, RootState } from "@/store/store";
 import { useNavigate } from "react-router-dom";
-import { Team, UserTeam, Invitation, Role } from "@/store/types";
+import { Team, UserTeam, Invitation, Role, Spot } from "@/store/types";
 import { genericActions } from "@/store/genericSlices";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Label } from "@/components/ui/label";
@@ -19,9 +19,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { buildInvitationLink } from "@/lib/invitationLink";
 import type { UserData } from "../types";
 import { getUserTeamRoleId } from "../utils/getUserTeamRoleId";
-import { useInvitationsColumnDefs, useUsersColumnDefs } from "../utils/columnDefs";
 import { UserStatistics } from "./UserStatistics";
+import { ColDef, ICellRendererParams } from 'ag-grid-community';
 
+import { Logger } from '@/utils/logger';
 import {
   SettingsLayout,
   SettingsGrid,
@@ -29,7 +30,8 @@ import {
   useSettingsState,
   TextField,
   SelectField,
-  CheckboxField
+  CheckboxField,
+  AvatarCellRenderer
 } from "../../../components";
 
 function Users() {
@@ -43,6 +45,7 @@ function Users() {
   const { value: userTeams } = useSelector((state: RootState) => state.userTeams) as { value: UserTeam[]; loading: boolean };
   const { value: invitations } = useSelector((state: RootState) => state.invitations) as { value: Invitation[]; loading: boolean };
   const { value: roles } = useSelector((state: RootState) => state.roles) as { value: Role[]; loading: boolean };
+  const { value: allSpots } = useSelector((state: RootState) => state.spots) as { value: Spot[]; loading: boolean };
   
   // Use shared state management
   const {
@@ -71,6 +74,88 @@ function Users() {
     searchFields: ['name', 'email']
   });
 
+  // localStorage key for user order
+  const USER_ORDER_STORAGE_KEY = 'wh-users-order-v1';
+
+  // Load user order from localStorage
+  const loadUserOrder = (): number[] => {
+    try {
+      const saved = localStorage.getItem(USER_ORDER_STORAGE_KEY);
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed.map((id: any) => Number(id)) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  // Save user order to localStorage
+  const saveUserOrder = (order: number[]) => {
+    try {
+      localStorage.setItem(USER_ORDER_STORAGE_KEY, JSON.stringify(order));
+    } catch {
+      // Ignore localStorage errors
+    }
+  };
+
+  // State for user order
+  const [userOrder, setUserOrder] = useState<number[]>(() => loadUserOrder());
+
+  // Update order when users change (add new users to end, remove deleted ones)
+  useEffect(() => {
+    // Don't update order when users haven't loaded yet
+    if (users.length === 0) return;
+    
+    const currentUserIds = users.map(u => u.id);
+    const savedOrder = loadUserOrder();
+    
+    // Filter out deleted users from order (preserve order)
+    const validOrder = savedOrder.filter(id => currentUserIds.includes(id));
+    
+    // Add new users to the end
+    const newUsers = currentUserIds.filter(id => !validOrder.includes(id));
+    const updatedOrder = [...validOrder, ...newUsers];
+    
+    // Only update if order actually changed (new users added or deleted users removed)
+    // Compare by length and IDs (not order-sensitive for this check)
+    const currentIdsSet = new Set(userOrder);
+    const updatedIdsSet = new Set(updatedOrder);
+    const idsChanged = userOrder.length !== updatedOrder.length || 
+      userOrder.some(id => !updatedIdsSet.has(id)) ||
+      updatedOrder.some(id => !currentIdsSet.has(id));
+    
+    if (idsChanged) {
+      setUserOrder(updatedOrder);
+      saveUserOrder(updatedOrder);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [users.length, users.map(u => u.id).join(',')]);
+
+  // Apply order to filtered items
+  const orderedFilteredItems = useMemo(() => {
+    if (!userOrder.length || !filteredItems.length) return filteredItems;
+    
+    // Create a map for quick lookup
+    const itemMap = new Map(filteredItems.map(item => [item.id, item]));
+    
+    // Sort by saved order, then add any items not in order at the end
+    const ordered: UserData[] = [];
+    const unordered: UserData[] = [];
+    
+    userOrder.forEach(id => {
+      const item = itemMap.get(id);
+      if (item) {
+        ordered.push(item);
+        itemMap.delete(id);
+      }
+    });
+    
+    // Add remaining items (not in saved order) at the end
+    itemMap.forEach(item => unordered.push(item));
+    
+    return [...ordered, ...unordered];
+  }, [filteredItems, userOrder]);
+
   // Roles are loaded by DataManager on login
 
   // Form state for controlled components
@@ -93,6 +178,7 @@ function Users() {
   // Selected teams state (using string IDs for MultiSelect)
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [selectedGlobalRoles, setSelectedGlobalRoles] = useState<string[]>([]);
+  const [selectedSpots, setSelectedSpots] = useState<string[]>([]);
   const [createSelectedTeams, setCreateSelectedTeams] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   // Team-role assignments for edit dialog
@@ -151,10 +237,17 @@ function Users() {
         ? editingUser.global_roles.map((role: any) => typeof role === 'object' ? role.name : role)
         : [];
       setSelectedGlobalRoles(roleNames);
+
+      // Load existing spot assignments
+      const userSpots = Array.isArray(editingUser.spots)
+        ? editingUser.spots.map((s: any) => String(s))
+        : [];
+      setSelectedSpots(userSpots);
     } else {
-      // Reset selected teams and global roles when dialog closes
+      // Reset selected teams, global roles, and spots when dialog closes
       setSelectedTeams([]);
       setSelectedGlobalRoles([]);
+      setSelectedSpots([]);
       setEditTeamAssignments([]);
     }
   }, [editingUser, userTeams]);
@@ -215,21 +308,356 @@ function Users() {
     }
   };
 
-  const columnDefs = useUsersColumnDefs({
-    translate: tu,
-    teams,
-    jobPositions,
-    userTeams,
-  });
+  const columnDefs = useMemo<ColDef[]>(() => {
+    const columnLabels = {
+      id: tu('grid.columns.id', 'ID'),
+      name: tu('grid.columns.name', 'Name'),
+      email: tu('grid.columns.email', 'Email'),
+      teams: tu('grid.columns.teams', 'Teams'),
+      jobPosition: tu('grid.columns.jobPosition', 'Job Position'),
+      subscription: tu('grid.columns.subscription', 'Subscription')
+    };
+    const noTeamsLabel = tu('grid.values.noTeams', 'No Teams');
+    const noJobPositionLabel = tu('grid.values.noJobPosition', 'No Job Position');
+    const activeLabel = tu('grid.values.active', 'Active');
+    const inactiveLabel = tu('grid.values.inactive', 'Inactive');
 
-  const invitationColumnDefs = useInvitationsColumnDefs({
-    translate: tu,
-    teams,
-    onDeleteInvitation: (invitation) => {
-      setDeletingInvitation(invitation);
-      setIsDeleteInvitationDialogOpen(true);
-    },
-  });
+    return [
+      {
+        field: 'id',
+        headerName: columnLabels.id,
+        width: 90,
+        hide: true
+      },
+      {
+        rowDrag: true,
+        width: 50,
+        maxWidth: 50,
+        minWidth: 50,
+        pinned: 'left',
+        lockPosition: true,
+        headerName: '',
+        suppressHeaderMenuButton: true,
+        sortable: false,
+        filter: false,
+        resizable: false
+      },
+      {
+        field: 'name',
+        headerName: columnLabels.name,
+        flex: 2,
+        minWidth: 180,
+        cellRenderer: (params: ICellRendererParams) => {
+          // Check if user has an admin-related global role (crown is based on global roles)
+          // Matches roles containing "admin" (e.g., "admin", "system admin", "super admin")
+          const globalRoles = params.data?.global_roles || [];
+          const hasAdminRole = Array.isArray(globalRoles) && globalRoles.some((role: any) => {
+            const roleName = typeof role === 'object' ? role.name : role;
+            return roleName && roleName.toLowerCase().includes('admin');
+          });
+          
+          // Check if user has is_admin field set to true (separate indicator)
+          const isAdminField = params.data?.is_admin === true;
+          
+          return (
+            <div className="flex items-center gap-2">
+              <AvatarCellRenderer name={params.data?.name || ''} color={params.data?.color} />
+              {hasAdminRole && (
+                <Crown 
+                  className="h-4 w-4 text-amber-500 flex-shrink-0" 
+                  title={tu('grid.values.adminRole', 'Admin Role')}
+                  aria-label={tu('grid.values.adminRole', 'Admin Role')}
+                />
+              )}
+              {isAdminField && (
+                <Shield 
+                  className="h-4 w-4 text-blue-500 flex-shrink-0" 
+                  title={tu('grid.values.adminField', 'Admin Field')}
+                  aria-label={tu('grid.values.adminField', 'Admin Field')}
+                />
+              )}
+            </div>
+          );
+        }
+      },
+      {
+        field: 'email',
+        headerName: columnLabels.email,
+        flex: 1.8,
+        minWidth: 180
+      },
+      {
+        field: 'teams',
+        headerName: columnLabels.teams,
+        flex: 2,
+        minWidth: 240,
+        cellRenderer: (params: ICellRendererParams) => {
+          const userId = params.data?.id;
+          if (!userId) return <span className="text-muted-foreground">{noTeamsLabel}</span>;
+
+          const userTeamRelationships = userTeams.filter((ut: UserTeam) => ut.user_id === userId);
+          
+          if (!userTeamRelationships || userTeamRelationships.length === 0) {
+            return <span className="text-muted-foreground">{noTeamsLabel}</span>;
+          }
+
+          const userTeamObjects = userTeamRelationships
+            .map((ut: UserTeam) => {
+              const team = teams.find((t: Team) => t.id === ut.team_id);
+              return team ? { id: team.id, name: team.name, color: team.color ?? null } : null;
+            })
+            .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
+
+          if (userTeamObjects.length === 0) {
+            return <span className="text-muted-foreground">{noTeamsLabel}</span>;
+          }
+
+          return (
+            <div className="flex flex-wrap gap-1 py-1 px-1 items-center">
+              {userTeamObjects.map((team: { id: number; name: string; color: string | null }) => {
+                const initial = (team.name || '').charAt(0).toUpperCase();
+                const hex = String(team.color || '').trim();
+                let bg = hex;
+                let fg = '#fff';
+                try {
+                  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
+                    const h = hex.length === 4
+                      ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+                      : hex;
+                    const r = parseInt(h.slice(1, 3), 16);
+                    const g = parseInt(h.slice(3, 5), 16);
+                    const b = parseInt(h.slice(5, 7), 16);
+                    const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                    fg = brightness > 180 ? '#111827' : '#ffffff';
+                  } else if (!hex) {
+                    bg = '';
+                  }
+                } catch { /* ignore */ }
+                return (
+                  <div
+                    key={team.id}
+                    className={`w-6 h-6 min-w-[1.5rem] rounded-full flex items-center justify-center text-xs font-semibold cursor-default leading-none ${bg ? '' : 'bg-muted text-foreground/80'}`}
+                    style={bg ? { backgroundColor: bg, color: fg } : undefined}
+                    title={team.name}
+                  >
+                    {initial || 'T'}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        },
+        cellStyle: { overflow: 'visible', padding: '0' },
+        autoHeight: true
+      },
+      {
+        field: 'job_position_id',
+        headerName: columnLabels.jobPosition,
+        flex: 1.6,
+        minWidth: 160,
+        cellRenderer: (params: ICellRendererParams) => {
+          const idVal = params.value as number | string | undefined;
+          if (idVal == null || idVal === '') return <span className="text-muted-foreground">{noJobPositionLabel}</span>;
+          const idNum = typeof idVal === 'string' ? Number(idVal) : idVal;
+          const jp = jobPositions.find((p: any) => Number(p.id) === idNum);
+          return <Badge variant="secondary" className="h-6 px-2 inline-flex items-center self-center">{jp?.title || idNum}</Badge>;
+        }
+      },
+      {
+        field: 'has_active_subscription',
+        headerName: columnLabels.subscription,
+        flex: 1,
+        minWidth: 150,
+        cellRenderer: (params: ICellRendererParams) =>
+          params.value ? <Badge variant="default" className="bg-green-500">{activeLabel}</Badge> : <Badge variant="destructive">{inactiveLabel}</Badge>
+      }
+    ];
+  }, [teams, jobPositions, userTeams, t]);
+
+  // Copy button component for table cells
+  const CopyButton = ({ text }: { text: string }) => {
+    const [copied, setCopied] = useState(false);
+    const copyText = tu('copyButton.copy', 'Copy');
+    const copiedText = tu('copyButton.copied', 'Copied');
+
+    const handleCopy = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Radix/AG Grid can listen above React; stop the native event too
+      (e.nativeEvent as any)?.stopImmediatePropagation?.();
+      navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 4000);
+    };
+
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        data-grid-stop-row-click="true"
+        onPointerDown={(e) => {
+          // Prevent AG Grid from treating this as a row click (which would open Edit)
+          e.preventDefault();
+          e.stopPropagation();
+          // Radix/AG Grid can listen above React; stop the native event too
+          (e.nativeEvent as any)?.stopImmediatePropagation?.();
+        }}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          (e.nativeEvent as any)?.stopImmediatePropagation?.();
+        }}
+        onClick={handleCopy}
+        className="min-w-[80px]"
+      >
+        {copied ? (
+          <>
+            <Check className="h-4 w-4 mr-1" />
+            {copiedText}
+          </>
+        ) : (
+          <>
+            <CopyIcon className="h-4 w-4 mr-1" />
+            {copyText}
+          </>
+        )}
+      </Button>
+    );
+  };
+
+  // Invitation column definitions
+  const invitationColumnDefs: ColDef[] = useMemo(() => {
+    const columnLabels = {
+      id: tu('invitations.columns.id', 'ID'),
+      email: tu('invitations.columns.email', 'Email'),
+      teams: tu('invitations.columns.teams', 'Teams'),
+      link: tu('invitations.columns.link', 'Invitation Link'),
+      created: tu('invitations.columns.created', 'Created'),
+      actions: tu('invitations.columns.actions', 'Actions')
+    };
+    const noEmailLabel = tu('invitations.values.noEmail', 'No email');
+    const noTeamsLabel = tu('grid.values.noTeams', 'No Teams');
+
+    return [
+      {
+        field: 'id',
+        headerName: columnLabels.id,
+        width: 90,
+        hide: true
+      },
+      {
+        field: 'user_email',
+        headerName: columnLabels.email,
+        flex: 2,
+        minWidth: 220,
+        cellRenderer: (params: ICellRendererParams) => {
+          return params.value || <span className="text-muted-foreground">{noEmailLabel}</span>;
+        }
+      },
+      {
+        field: 'team_ids',
+        headerName: columnLabels.teams,
+        flex: 2,
+        minWidth: 240,
+        cellRenderer: (params: ICellRendererParams) => {
+          const teamIds = params.value as number[] | null | undefined;
+          if (!teamIds || teamIds.length === 0) {
+            return <span className="text-muted-foreground">{noTeamsLabel}</span>;
+          }
+
+          const invitationTeams = teamIds
+            .map((teamId: number) => {
+              const team = teams.find((t: Team) => t.id === teamId);
+              return team ? { id: team.id, name: team.name, color: team.color ?? null } : null;
+            })
+            .filter((team): team is { id: number; name: string; color: string | null } => team !== null);
+
+          if (invitationTeams.length === 0) {
+            return <span className="text-muted-foreground">{noTeamsLabel}</span>;
+          }
+
+        return (
+          <div className="flex flex-wrap gap-1 py-1 px-1 items-center">
+            {invitationTeams.map((team: { id: number; name: string; color: string | null }) => {
+              const initial = (team.name || '').charAt(0).toUpperCase();
+              const hex = String(team.color || '').trim();
+              let bg = hex;
+              let fg = '#fff';
+              try {
+                if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
+                  const h = hex.length === 4
+                    ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+                    : hex;
+                  const r = parseInt(h.slice(1, 3), 16);
+                  const g = parseInt(h.slice(3, 5), 16);
+                  const b = parseInt(h.slice(5, 7), 16);
+                  const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                  fg = brightness > 180 ? '#111827' : '#ffffff';
+                } else if (!hex) {
+                  bg = '';
+                }
+              } catch { /* ignore */ }
+              return (
+                <div
+                  key={team.id}
+                  className={`w-6 h-6 min-w-[1.5rem] rounded-full flex items-center justify-center text-xs font-semibold cursor-default ${bg ? '' : 'bg-muted text-foreground/80'}`}
+                  style={bg ? { backgroundColor: bg, color: fg } : undefined}
+                  title={team.name}
+                >
+                  {initial || 'T'}
+                </div>
+              );
+            })}
+          </div>
+        );
+      },
+      cellStyle: { overflow: 'visible', padding: '0' },
+      autoHeight: true
+      },
+    {
+      field: 'invitation_link',
+      headerName: 'Invitation Link',
+      flex: 3,
+      minWidth: 300,
+      cellRenderer: (params: ICellRendererParams) => {
+        const invitation = params.data as Invitation;
+        if (!invitation?.invitation_token) return <span className="text-muted-foreground">No token</span>;
+
+        const invitationLink = buildInvitationLink({
+          invitationToken: invitation.invitation_token,
+          tenantDomainPrefix: invitation.tenant_domain_prefix,
+        });
+        
+        return (
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              readOnly
+              value={invitationLink}
+              data-grid-stop-row-click="true"
+              className="flex-1 px-2 py-1 text-xs border rounded bg-background text-foreground"
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                (e.nativeEvent as any)?.stopImmediatePropagation?.();
+              }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                (e.nativeEvent as any)?.stopImmediatePropagation?.();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                (e.nativeEvent as any)?.stopImmediatePropagation?.();
+                (e.target as HTMLInputElement).select();
+              }}
+            />
+            <CopyButton text={invitationLink} />
+          </div>
+        );
+      }
+    }
+  ];
+}, [teams, t]);
 
   // Handle invitation deletion
   const handleDeleteInvitation = async () => {
@@ -245,10 +673,10 @@ function Users() {
       // If error is 404 or 500, the invitation might already be deleted
       // Refresh from IndexedDB to sync state
       if (error?.response?.status === 404 || error?.response?.status === 500) {
-        console.warn('Invitation may already be deleted, refreshing from cache');
+        Logger.warn('settings', 'Invitation may already be deleted, refreshing from cache');
         // No manual cache hydration here; state is kept in sync by login hydration + CRUD thunks/RTL.
       }
-      console.error('Failed to delete invitation:', error);
+      Logger.error('settings', 'Failed to delete invitation:', error);
       setIsDeleteInvitationDialogOpen(false);
       setDeletingInvitation(null);
     }
@@ -513,7 +941,7 @@ function Users() {
               role_id: defaultRole?.id || null
             })).unwrap();
           } catch (error) {
-            console.error(`Failed to add user-team relationship:`, error);
+            Logger.error('settings', `Failed to add user-team relationship:`, error);
             setFormError(tu('errors.addTeamFailed', `Failed to add team relationship: ${error instanceof Error ? error.message : 'Unknown error'}`));
           }
         }
@@ -537,6 +965,57 @@ function Users() {
     }
   };
 
+  // Compute global roles options for MultiSelect
+  // Include both GLOBAL scope roles and roles already assigned to the user
+  const globalRolesOptions = useMemo(() => {
+    // Get all GLOBAL scope roles from available roles
+    const globalRolesFromList = roles
+      .filter((role: Role) => role.scope === 'GLOBAL')
+      .map((role: Role) => ({
+        value: role.name,
+        label: role.name
+      }));
+    
+    // Also include roles that are already assigned to the user
+    // This ensures assigned roles are visible even if they're not in the roles list
+    const assignedRoleNames = Array.isArray(editingUser?.global_roles)
+      ? editingUser.global_roles.map((role: any) => typeof role === 'object' ? role.name : role)
+      : [];
+    
+    // Create options for assigned roles that aren't already in the list
+    const assignedRoleOptions = assignedRoleNames
+      .filter((roleName: string) => !globalRolesFromList.some(opt => opt.value === roleName))
+      .map((roleName: string) => ({
+        value: roleName,
+        label: roleName
+      }));
+    
+    // Merge and return unique options
+    return [...globalRolesFromList, ...assignedRoleOptions];
+  }, [roles, editingUser?.global_roles]);
+
+  // Build spot options with hierarchical path labels (e.g. "Building A > Floor 2 > Room 201")
+  const spotOptions = useMemo(() => {
+    const spotMap = new Map(allSpots.map(s => [s.id, s]));
+    const getPath = (spot: Spot): string => {
+      const parts: string[] = [spot.name];
+      let current = spot;
+      while (current.parent_id != null) {
+        const parent = spotMap.get(current.parent_id);
+        if (!parent) break;
+        parts.unshift(parent.name);
+        current = parent;
+      }
+      return parts.join(' > ');
+    };
+    return allSpots
+      .map(spot => ({
+        value: spot.id.toString(),
+        label: getPath(spot)
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [allSpots]);
+
   // Edit submit handler
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -550,7 +1029,8 @@ function Users() {
       color: editFormData.color || null,
       is_admin: editFormData.is_admin,
       has_active_subscription: editFormData.has_active_subscription,
-      global_roles: selectedGlobalRoles
+      global_roles: selectedGlobalRoles,
+      spots: selectedSpots.length > 0 ? selectedSpots.map(Number) : null
     };
     
     try {
@@ -592,7 +1072,7 @@ function Users() {
             role_id: add.roleIdNum
           })).unwrap();
         } catch (error: any) {
-          console.error(`Failed to add user-team relationship:`, error);
+          Logger.error('settings', `Failed to add user-team relationship:`, error);
           const errorMsg = error?.response?.data?.message || error?.message || 'Unknown error';
           setFormError(tu('errors.addTeamFailed', `Failed to add team relationship: ${errorMsg}`));
           return;
@@ -610,7 +1090,7 @@ function Users() {
             }
           })).unwrap();
         } catch (error: any) {
-          console.error(`Failed to update user-team relationship:`, error);
+          Logger.error('settings', `Failed to update user-team relationship:`, error);
           const errorMsg = error?.response?.data?.message || error?.message || 'Unknown error';
           setFormError(tu('errors.updateTeamFailed', `Failed to update team relationship: ${errorMsg}`));
           return;
@@ -622,7 +1102,7 @@ function Users() {
         try {
           await dispatch((genericActions as any).userTeams.removeAsync(del.id)).unwrap();
         } catch (error: any) {
-          console.error(`Failed to remove user-team relationship:`, error);
+          Logger.error('settings', `Failed to remove user-team relationship:`, error);
           const errorMsg = error?.response?.data?.message || error?.message || 'Unknown error';
           setFormError(tu('errors.removeTeamFailed', `Failed to remove team relationship: ${errorMsg}`));
           return;
@@ -637,6 +1117,8 @@ function Users() {
       
       // Close edit dialog on success
       setIsEditDialogOpen(false);
+      
+      // Order is maintained by localStorage, no need to update here
     } catch (error: any) {
       const backendErrors = error?.response?.data?.errors;
       const backendMessage = error?.response?.data?.message;
@@ -700,12 +1182,82 @@ function Users() {
             ),
             content: (
               <div className="flex h-full flex-col">
+                <style>{`
+                  .ag-theme-quartz .ag-row-drag {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: move;
+                  }
+                  .ag-theme-quartz .ag-row-drag::before {
+                    content: '';
+                    display: block;
+                    width: 4px;
+                    height: 16px;
+                    background: repeating-linear-gradient(
+                      to bottom,
+                      hsl(var(--muted-foreground)) 0px,
+                      hsl(var(--muted-foreground)) 2px,
+                      transparent 2px,
+                      transparent 4px
+                    );
+                    margin-right: 4px;
+                  }
+                  .ag-theme-quartz .ag-row-drag::after {
+                    content: '';
+                    display: block;
+                    width: 4px;
+                    height: 16px;
+                    background: repeating-linear-gradient(
+                      to bottom,
+                      hsl(var(--muted-foreground)) 0px,
+                      hsl(var(--muted-foreground)) 2px,
+                      transparent 2px,
+                      transparent 4px
+                    );
+                  }
+                  .ag-theme-quartz .ag-row-drag {
+                    background-image: none;
+                  }
+                `}</style>
                 <div className="flex-1 min-h-0">
                   <SettingsGrid
-                    rowData={filteredItems}
+                    rowData={orderedFilteredItems}
                     columnDefs={columnDefs}
                     noRowsMessage={tu('grid.noUsers', 'No users found')}
                     onRowDoubleClicked={(row: UserData) => handleEdit(row)}
+                    getRowId={(params) => String(params.data.id)}
+                    gridOptions={{
+                      rowDragManaged: true,
+                      animateRows: true
+                    }}
+                    onRowDragEnd={(event: any) => {
+                      // Handle row drag end - save new order to localStorage
+                      // AG Grid with rowDragManaged: true automatically reorders rows
+                      // We need to get the new order from the grid and save it
+                      const gridApi = event.api;
+                      if (!gridApi) return;
+                      
+                      // Small delay to ensure AG Grid has updated its internal order
+                      setTimeout(() => {
+                        const allRowNodes: any[] = [];
+                        gridApi.forEachNodeAfterFilterAndSort((node: any) => {
+                          if (node.data) {
+                            allRowNodes.push(node.data);
+                          }
+                        });
+                        
+                        // Extract the new order (IDs in the order they appear)
+                        const newOrder = allRowNodes.map((item: UserData) => item.id);
+                        
+                        // Update state and save to localStorage
+                        if (newOrder.length > 0) {
+                          Logger.info('settings', 'Saving new user order:', newOrder);
+                          setUserOrder(newOrder);
+                          saveUserOrder(newOrder);
+                        }
+                      }, 0);
+                    }}
                   />
                 </div>
               </div>
@@ -1013,6 +1565,9 @@ function Users() {
                 <TabsTrigger value="permissions">
                   {tu('dialogs.editUser.tabs.permissions', 'Roles Globales')}
                 </TabsTrigger>
+                <TabsTrigger value="spots">
+                  {tu('dialogs.editUser.tabs.spots', 'Spots')}
+                </TabsTrigger>
               </TabsList>
             </div>
             <TabsContent value="basic" className="mt-4 min-h-[200px]">
@@ -1152,14 +1707,7 @@ function Users() {
                     </span>
                   </Label>
                   <MultiSelect
-                    options={roles.length > 0
-                      ? roles
-                          .filter((role: Role) => role.scope === 'GLOBAL')
-                          .map((role: Role) => ({
-                            value: role.name,
-                            label: role.name
-                          }))
-                      : []}
+                    options={globalRolesOptions}
                     onValueChange={setSelectedGlobalRoles}
                     defaultValue={selectedGlobalRoles}
                     placeholder={
@@ -1172,6 +1720,33 @@ function Users() {
                   />
                   <p className="text-xs text-muted-foreground">
                     {tu('dialogs.editUser.fields.globalRolesHelp', 'Global roles are optional. You can leave this field empty if you don\'t need to assign global roles to the user.')}
+                  </p>
+                </div>
+              </div>
+            </TabsContent>
+            <TabsContent value="spots" className="mt-4 min-h-[200px]">
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    {tu('dialogs.editUser.fields.visibleSpots', 'Visible Spots')}
+                    <span className="text-muted-foreground text-xs font-normal ml-1">
+                      ({tu('dialogs.editUser.fields.optional', 'Optional')})
+                    </span>
+                  </Label>
+                  <MultiSelect
+                    options={spotOptions}
+                    onValueChange={setSelectedSpots}
+                    defaultValue={selectedSpots}
+                    placeholder={
+                      allSpots.length === 0
+                        ? tu('multiSelect.noSpots', 'No spots available')
+                        : tu('multiSelect.selectSpots', 'Select spots (empty = see all tasks)...')
+                    }
+                    maxCount={10}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {tu('dialogs.editUser.fields.spotsHelp', 'Select which spots this user can see tasks for. Selecting a parent spot includes all child spots. Leave empty to allow the user to see all tasks.')}
                   </p>
                 </div>
               </div>

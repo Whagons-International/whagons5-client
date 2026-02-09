@@ -1,7 +1,8 @@
 import { useRef, useMemo, useState, useEffect } from 'react';
+import { cn } from '@/lib/utils';
 import { useLocation } from 'react-router-dom';
 import { UrlTabs } from '@/components/ui/url-tabs';
-import { MessageSquare, FolderPlus, X, CheckCircle2, UserRound, CalendarDays, Flag, Trash2 } from 'lucide-react';
+import { MessageSquare, FolderPlus, X, CheckCircle2, UserRound, CalendarDays, Flag, Trash2, Paintbrush } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -15,6 +16,7 @@ import { TabsTrigger } from '@/animated/Tabs';
 import { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import ChatTab from '@/pages/spaces/components/ChatTab';
 import ResourcesTab from '@/pages/spaces/components/ResourcesTab';
+import WhiteboardViewTab from '@/pages/spaces/components/WhiteboardViewTab';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '@/store';
 import {
@@ -47,6 +49,7 @@ import { useWorkspaceFilters } from './workspace/hooks/useWorkspaceFilters';
 import { useWorkspaceDragDrop } from './workspace/hooks/useWorkspaceDragDrop';
 import { useWorkspaceTaskDialog } from './workspace/hooks/useWorkspaceTaskDialog';
 import { useWorkspaceRowDensity } from './workspace/hooks/useWorkspaceRowDensity';
+import { useTaskCompletionToast } from './workspace/hooks/useTaskCompletionToast';
 import { createWorkspaceTabs } from './workspace/utils/workspaceTabs';
 import { SortableTab } from './workspace/components/SortableTab';
 import { SortableKpiCard } from './workspace/components/SortableKpiCard';
@@ -93,6 +96,76 @@ export const Workspace = () => {
   const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
   const users = useSelector((s: RootState) => (s as any).users.value as any[]);
   const tags = useSelector((s: RootState) => (s as any).tags.value as any[]);
+  const categories = useSelector((s: RootState) => (s as any).categories.value as any[]);
+  const workspaces = useSelector((s: RootState) => (s as any).workspaces.value as any[]);
+  const spotTypes = useSelector((s: RootState) => (s as any).spotTypes.value as any[]);
+
+  // Get current workspace data for filtering
+  const currentWorkspace = useMemo(() => {
+    if (isAllWorkspaces || !id) return null;
+    return workspaces.find((w: any) => String(w.id) === id);
+  }, [workspaces, id, isAllWorkspaces]);
+
+  // Get category IDs for the current workspace
+  const workspaceCategoryIds = useMemo(() => {
+    if (isAllWorkspaces || !currentWorkspace) return null; // null means show all
+    
+    // PROJECT workspaces use allowed_category_ids
+    if (currentWorkspace.type === 'PROJECT') {
+      const allowed = Array.isArray(currentWorkspace.allowed_category_ids) 
+        ? currentWorkspace.allowed_category_ids 
+        : [];
+      return new Set(allowed.map((id: any) => Number(id)));
+    }
+    
+    // DEFAULT workspaces use categories with matching workspace_id
+    const catIds = (categories || [])
+      .filter((c: any) => Number(c.workspace_id) === Number(currentWorkspace.id))
+      .map((c: any) => Number(c.id));
+    return new Set(catIds);
+  }, [isAllWorkspaces, currentWorkspace, categories]);
+
+  // Filter priorities by workspace categories - only include those with category_id in this workspace
+  const workspacePriorities = useMemo(() => {
+    if (!workspaceCategoryIds) return priorities || []; // Show all for "all workspaces"
+    return (priorities || []).filter((p: any) => {
+      const catId = Number(p.category_id);
+      // Only include priorities that belong to this workspace's categories
+      return Number.isFinite(catId) && workspaceCategoryIds.has(catId);
+    });
+  }, [priorities, workspaceCategoryIds]);
+
+  // Filter statuses by workspace categories - only include those with category_id in this workspace
+  const workspaceStatuses = useMemo(() => {
+    if (!workspaceCategoryIds) return statuses || []; // Show all for "all workspaces"
+    return (statuses || []).filter((s: any) => {
+      const catId = Number(s.category_id);
+      // Only include statuses that belong to this workspace's categories
+      return Number.isFinite(catId) && workspaceCategoryIds.has(catId);
+    });
+  }, [statuses, workspaceCategoryIds]);
+
+  // Filter spots by spot_type's workspace_id (spots belong to spot_types which have workspace_id)
+  const workspaceSpots = useMemo(() => {
+    if (isAllWorkspaces || !currentWorkspace) return spots || []; // Show all for "all workspaces"
+    const wsId = Number(currentWorkspace.id);
+    const typeById = new Map((spotTypes || []).map((st: any) => [st.id, st]));
+    return (spots || []).filter((s: any) => {
+      const st: any = typeById.get(s.spot_type_id);
+      // Include spots where spot_type has no workspace_id (global) or matches current workspace
+      return !st?.workspace_id || Number(st.workspace_id) === wsId;
+    });
+  }, [spots, spotTypes, currentWorkspace, isAllWorkspaces]);
+
+  // Filter tags by workspace categories - only include those with category_id in this workspace
+  const workspaceTags = useMemo(() => {
+    if (!workspaceCategoryIds) return tags || []; // Show all for "all workspaces"
+    return (tags || []).filter((t: any) => {
+      const catId = Number(t.category_id);
+      // Only include tags that belong to this workspace's categories
+      return Number.isFinite(catId) && workspaceCategoryIds.has(catId);
+    });
+  }, [tags, workspaceCategoryIds]);
 
   // Derived status groupings for stats
   const doneStatusId = (statuses || []).find((s: any) => String((s as any).action || '').toUpperCase() === 'FINISHED')?.id
@@ -116,13 +189,18 @@ export const Workspace = () => {
     headerKpiCards,
     setHeaderKpiCards,
     headerCards,
-    canReorderHeaderKpis
+    canReorderHeaderKpis,
+    isReorderingRef,
   } = useWorkspaceKpiCards({
     workspaceIdNum,
     currentUserId,
     doneStatusId,
+    workingStatusIds,
     stats,
   });
+
+  // Track selected KPI card for filtering
+  const [selectedKpiCardId, setSelectedKpiCardId] = useState<number | null>(null);
 
   // Task actions
   const {
@@ -148,12 +226,16 @@ export const Workspace = () => {
   // Task dialog
   const { openCreateTask, setOpenCreateTask, openEditTask, setOpenEditTask, selectedTask, handleOpenTaskDialog } = useWorkspaceTaskDialog();
 
+  // Task completion toast notifications
+  useTaskCompletionToast();
+
   // Drag and drop
   const { activeKpiId, handleDragStart, handleDragEnd, handleKpiDragStart, handleKpiDragEnd } = useWorkspaceDragDrop({
     customTabOrder,
     setCustomTabOrder,
     headerKpiCards,
     setHeaderKpiCards,
+    isReorderingRef,
   });
 
   // DnD sensors
@@ -278,6 +360,84 @@ export const Workspace = () => {
 
   const [showClearFilters, setShowClearFilters] = useState(false);
 
+  // Handle KPI card click to apply filters
+  const handleKpiCardClick = (cardId: number) => {
+    const card = headerCards.find((c: any) => c.id === cardId);
+    if (!card || !card.filterModel) {
+      // If no filter model, clear selection and filters
+      setSelectedKpiCardId(null);
+      tableRef.current?.setFilterModel?.(null);
+      dispatch(setFilterModel(null));
+      try {
+        localStorage.removeItem(`wh_workspace_filters_${id || 'all'}`);
+      } catch {}
+      return;
+    }
+
+    // Toggle: if already selected, deselect and clear filters
+    if (selectedKpiCardId === cardId) {
+      setSelectedKpiCardId(null);
+      tableRef.current?.setFilterModel?.(null);
+      dispatch(setFilterModel(null));
+      try {
+        localStorage.removeItem(`wh_workspace_filters_${id || 'all'}`);
+      } catch {}
+    } else {
+      // Apply filter from card
+      setSelectedKpiCardId(cardId);
+      tableRef.current?.setFilterModel?.(card.filterModel);
+      dispatch(setFilterModel(card.filterModel));
+      try {
+        localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify({ filterModel: card.filterModel, cardId: cardId }));
+      } catch {}
+      dispatch(setSearchText(''));
+    }
+  };
+
+  // Clear KPI selection when filters are cleared externally
+  useEffect(() => {
+    const handleClearFilters = () => {
+      setSelectedKpiCardId(null);
+    };
+    window.addEventListener('workspace-filter-clear', handleClearFilters as EventListener);
+    return () => {
+      window.removeEventListener('workspace-filter-clear', handleClearFilters as EventListener);
+    };
+  }, []);
+
+  // Sync selected KPI card when filters are loaded from localStorage
+  useEffect(() => {
+    if (!id && !isAllWorkspaces) return;
+    const workspaceId = id || 'all';
+    try {
+      const key = `wh_workspace_filters_${workspaceId}`;
+      const saved = localStorage.getItem(key);
+      if (saved && headerCards.length > 0) {
+        const parsed = JSON.parse(saved);
+        // Support both new format { filterModel, cardId } and legacy format (plain filterModel)
+        const filterModel = parsed?.filterModel !== undefined ? parsed.filterModel : parsed;
+        const savedCardId = parsed?.cardId;
+        
+        // First try to match by saved card ID
+        if (savedCardId != null) {
+          const exactCard = headerCards.find((card: any) => card.id === savedCardId);
+          if (exactCard) {
+            setSelectedKpiCardId(exactCard.id);
+            return;
+          }
+        }
+        // Fallback: match by filter model
+        const matchingCard = headerCards.find((card: any) => {
+          if (!card.filterModel) return false;
+          return JSON.stringify(card.filterModel) === JSON.stringify(filterModel);
+        });
+        if (matchingCard) {
+          setSelectedKpiCardId(matchingCard.id);
+        }
+      }
+    } catch {}
+  }, [id, isAllWorkspaces, headerCards]);
+
   if (invalidWorkspaceRoute) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -302,8 +462,8 @@ export const Workspace = () => {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="flex items-start gap-3 -mt-1 mb-3">
-        {showHeaderKpis && (
+      {showHeaderKpis && (
+        <div className="flex-shrink-0 flex items-start gap-3 -mt-1 mb-3">
           <div className="flex-1 min-w-0">
             <DndContext
               sensors={kpiSensors}
@@ -317,12 +477,14 @@ export const Workspace = () => {
               {canReorderHeaderKpis ? (
                 <>
                   <SortableContext items={headerCards.map((c: any) => c.id)} strategy={rectSortingStrategy}>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 items-stretch">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 items-stretch">
                       {headerCards.map((card: any) => (
                         <SortableKpiCard
                           key={card.id}
                           id={card.id}
                           card={card}
+                          isSelected={selectedKpiCardId === card.id}
+                          onClick={() => handleKpiCardClick(card.id)}
                         />
                       ))}
                     </div>
@@ -347,7 +509,7 @@ export const Workspace = () => {
                   </DragOverlay>
                 </>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 items-stretch">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 items-stretch">
                   {headerCards.map((card: any) => (
                     <WorkspaceKpiCard
                       key={card.id}
@@ -357,52 +519,16 @@ export const Workspace = () => {
                       accent={card.accent}
                       helperText={card.helperText}
                       right={card.sparkline}
+                      isSelected={selectedKpiCardId === card.id}
+                      onClick={() => handleKpiCardClick(card.id)}
                     />
                   ))}
                 </div>
               )}
             </DndContext>
           </div>
-        )}
-
-        <div className={`flex-shrink-0 flex items-center gap-3 ${showHeaderKpis ? '' : 'ml-auto'}`}>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant={rightPanel ? 'secondary' : 'ghost'}
-                size="sm"
-                className="gap-2"
-                aria-label="Collaboration menu"
-              >
-                <MessageSquare className="w-4 h-4" strokeWidth={2.2} />
-                <span className="hidden sm:inline">{t('workspace.collab.collab', 'Collab')}</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel>{t('workspace.collab.collaboration', 'Collaboration')}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuCheckboxItem
-                checked={rightPanel === 'chat'}
-                onCheckedChange={() => toggleRightPanel('chat')}
-              >
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4" />
-                  <span>{t('workspace.collab.chat', 'Chat')}</span>
-                </div>
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={rightPanel === 'resources'}
-                onCheckedChange={() => toggleRightPanel('resources')}
-              >
-                <div className="flex items-center gap-2">
-                  <FolderPlus className="w-4 h-4" />
-                  <span>{t('workspace.collab.resources', 'Resources')}</span>
-                </div>
-              </DropdownMenuCheckboxItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
-      </div>
+      )}
 
       {/* Bulk actions toolbar */}
       {selectedIds.length > 0 && (
@@ -444,73 +570,142 @@ export const Workspace = () => {
         </div>
       )}
 
-      <div className={`flex h-full ${isResizing ? 'select-none' : ''}`}>
-        <div className='flex-1 min-w-0'>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={filteredOrder} strategy={rectSortingStrategy}>
-              <UrlTabs
-                tabs={tabsForRender}
-                defaultValue={primaryTabValue}
-                basePath={`/workspace/${id}`}
-                pathMap={WORKSPACE_TAB_PATHS}
-                className="w-full h-full flex flex-col [&_[data-slot=tabs]]:gap-0 [&_[data-slot=tabs-content]]:mt-0 [&>div]:pt-0 [&_[data-slot=tabs-list]]:mb-0"
-                onValueChange={(v) => { 
-                  if (Object.keys(WORKSPACE_TAB_PATHS).includes(v)) {
-                    const tabValue = v as WorkspaceTabKey;
-                    setPrevActiveTab(activeTab); 
-                    setActiveTab(tabValue);
-                  }
-                }}
-                showClearFilters={showClearFilters}
-                onClearFilters={() => tableRef.current?.clearFilters()}
-                sortable={true}
-                sortableItems={filteredOrder.filter(key => !FIXED_TABS.includes(key))}
-                renderSortableTab={(tab, isFixed) => (
-                  <SortableTab
-                    key={tab.value}
-                    id={tab.value}
-                    disabled={isFixed}
-                  >
-                    <TabsTrigger
-                      value={tab.value}
-                      disabled={tab.disabled}
+      <div className={`flex flex-1 min-h-0 ${isResizing ? 'select-none' : ''}`}>
+        {/* Main content area - hidden when whiteboard is active */}
+        {rightPanel !== 'whiteboard' && (
+          <div className='flex-1 min-w-0 h-full'>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext items={filteredOrder} strategy={rectSortingStrategy}>
+                <UrlTabs
+                  tabs={tabsForRender}
+                  defaultValue={primaryTabValue}
+                  basePath={`/workspace/${id}`}
+                  pathMap={WORKSPACE_TAB_PATHS}
+                  className="w-full h-full flex flex-col [&_[data-slot=tabs]]:gap-0 [&_[data-slot=tabs-content]]:mt-0 [&>div]:pt-0 [&_[data-slot=tabs-list]]:mb-0"
+                  onValueChange={(v) => { 
+                    if (Object.keys(WORKSPACE_TAB_PATHS).includes(v)) {
+                      const tabValue = v as WorkspaceTabKey;
+                      setPrevActiveTab(activeTab); 
+                      setActiveTab(tabValue);
+                    }
+                  }}
+                  showClearFilters={showClearFilters}
+                  onClearFilters={() => {
+                    tableRef.current?.clearFilters();
+                    setSelectedKpiCardId(null);
+                    window.dispatchEvent(new CustomEvent('workspace-filter-clear'));
+                  }}
+                  sortable={true}
+                  sortableItems={filteredOrder.filter(key => !FIXED_TABS.includes(key))}
+                  renderSortableTab={(tab, isFixed) => (
+                    <SortableTab
+                      key={tab.value}
+                      id={tab.value}
+                      disabled={isFixed}
                     >
-                      {tab.label}
-                    </TabsTrigger>
-                  </SortableTab>
-                )}
-              />
-            </SortableContext>
-          </DndContext>
-        </div>
+                      <TabsTrigger
+                        value={tab.value}
+                        disabled={tab.disabled}
+                      >
+                        {tab.label}
+                      </TabsTrigger>
+                    </SortableTab>
+                  )}
+                  rightElement={
+                    !rightPanel ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5 h-8 px-3 rounded-md font-medium text-xs text-muted-foreground hover:text-foreground hover:bg-muted"
+                        aria-label="Collaboration"
+                        onClick={() => setRightPanel('chat')}
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">{t('workspace.collab.collab', 'Collab')}</span>
+                      </Button>
+                    ) : null
+                  }
+                />
+              </SortableContext>
+            </DndContext>
+          </div>
+        )}
+        {/* Right panel for chat/resources, or full-width whiteboard */}
         {rightPanel && (
-          <>
-            <div
-              className="w-1.5 cursor-col-resize bg-border hover:bg-primary/40"
-              onMouseDown={startResize}
-              title="Drag to resize"
-            />
-            <div className="border-l bg-background flex flex-col" style={{ width: rightPanelWidth, flex: '0 0 auto' }}>
-              <div className="flex items-center justify-between px-3 py-2 border-b">
-                <div className="text-sm font-medium">{rightPanel === 'chat' ? t('workspace.collab.chat', 'Chat') : t('workspace.collab.resources', 'Resources')}</div>
-                <Button variant="ghost" size="icon" aria-label="Close panel" onClick={() => setRightPanel(null)}>
-                  <X className="w-4 h-4" />
+            <div 
+              className={cn(
+                "relative bg-background flex flex-col",
+                rightPanel === 'whiteboard' ? "flex-1" : "border-l"
+              )} 
+              style={rightPanel === 'whiteboard' ? undefined : { width: rightPanelWidth, flex: '0 0 auto' }}
+            >
+              {/* Resize handle - only show for non-whiteboard panels */}
+              {rightPanel !== 'whiteboard' && (
+                <div
+                  className="absolute left-0 top-0 bottom-0 w-3 -translate-x-1/2 cursor-col-resize z-10 group"
+                  onMouseDown={startResize}
+                >
+                  <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-px bg-transparent group-hover:bg-primary/40 transition-colors" />
+                </div>
+              )}
+              <div className="flex items-center justify-between px-2 py-1.5 border-b">
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "h-7 px-2.5 text-xs font-medium rounded-md",
+                      rightPanel === 'chat' ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
+                    )}
+                    onClick={() => setRightPanel('chat')}
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
+                    {t('workspace.collab.chat', 'Chat')}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "h-7 px-2.5 text-xs font-medium rounded-md",
+                      rightPanel === 'resources' ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
+                    )}
+                    onClick={() => setRightPanel('resources')}
+                  >
+                    <FolderPlus className="w-3.5 h-3.5 mr-1.5" />
+                    {t('workspace.collab.resources', 'Resources')}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "h-7 px-2.5 text-xs font-medium rounded-md",
+                      rightPanel === 'whiteboard' ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
+                    )}
+                    onClick={() => setRightPanel('whiteboard')}
+                  >
+                    <Paintbrush className="w-3.5 h-3.5 mr-1.5" />
+                    {t('workspace.collab.whiteboard', 'Board')}
+                  </Button>
+                </div>
+                <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" aria-label="Close panel" onClick={() => setRightPanel(null)}>
+                  <X className="w-3.5 h-3.5" />
                 </Button>
               </div>
-              <div className="flex-1 min-h-0 overflow-auto p-2">
+              <div className="flex-1 min-h-0 overflow-auto">
                 {rightPanel === 'chat' ? (
                   <ChatTab workspaceId={id} />
-                ) : (
+                ) : rightPanel === 'resources' ? (
                   <ResourcesTab workspaceId={id} />
+                ) : (
+                  <WhiteboardViewTab workspaceId={id} />
                 )}
               </div>
             </div>
-          </>
         )}
       </div>
 
@@ -518,9 +713,9 @@ export const Workspace = () => {
         open={filtersOpen}
         onOpenChange={setFiltersOpen}
         workspaceId={isAllWorkspaces ? 'all' : (id || 'all')}
-        statuses={(statuses || []).map((s: any) => ({ id: Number(s.id), name: s.name }))}
-        priorities={(priorities || []).map((p: any) => ({ id: Number(p.id), name: p.name }))}
-        spots={(spots || []).map((sp: any) => ({ id: Number(sp.id), name: sp.name }))}
+        statuses={(workspaceStatuses || []).map((s: any) => ({ id: Number(s.id), name: s.name }))}
+        priorities={(workspacePriorities || []).map((p: any) => ({ id: Number(p.id), name: p.name }))}
+        spots={(workspaceSpots || []).map((sp: any) => ({ id: Number(sp.id), name: sp.name }))}
         owners={(users || [])
           .map((u: any) => {
             const idNum = Number(u.id);
@@ -528,7 +723,7 @@ export const Workspace = () => {
             return { id: idNum, name: u.name || u.email || `User #${idNum}` };
           })
           .filter((o): o is { id: number; name: string } => Boolean(o))}
-        tags={(tags || [])
+        tags={(workspaceTags || [])
           .filter((t: any) => {
             const idNum = Number(t.id);
             return Number.isFinite(idNum);
@@ -546,6 +741,23 @@ export const Workspace = () => {
           dispatch(setFilterModel(filterModel));
           try { localStorage.setItem(`wh_workspace_filters_${id || 'all'}`, JSON.stringify(filterModel)); } catch {}
           dispatch(setSearchText(''));
+          
+          // Check if the applied filter matches any KPI card
+          if (!filterModel) {
+            setSelectedKpiCardId(null);
+          } else {
+            // Try to find a matching card
+            const matchingCard = headerCards.find((card: any) => {
+              if (!card.filterModel) return false;
+              // Simple comparison - check if filter models match
+              return JSON.stringify(card.filterModel) === JSON.stringify(filterModel);
+            });
+            if (matchingCard) {
+              setSelectedKpiCardId(matchingCard.id);
+            } else {
+              setSelectedKpiCardId(null);
+            }
+          }
         }}
       />
 

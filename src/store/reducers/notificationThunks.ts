@@ -2,6 +2,7 @@ import { createAsyncThunk } from "@reduxjs/toolkit";
 import { DB } from "../indexedDB/DB";
 import { genericInternalActions } from "../genericSlices";
 
+import { Logger } from '@/utils/logger';
 /**
  * Cleanup expired notifications (viewed more than 24 hours ago)
  * Opens DB, finds expired IDs by viewed_at > 24h, performs store.delete
@@ -56,7 +57,7 @@ export const cleanupExpiredNotifications = createAsyncThunk(
 
             return { deletedCount: expiredIds.length };
         } catch (error: any) {
-            console.error('Error cleaning up expired notifications:', error);
+            Logger.error('redux', 'Error cleaning up expired notifications:', error);
             return rejectWithValue(error?.message || 'Failed to cleanup expired notifications');
         }
     }
@@ -99,7 +100,7 @@ export const markAllViewedNotifications = createAsyncThunk(
 
             return { markedCount: notifications.filter(n => !n.viewed_at).length };
         } catch (error: any) {
-            console.error('Error marking notifications as viewed:', error);
+            Logger.error('redux', 'Error marking notifications as viewed:', error);
             return rejectWithValue(error?.message || 'Failed to mark notifications as viewed');
         }
     }

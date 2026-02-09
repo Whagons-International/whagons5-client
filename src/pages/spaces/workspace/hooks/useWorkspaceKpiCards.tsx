@@ -1,10 +1,69 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, useRef, type ReactNode } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { BarChart3, Activity, TrendingUp } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faChartBar,
+  faChartLine,
+  faChartPie,
+  faListCheck,
+  faCheckCircle,
+  faClock,
+  faCalendarCheck,
+  faTasks,
+  faGauge,
+  faBullseye,
+  faTrophy,
+  faStar,
+  faFire,
+  faRocket,
+  faBolt,
+  faUsers,
+  faUserCheck,
+  faClipboardCheck,
+  faHashtag,
+  faPercent,
+  IconDefinition,
+} from '@fortawesome/free-solid-svg-icons';
 import { WorkspaceStats } from './useWorkspaceStats';
+import { TaskEvents } from '@/store/eventEmiters/taskEvents';
+
+import { Logger } from '@/utils/logger';
+// Icon mapping from string value to FontAwesome icon
+const FA_ICON_MAP: Record<string, IconDefinition> = {
+  faChartBar,
+  faChartLine,
+  faChartPie,
+  faListCheck,
+  faCheckCircle,
+  faClock,
+  faCalendarCheck,
+  faTasks,
+  faGauge,
+  faBullseye,
+  faTrophy,
+  faStar,
+  faFire,
+  faRocket,
+  faBolt,
+  faUsers,
+  faUserCheck,
+  faClipboardCheck,
+  faHashtag,
+  faPercent,
+};
+
+// Helper to get icon ReactNode from display_config
+const getIconFromConfig = (displayConfig: any, fallback: ReactNode): ReactNode => {
+  const iconValue = displayConfig?.icon;
+  if (iconValue && FA_ICON_MAP[iconValue]) {
+    return <FontAwesomeIcon icon={FA_ICON_MAP[iconValue]} className="h-5 w-5" />;
+  }
+  return fallback;
+};
 
 type KpiCardEntity = {
   id: number;
@@ -26,6 +85,7 @@ export type WorkspaceHeaderCard = {
   accent: 'indigo' | 'amber' | 'emerald' | 'purple';
   sparkline?: ReactNode;
   helperText?: string;
+  filterModel?: any; // Filter model to apply when card is clicked
 };
 
 type TrendSparklineProps = {
@@ -67,20 +127,35 @@ export function useWorkspaceKpiCards(params: {
   workspaceIdNum: number | null;
   currentUserId: number;
   doneStatusId: number | undefined;
+  workingStatusIds: number[];
   stats: WorkspaceStats;
 }): {
   headerKpiCards: KpiCardEntity[];
   setHeaderKpiCards: (cards: KpiCardEntity[]) => void;
   headerCards: WorkspaceHeaderCard[];
   canReorderHeaderKpis: boolean;
+  isReorderingRef: React.MutableRefObject<boolean>;
 } {
-  const { workspaceIdNum, currentUserId, doneStatusId, stats } = params;
+  const { workspaceIdNum, currentUserId, doneStatusId, workingStatusIds, stats } = params;
   const { t } = useLanguage();
+
+  // Ref to track when a reorder operation is in flight to prevent Redux sync from overwriting local state
+  const isReorderingRef = useRef(false);
 
   const allKpiCardsFromRedux = useSelector((s: RootState) => ((s as any).kpiCards?.value ?? []) as KpiCardEntity[]);
 
   const scopedKpiCardsFromStore = useMemo(() => {
     return (allKpiCardsFromRedux || [])
+      .map((c) => {
+        // Normalize query_config / display_config from JSON strings to objects
+        let qc = c.query_config;
+        if (typeof qc === 'string') { try { qc = JSON.parse(qc); } catch { qc = {}; } }
+        let dc = c.display_config;
+        if (typeof dc === 'string') { try { dc = JSON.parse(dc); } catch { dc = {}; } }
+        return (qc !== c.query_config || dc !== c.display_config)
+          ? { ...c, query_config: qc, display_config: dc }
+          : c;
+      })
       .filter((c) => c && typeof c.id === 'number')
       .filter((c) => c.is_enabled !== false)
       .filter((c) => {
@@ -97,6 +172,9 @@ export function useWorkspaceKpiCards(params: {
   const [headerKpiCards, setHeaderKpiCards] = useState<KpiCardEntity[]>([]);
 
   useEffect(() => {
+    // Skip syncing from Redux while a reorder operation is in progress
+    // This prevents the flicker where cards briefly jump back to old positions
+    if (isReorderingRef.current) return;
     setHeaderKpiCards(scopedKpiCardsFromStore);
   }, [scopedKpiCardsFromStore]);
 
@@ -104,12 +182,31 @@ export function useWorkspaceKpiCards(params: {
   const completedLast7Days = stats.trend.reduce((sum, val) => sum + val, 0);
   const trendDelta = stats.trend.length >= 2 ? stats.trend[stats.trend.length - 1] - stats.trend[stats.trend.length - 2] : 0;
 
-  const inferAccent = (displayConfig: any): WorkspaceHeaderCard['accent'] => {
-    const c = String(displayConfig?.color || '').toLowerCase();
+  const normalizeDisplayConfig = (input: any): any => {
+    if (!input) return {};
+    if (typeof input === 'string') {
+      try {
+        return JSON.parse(input);
+      } catch {
+        return {};
+      }
+    }
+    return input;
+  };
+
+  const inferAccent = (displayConfigInput: any, cardId?: number): WorkspaceHeaderCard['accent'] => {
+    const displayConfig = normalizeDisplayConfig(displayConfigInput);
+    const c = String(displayConfig?.color || displayConfig?.badgeClass || displayConfig?.barClass || '').toLowerCase();
     if (c.includes('amber') || c.includes('orange') || c.includes('yellow')) return 'amber';
     if (c.includes('emerald') || c.includes('green')) return 'emerald';
     if (c.includes('indigo') || c.includes('blue') || c.includes('sky') || c.includes('cyan')) return 'indigo';
-    return 'purple';
+    if (c.includes('purple') || c.includes('violet')) return 'purple';
+
+    const palette: WorkspaceHeaderCard['accent'][] = ['indigo', 'amber', 'emerald', 'purple'];
+    if (typeof cardId === 'number' && Number.isFinite(cardId)) {
+      return palette[Math.abs(cardId) % palette.length];
+    }
+    return 'indigo';
   };
 
   const getDefaultLabel = (defaultKey?: string) => {
@@ -137,6 +234,9 @@ export function useWorkspaceKpiCards(params: {
           value: formatStatValue(stats.inProgress),
           icon: <Activity className="h-5 w-5" />,
           accent: 'amber',
+          filterModel: workingStatusIds.length > 0 
+            ? { status_id: { filterType: 'set', values: workingStatusIds } }
+            : undefined,
         };
       case 'completedToday':
         return {
@@ -148,11 +248,14 @@ export function useWorkspaceKpiCards(params: {
             stats.completedToday === 0 && !statsArePending
               ? t('workspace.stats.startCompleting', 'Start completing tasks to see progress!')
               : undefined,
+          filterModel: doneStatusId != null
+            ? { status_id: { filterType: 'set', values: [doneStatusId] } }
+            : undefined,
         };
       case 'trend':
         return {
           label: getDefaultLabel(defaultKey),
-          value: statsArePending ? '—' : `${completedLast7Days.toLocaleString()} ${t('workspace.stats.done', 'done')}`,
+          value: statsArePending ? '—' : completedLast7Days.toLocaleString(),
           icon: <TrendingUp className="h-5 w-5" />,
           accent: 'purple',
           sparkline: <TrendSparkline data={stats.trend} className="text-purple-600" />,
@@ -161,6 +264,9 @@ export function useWorkspaceKpiCards(params: {
             : completedLast7Days === 0
               ? t('workspace.stats.completeFirst', 'Complete your first task to begin tracking progress!')
               : `${trendDelta >= 0 ? '+' : ''}${trendDelta} ${t('workspace.stats.vsYesterday', 'vs yesterday')}`,
+          filterModel: doneStatusId != null
+            ? { status_id: { filterType: 'set', values: [doneStatusId] } }
+            : undefined,
         };
       case 'total':
       default:
@@ -169,6 +275,8 @@ export function useWorkspaceKpiCards(params: {
           value: formatStatValue(stats.total),
           icon: <BarChart3 className="h-5 w-5" />,
           accent: 'indigo',
+          // Total shows all tasks, so no filter
+          filterModel: undefined,
         };
     }
   };
@@ -195,9 +303,25 @@ export function useWorkspaceKpiCards(params: {
   ]);
 
   const [customComputed, setCustomComputed] = useState<Map<number, Omit<WorkspaceHeaderCard, 'id'>>>(new Map());
+  const [tasksRefreshKey, setTasksRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const bump = () => setTasksRefreshKey((prev) => prev + 1);
+    const unsubscribers = [
+      TaskEvents.on(TaskEvents.EVENTS.TASK_CREATED, bump),
+      TaskEvents.on(TaskEvents.EVENTS.TASK_UPDATED, bump),
+      TaskEvents.on(TaskEvents.EVENTS.TASK_DELETED, bump),
+      TaskEvents.on(TaskEvents.EVENTS.TASKS_BULK_UPDATE, bump),
+      TaskEvents.on(TaskEvents.EVENTS.CACHE_INVALIDATE, bump),
+    ];
+    return () => {
+      unsubscribers.forEach((u) => { u(); });
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
+    const cardsToProcess = headerKpiCards;
 
     const toFirstId = (v: any) => {
       if (Array.isArray(v) && v.length > 0) return Number(v[0]);
@@ -229,24 +353,48 @@ export function useWorkspaceKpiCards(params: {
         if (!TasksCache.initialized) await TasksCache.init();
 
         const next = new Map<number, Omit<WorkspaceHeaderCard, 'id'>>();
-        for (const card of headerKpiCards) {
+        for (const card of cardsToProcess) {
           if (!card || card.is_enabled === false) continue;
           if (card.query_config?.is_default) continue;
 
-          const display = card.display_config || {};
-          const accent = inferAccent(display);
+          const display = normalizeDisplayConfig(card.display_config);
+          const accent = inferAccent(display, card.id);
           const helperText = display?.helperText ? String(display.helperText) : undefined;
 
           if (card.type === 'task_count') {
             const q = buildTaskQuery(card.query_config?.filters);
             const r = await TasksCache.queryTasks({ ...q, startRow: 0, endRow: 0 });
             const count = Number((r as any)?.rowCount ?? 0);
+            const filters = card.query_config?.filters ?? {};
+            const filterModel: any = {};
+            if (filters?.status_id != null) {
+              const sid = Array.isArray(filters.status_id) ? filters.status_id : [filters.status_id];
+              const statusIds = sid.map((id: any) => Number(id)).filter((n: number) => Number.isFinite(n));
+              if (statusIds.length > 0) {
+                filterModel.status_id = { filterType: 'set', values: statusIds };
+              }
+            }
+            if (filters?.priority_id != null) {
+              const pid = Array.isArray(filters.priority_id) ? filters.priority_id : [filters.priority_id];
+              const priorityIds = pid.map((id: any) => Number(id)).filter((n: number) => Number.isFinite(n));
+              if (priorityIds.length > 0) {
+                filterModel.priority_id = { filterType: 'set', values: priorityIds };
+              }
+            }
+            if (filters?.spot_id != null) {
+              const spid = Array.isArray(filters.spot_id) ? filters.spot_id : [filters.spot_id];
+              const spotIds = spid.map((id: any) => Number(id)).filter((n: number) => Number.isFinite(n));
+              if (spotIds.length > 0) {
+                filterModel.spot_id = { filterType: 'set', values: spotIds };
+              }
+            }
             next.set(card.id, {
               label: card.name,
               value: statsArePending ? '—' : count.toLocaleString(),
-              icon: <BarChart3 className="h-5 w-5" />,
+              icon: getIconFromConfig(display, <BarChart3 className="h-5 w-5" />),
               accent,
               helperText,
+              filterModel: Object.keys(filterModel).length > 0 ? filterModel : undefined,
             });
           } else if (card.type === 'task_percentage') {
             const numQ = buildTaskQuery(card.query_config?.numerator_filters);
@@ -261,7 +409,7 @@ export function useWorkspaceKpiCards(params: {
             next.set(card.id, {
               label: card.name,
               value: statsArePending ? '—' : `${pct.toLocaleString()}%`,
-              icon: <Activity className="h-5 w-5" />,
+              icon: getIconFromConfig(display, <Activity className="h-5 w-5" />),
               accent,
               helperText:
                 helperText ?? (denominator === 0 ? t('kpiCards.noDenominator', 'No data to compare') : undefined),
@@ -272,7 +420,7 @@ export function useWorkspaceKpiCards(params: {
               next.set(card.id, {
                 label: card.name,
                 value: '—',
-                icon: <TrendingUp className="h-5 w-5" />,
+                icon: getIconFromConfig(display, <TrendingUp className="h-5 w-5" />),
                 accent,
                 helperText: helperText ?? t('workspace.stats.noDoneStatus', 'No "done" status configured'),
               });
@@ -301,7 +449,7 @@ export function useWorkspaceKpiCards(params: {
             next.set(card.id, {
               label: card.name,
               value: statsArePending ? '—' : `${sum.toLocaleString()} ${t('workspace.stats.done', 'done')}`,
-              icon: <TrendingUp className="h-5 w-5" />,
+              icon: getIconFromConfig(display, <TrendingUp className="h-5 w-5" />),
               accent,
               sparkline: (
                 <TrendSparkline
@@ -323,18 +471,42 @@ export function useWorkspaceKpiCards(params: {
             const q = buildTaskQuery(card.query_config);
             const r = await TasksCache.queryTasks({ ...q, startRow: 0, endRow: 0 });
             const count = Number((r as any)?.rowCount ?? 0);
+            const filters = card.query_config?.filters ?? card.query_config ?? {};
+            const filterModel: any = {};
+            if (filters?.status_id != null) {
+              const sid = Array.isArray(filters.status_id) ? filters.status_id : [filters.status_id];
+              const statusIds = sid.map((id: any) => Number(id)).filter((n: number) => Number.isFinite(n));
+              if (statusIds.length > 0) {
+                filterModel.status_id = { filterType: 'set', values: statusIds };
+              }
+            }
+            if (filters?.priority_id != null) {
+              const pid = Array.isArray(filters.priority_id) ? filters.priority_id : [filters.priority_id];
+              const priorityIds = pid.map((id: any) => Number(id)).filter((n: number) => Number.isFinite(n));
+              if (priorityIds.length > 0) {
+                filterModel.priority_id = { filterType: 'set', values: priorityIds };
+              }
+            }
+            if (filters?.spot_id != null) {
+              const spid = Array.isArray(filters.spot_id) ? filters.spot_id : [filters.spot_id];
+              const spotIds = spid.map((id: any) => Number(id)).filter((n: number) => Number.isFinite(n));
+              if (spotIds.length > 0) {
+                filterModel.spot_id = { filterType: 'set', values: spotIds };
+              }
+            }
             next.set(card.id, {
               label: card.name,
               value: statsArePending ? '—' : count.toLocaleString(),
-              icon: <BarChart3 className="h-5 w-5" />,
+              icon: getIconFromConfig(display, <BarChart3 className="h-5 w-5" />),
               accent,
               helperText,
+              filterModel: Object.keys(filterModel).length > 0 ? filterModel : undefined,
             });
           } else {
             next.set(card.id, {
               label: card.name,
               value: '—',
-              icon: <BarChart3 className="h-5 w-5" />,
+              icon: getIconFromConfig(display, <BarChart3 className="h-5 w-5" />),
               accent,
               helperText: helperText ?? t('kpiCards.unsupportedType', 'Unsupported KPI card type'),
             });
@@ -343,7 +515,7 @@ export function useWorkspaceKpiCards(params: {
 
         if (!cancelled) setCustomComputed(next);
       } catch (error) {
-        console.error('[Workspace KPI] Error computing KPI cards:', error);
+        Logger.error('workspaces', '[Workspace KPI] Error computing KPI cards:', error);
       }
     };
 
@@ -351,32 +523,64 @@ export function useWorkspaceKpiCards(params: {
     return () => {
       cancelled = true;
     };
-  }, [headerKpiCards, workspaceIdNum, doneStatusId, statsArePending, t]);
+  }, [headerKpiCards, workspaceIdNum, doneStatusId, statsArePending, t, tasksRefreshKey]);
+
+  // Check if we have default cards in the loaded cards
+  const hasDefaultCardsInLoaded = useMemo(() => {
+    return headerKpiCards.some((c) => c?.query_config?.is_default);
+  }, [headerKpiCards]);
 
   const headerCardsForRender = useMemo(() => {
-    const out: WorkspaceHeaderCard[] = [];
-    for (const card of headerKpiCards) {
-      const computed = defaultComputed.get(card.id) ?? customComputed.get(card.id);
-      if (!computed) continue;
-      out.push({ id: card.id, ...computed });
+    const defaults: WorkspaceHeaderCard[] = [];
+    const customs: WorkspaceHeaderCard[] = [];
+    
+    // Collect default cards (either from DB or fallbacks)
+    if (hasDefaultCardsInLoaded) {
+      // Use default cards from database, sorted by position
+      const defaultCardsFromDb = headerKpiCards
+        .filter((c) => c?.query_config?.is_default)
+        .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
+      
+      for (const card of defaultCardsFromDb) {
+        const computed = defaultComputed.get(card.id);
+        if (!computed) continue;
+        defaults.push({ id: card.id, ...computed });
+      }
+    } else {
+      // Use fallback default cards if none in database
+      defaults.push(
+        { id: -1, ...getDefaultCardData('total') },
+        { id: -2, ...getDefaultCardData('inProgress') },
+        { id: -3, ...getDefaultCardData('completedToday') },
+        { id: -4, ...getDefaultCardData('trend') }
+      );
     }
-    return out;
-  }, [headerKpiCards, defaultComputed, customComputed]);
+    
+    // Collect custom cards, sorted by position
+    const customCardsFromDb = headerKpiCards
+      .filter((c) => c && !c.query_config?.is_default)
+      .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
+    
+    for (const card of customCardsFromDb) {
+      const computed = customComputed.get(card.id);
+      if (!computed) continue;
+      customs.push({ id: card.id, ...computed });
+    }
+    
+    // Return defaults first, then customs
+    return [...defaults, ...customs];
+  }, [headerKpiCards, defaultComputed, customComputed, hasDefaultCardsInLoaded, doneStatusId, workingStatusIds, stats.total, stats.inProgress, stats.completedToday, stats.trend, statsArePending, completedLast7Days, trendDelta, t]);
 
-  const fallbackDefaultCards: WorkspaceHeaderCard[] = [
-    { id: -1, ...getDefaultCardData('total') },
-    { id: -2, ...getDefaultCardData('inProgress') },
-    { id: -3, ...getDefaultCardData('completedToday') },
-    { id: -4, ...getDefaultCardData('trend') },
-  ];
+  const headerCards = headerCardsForRender;
 
-  const headerCards = headerCardsForRender.length > 0 ? headerCardsForRender : fallbackDefaultCards;
+
 
   return {
     headerKpiCards,
     setHeaderKpiCards,
     headerCards,
-    canReorderHeaderKpis: headerKpiCards.length > 0,
+    // Allow dragging when there are cards (fallback cards will snap back since they can't persist)
+    canReorderHeaderKpis: headerCards.length > 0,
+    isReorderingRef,
   };
 }
-

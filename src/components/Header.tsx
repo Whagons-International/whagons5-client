@@ -14,6 +14,7 @@ import {
 import { User, LogOut, Plus, Layers, Search, Bell, X } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./ModeToggle";
+
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store/store";
 import {
@@ -145,6 +146,9 @@ function Header() {
             boards: 'Boards',
             plugins: 'Plugins',
             'kpi-cards': 'KPI Cards',
+            'working-schedules': 'Working Schedules',
+            'working-hours': 'Working Hours',
+            'time-off-types': 'Time Off Types',
         };
         const getLabel = (seg: string, index: number) => {
             // Special handling for boards board ID
@@ -167,20 +171,42 @@ function Header() {
             acc.push({ label: t('breadcrumbs.plugins', 'Plugins'), to: '/plugins' });
             acc.push({ label: pluginName, to: location.pathname });
         } else if (parts[0] === 'settings' && parts.length > 1) {
-            // For settings subpages, create breadcrumbs like: Settings > Subpage
-            acc.push({ label: t('breadcrumbs.settings', 'Settings'), to: '/settings' });
-            
-            // Special case for kpi-cards: Settings > Plugins > Custom KPI Cards
+            // Special case for plugin settings pages: Plugins > Page Name (no Settings prefix)
             if (parts[1] === 'kpi-cards') {
                 acc.push({ label: t('breadcrumbs.plugins', 'Plugins'), to: '/plugins' });
                 acc.push({ label: t('kpiCards.title', 'Custom KPI Cards'), to: '/settings/kpi-cards/manage' });
+            } else if (parts[1] === 'working-schedules') {
+                acc.push({ label: t('breadcrumbs.plugins', 'Plugins'), to: '/plugins' });
+                acc.push({ label: t('settings.workingSchedules.title', 'Working Schedules'), to: '/settings/working-schedules' });
+            } else if (parts[1] === 'working-hours') {
+                acc.push({ label: t('breadcrumbs.plugins', 'Plugins'), to: '/plugins' });
+                acc.push({ label: t('plugins.working-hours.title', 'Working Hours'), to: '/settings/working-hours' });
+            } else if (parts[1] === 'time-off-types') {
+                acc.push({ label: t('breadcrumbs.plugins', 'Plugins'), to: '/plugins' });
+                acc.push({ label: t('settings.timeOffTypes.title', 'Time Off Types'), to: '/settings/time-off-types' });
             } else {
-                // Regular settings subpages
+                // Regular settings subpages: Settings > Subpage
+                acc.push({ label: t('breadcrumbs.settings', 'Settings'), to: '/settings' });
                 for (let i = 1; i < parts.length; i++) {
                     const seg = parts[i];
                     path += `/${seg}`;
                     const label = getLabel(seg, i);
                     acc.push({ label, to: `/settings${path}` });
+                }
+            }
+        } else if (parts[0] === 'admin' && parts[1] === 'plugins') {
+            // Special case for /admin/plugins: Inicio > Plugins (→ /plugins) > Manage Plugins
+            // "Plugins" breadcrumb should link to /plugins instead of /admin
+            acc.push({ label: t('breadcrumbs.plugins', 'Plugins'), to: '/plugins' });
+            acc.push({ label: t('plugins.manage', 'Manage Plugins'), to: '/admin/plugins' });
+        } else if (parts[0] === 'assets') {
+            acc.push({ label: t('breadcrumbs.plugins', 'Plugins'), to: '/plugins' });
+            acc.push({ label: t('plugins.assets.title', 'Assets'), to: '/assets' });
+            if (parts.length > 1) {
+                if (parts[1] === 'types') {
+                    acc.push({ label: t('assets.types.title', 'Asset Types'), to: '/assets/types' });
+                } else {
+                    acc.push({ label: t('assets.detail.title', 'Asset Detail'), to: location.pathname });
                 }
             }
         } else if (parts[0] === 'boards' && parts.length > 1) {
@@ -774,7 +800,7 @@ function Header() {
                         <div className="relative w-full">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
                             <Input
-                                placeholder="Search…"
+                                placeholder={t('workspace.search.placeholder', 'Search...')}
                                 className="h-9 pl-9 pr-9 rounded-[8px] border border-border/40 placeholder:text-muted-foreground/50 dark:bg-[#252b36] dark:border-[#2A2A2A] dark:placeholder-[#6B7280] focus-visible:border-[#6366F1]"
                                 value={searchText}
                                 onChange={(e) => dispatch(setSearchText(e.target.value))}

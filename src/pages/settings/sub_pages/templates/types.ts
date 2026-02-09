@@ -2,6 +2,7 @@ import { Template, Task, Category, Approval } from "@/store/types";
 
 export interface TemplateFormData {
   name: string;
+  alias: string;
   description: string;
   instructions: string;
   category_id: string;

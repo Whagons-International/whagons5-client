@@ -1,11 +1,11 @@
 import React, { type ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { ClipboardList, Settings, Calendar, Clock, LayoutDashboard, Map as MapIcon, BarChart3 } from 'lucide-react';
+import { ClipboardList, Settings, Calendar, Clock, LayoutDashboard, Map as MapIcon, Gauge } from 'lucide-react';
 import { TAB_ANIMATION, getTabInitialX, type TabAnimationConfig } from '@/config/tabAnimation';
 import WorkspaceTable, { WorkspaceTableHandle } from '@/pages/spaces/components/WorkspaceTable';
 import SettingsComponent from '@/pages/spaces/components/Settings';
 import CalendarViewTab from '@/pages/spaces/components/CalendarViewTab';
-import SchedulerViewTab from '@/pages/spaces/components/SchedulerViewTab';
+import SchedulerViewTab from '@/features/scheduler/SchedulerViewTab';
 import TaskBoardTab from '@/pages/spaces/components/TaskBoardTab';
 import MapViewTab from '@/pages/spaces/components/MapViewTab';
 import WorkspaceStatistics from '@/pages/spaces/components/WorkspaceStatistics';
@@ -68,7 +68,7 @@ export function createWorkspaceTabs(props: TabContentProps) {
       forceMount: true,
       content: (
         <motion.div
-          className='flex-1 h-full'
+          className='flex-1 h-full min-h-0'
           key='grid'
           initial={false}
           animate={{ x: activeTab === 'grid' ? 0 : getDynamicTabInitialX(activeTab, 'grid') }}
@@ -108,7 +108,7 @@ export function createWorkspaceTabs(props: TabContentProps) {
         </div>
       ),
       content: (
-        <motion.div className='flex-1 h-full' key='calendar' initial={{ x: getDynamicTabInitialX(prevActiveTab, 'calendar') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+        <motion.div className='flex-1 h-full min-h-0 relative' key='calendar' initial={{ x: getDynamicTabInitialX(prevActiveTab, 'calendar') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <CalendarViewTab workspaceId={workspaceId} />
         </motion.div>
       )
@@ -122,7 +122,7 @@ export function createWorkspaceTabs(props: TabContentProps) {
         </div>
       ),
       content: (
-        <motion.div className='flex-1 h-full' key='scheduler' initial={{ x: getDynamicTabInitialX(prevActiveTab, 'scheduler') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+        <motion.div className='flex-1 h-full min-h-0' key='scheduler' initial={{ x: getDynamicTabInitialX(prevActiveTab, 'scheduler') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <SchedulerViewTab workspaceId={workspaceId} />
         </motion.div>
       )
@@ -136,7 +136,7 @@ export function createWorkspaceTabs(props: TabContentProps) {
         </div>
       ),
       content: (
-        <motion.div className='flex-1 h-full' key='map' initial={{ x: getDynamicTabInitialX(prevActiveTab, 'map') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+        <motion.div className='flex-1 h-full min-h-0' key='map' initial={{ x: getDynamicTabInitialX(prevActiveTab, 'map') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <MapViewTab workspaceId={workspaceId} />
         </motion.div>
       )
@@ -149,24 +149,31 @@ export function createWorkspaceTabs(props: TabContentProps) {
           <span className="tab-label-text">{t('workspace.tabs.board', 'Board')}</span>
         </div>
       ),
+      forceMount: true, // Keep DnD context alive to avoid expensive remount
       content: (
-        <motion.div className='flex-1 h-full' key='board' initial={{ x: getDynamicTabInitialX(prevActiveTab, 'board') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+        <motion.div
+          className='flex-1 h-full min-h-0'
+          key='board'
+          initial={false}
+          animate={{ x: activeTab === 'board' ? 0 : getDynamicTabInitialX(activeTab, 'board') }}
+          transition={activeTab === 'board' ? TAB_ANIMATION.transition : { duration: 0 }}
+        >
           <TaskBoardTab workspaceId={workspaceId} />
         </motion.div>
       )
     },
     {
-      value: 'statistics',
+      value: 'dashboard',
       label: (
-        <div className="flex items-center gap-2" aria-label="Statistics">
+        <div className="flex items-center gap-2" aria-label="Dashboard">
           <div className="flex items-center justify-center w-6 h-6 rounded border border-border/60 bg-muted/40 text-muted-foreground">
-            <BarChart3 className="w-4 h-4" strokeWidth={2.2} />
+            <Gauge className="w-4 h-4" strokeWidth={2.2} />
           </div>
-          <span className="tab-label-text">{t('workspace.tabs.stats', 'Stats')}</span>
+          <span className="tab-label-text">{t('workspace.tabs.dashboard', 'Dashboard')}</span>
         </div>
       ),
       content: (
-        <motion.div className='flex-1 h-full' key='statistics' initial={{ x: getDynamicTabInitialX(prevActiveTab, 'statistics') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+        <motion.div className='flex-1 h-full min-h-0' key='dashboard' initial={{ x: getDynamicTabInitialX(prevActiveTab, 'dashboard') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <WorkspaceStatistics workspaceId={workspaceId} />
         </motion.div>
       )
@@ -182,7 +189,7 @@ export function createWorkspaceTabs(props: TabContentProps) {
         </div>
       ),
       content: (
-        <motion.div className='flex-1 h-full' key='settings' initial={{ x: getDynamicTabInitialX(prevActiveTab, 'settings') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
+        <motion.div className='flex-1 h-full min-h-0' key='settings' initial={{ x: getDynamicTabInitialX(prevActiveTab, 'settings') }} animate={{ x: 0 }} transition={TAB_ANIMATION.transition}>
           <SettingsComponent workspaceId={workspaceId} />
         </motion.div>
       )

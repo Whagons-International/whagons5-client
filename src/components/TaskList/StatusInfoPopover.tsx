@@ -6,6 +6,7 @@ import { DB } from "@/store/indexedDB/DB";
 import { TasksCache } from "@/store/indexedDB/TasksCache";
 import { cn } from "@/lib/utils";
 
+import { Logger } from '@/utils/logger';
 interface StatusTransitionLog {
   id: number;
   task_id: number;
@@ -80,7 +81,7 @@ export function StatusInfoPopover({ taskId, statusId, children }: StatusInfoPopo
         } catch (storeError: any) {
           // Store doesn't exist yet - that's okay, we'll use task data as fallback
           if (storeError.name !== 'NotFoundError') {
-            console.warn('[StatusInfoPopover] Error accessing status_transition_logs:', storeError);
+            Logger.warn('tasks', '[StatusInfoPopover] Error accessing status_transition_logs:', storeError);
           }
         }
         
@@ -147,7 +148,7 @@ export function StatusInfoPopover({ taskId, statusId, children }: StatusInfoPopo
             }
           }
         } catch (taskError) {
-          console.error('[StatusInfoPopover] Error fetching task data:', taskError);
+          Logger.error('tasks', '[StatusInfoPopover] Error fetching task data:', taskError);
         }
         
         // No data available at all
@@ -158,7 +159,7 @@ export function StatusInfoPopover({ taskId, statusId, children }: StatusInfoPopo
         });
         setLoading(false);
       } catch (error) {
-        console.error('[StatusInfoPopover] Error fetching status info:', error);
+        Logger.error('tasks', '[StatusInfoPopover] Error fetching status info:', error);
         if (!cancelled) {
           setStatusInfo(null);
           setLoading(false);

@@ -29,6 +29,8 @@ interface UrlTabsProps {
   sortable?: boolean;
   sortableItems?: string[]; // values that are draggable; others treated as fixed
   renderSortableTab?: (tab: TabItem, isFixed: boolean) => React.ReactNode;
+  // Optional: element to render on the right side of the tabs row
+  rightElement?: React.ReactNode;
 }
 
 /**
@@ -51,6 +53,7 @@ export function UrlTabs({
   sortable,
   sortableItems,
   renderSortableTab,
+  rightElement,
 }: UrlTabsProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -151,12 +154,12 @@ export function UrlTabs({
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className={className}>
       <div className="relative flex-1 flex flex-col min-h-0 w-full pt-0">
-        <TabsList>
-          {tabListContent}
-        </TabsList>
+        <div className="flex items-center w-full border-b border-border/60">
+          <TabsList className="border-b-0">
+            {tabListContent}
+          </TabsList>
 
-        {showClearFilters && (
-          <div className="absolute right-0 top-0 translate-x-full">
+          {showClearFilters && (
             <Button
               variant="outline"
               size="sm"
@@ -166,8 +169,14 @@ export function UrlTabs({
               Clear filters
               <X className="h-3 w-3" />
             </Button>
-          </div>
-        )}
+          )}
+
+          {rightElement && (
+            <div className="ml-auto flex items-center">
+              {rightElement}
+            </div>
+          )}
+        </div>
 
         {tabs.map((tab) => (
           <TabsContent

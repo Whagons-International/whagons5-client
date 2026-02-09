@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Heart, MessageCircle, Repeat2, Send, MoreHorizontal, Pin, Pencil } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -10,13 +10,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { BoardMessage } from '@/store/types';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { RootState } from '@/store/store';
-import { genericActions } from '@/store/genericSlices';
 import { getFileUrl } from '@/api/assetApi';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 
+import { Logger } from '@/utils/logger';
 dayjs.extend(relativeTime);
 
 interface PostItemProps {
@@ -47,7 +47,6 @@ export function PostItem({
   onEdit,
   onPin,
 }: PostItemProps) {
-  const dispatch = useDispatch();
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   
@@ -185,15 +184,38 @@ export function PostItem({
                   : 'grid-cols-2'
             }`}>
               {messageImages.slice(0, 4).map((attachment: any) => {
-                const imageUrl = attachment.file_path?.startsWith('http') 
-                  ? attachment.file_path 
-                  : getFileUrl(attachment.file_path || attachment.id);
+                // Handle different URL formats:
+                // 1. Full URL (http/https) - use as-is
+                // 2. Relative path starting with /api/assets - prepend base URL
+                // 3. Just an ID - use getFileUrl to construct full URL
+                let imageUrl = attachment.file_path;
+                if (imageUrl?.startsWith('blob:') || imageUrl?.startsWith('data:')) {
+                  // Blob/data URLs (e.g. from IndexedDB), use as-is
+                } else if (imageUrl?.startsWith('http')) {
+                  // Full URL, use as-is
+                } else if (imageUrl?.includes('/api/assets/')) {
+                  // Relative path with /api/assets/, extract the ID
+                  const match = imageUrl.match(/\/api\/assets\/([^\/\?]+)/);
+                  imageUrl = match ? getFileUrl(match[1]) : getFileUrl(attachment.id);
+                } else if (imageUrl) {
+                  // Assume it's a file ID
+                  imageUrl = getFileUrl(imageUrl);
+                } else {
+                  // Fallback to attachment ID
+                  imageUrl = getFileUrl(attachment.id);
+                }
+                
                 return (
                   <img
                     key={attachment.id}
                     src={imageUrl}
                     alt={attachment.file_name || ''}
                     className="w-full h-auto object-cover aspect-square"
+                    onError={(e) => {
+                      Logger.error('boards', 'Failed to load image:', imageUrl, attachment);
+                      // Hide broken image
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
                   />
                 );
               })}

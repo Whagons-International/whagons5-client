@@ -1,4 +1,5 @@
-export type FontStyle = 'system' | 'inter' | 'roboto' | 'montserrat' | 'georgia' | 'playfair' | 'poppins' | 'raleway' | 'bebas' | 'oswald';
+import { Logger } from '@/utils/logger';
+export type FontStyle = 'system' | 'inter' | 'roboto' | 'montserrat' | 'georgia' | 'playfair' | 'poppins' | 'raleway' | 'tahoma' | 'patrickHand' | 'architectsDaughter' | 'dmSans' | 'nunito';
 
 const FONT_STYLE_SETTING_KEY = 'wh-font-style';
 
@@ -11,8 +12,11 @@ const FONT_FAMILIES: Record<FontStyle, string> = {
   playfair: '"Playfair Display", Georgia, serif',
   poppins: '"Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   raleway: '"Raleway", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  bebas: '"Bebas Neue", "Arial Black", sans-serif',
-  oswald: '"Oswald", "Arial Narrow", sans-serif',
+  tahoma: 'Tahoma, Verdana, Arial, sans-serif',
+  patrickHand: '"Patrick Hand", cursive',
+  architectsDaughter: '"Architects Daughter", cursive',
+  dmSans: '"DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  nunito: '"Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
 };
 
 /**
@@ -22,12 +26,12 @@ export function getFontStyle(): FontStyle {
   if (typeof window === 'undefined') return 'system';
   try {
     const stored = localStorage.getItem(FONT_STYLE_SETTING_KEY);
-    const validFonts: FontStyle[] = ['system', 'inter', 'roboto', 'montserrat', 'georgia', 'playfair', 'poppins', 'raleway', 'bebas', 'oswald'];
+    const validFonts: FontStyle[] = ['system', 'inter', 'roboto', 'montserrat', 'georgia', 'playfair', 'poppins', 'raleway', 'tahoma', 'patrickHand', 'architectsDaughter', 'dmSans', 'nunito'];
     if (stored && validFonts.includes(stored as FontStyle)) {
       return stored as FontStyle;
     }
   } catch (error) {
-    console.warn('[FontStyle] Error reading localStorage:', error);
+    Logger.warn('ui', '[FontStyle] Error reading localStorage:', error);
   }
   return 'system'; // Default
 }
@@ -44,11 +48,12 @@ export function setFontStyle(style: FontStyle) {
     // Load Google Font if needed
     if (style === 'inter' || style === 'roboto' || style === 'montserrat' || 
         style === 'playfair' || style === 'poppins' || style === 'raleway' || 
-        style === 'bebas' || style === 'oswald') {
+        style === 'patrickHand' || style === 'architectsDaughter' ||
+        style === 'dmSans' || style === 'nunito') {
       loadGoogleFont(style);
     }
   } catch (error) {
-    console.warn('[FontStyle] Error saving to localStorage:', error);
+    Logger.warn('ui', '[FontStyle] Error saving to localStorage:', error);
   }
 }
 
@@ -78,7 +83,8 @@ export function initFontStyle() {
   const fontStyle = getFontStyle();
   if (fontStyle === 'inter' || fontStyle === 'roboto' || fontStyle === 'montserrat' || 
       fontStyle === 'playfair' || fontStyle === 'poppins' || fontStyle === 'raleway' || 
-      fontStyle === 'bebas' || fontStyle === 'oswald') {
+      fontStyle === 'patrickHand' || fontStyle === 'architectsDaughter' ||
+      fontStyle === 'dmSans' || fontStyle === 'nunito') {
     loadGoogleFont(fontStyle);
   }
 }
@@ -110,7 +116,7 @@ function addGoogleFontsPreconnect() {
 /**
  * Load Google Font dynamically
  */
-function loadGoogleFont(font: 'inter' | 'roboto' | 'montserrat' | 'playfair' | 'poppins' | 'raleway' | 'bebas' | 'oswald') {
+function loadGoogleFont(font: 'inter' | 'roboto' | 'montserrat' | 'playfair' | 'poppins' | 'raleway' | 'patrickHand' | 'architectsDaughter' | 'dmSans' | 'nunito') {
   if (typeof document === 'undefined') return;
   
   // Add preconnect links first for better performance
@@ -127,8 +133,10 @@ function loadGoogleFont(font: 'inter' | 'roboto' | 'montserrat' | 'playfair' | '
     playfair: 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800;900&display=swap',
     poppins: 'https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap',
     raleway: 'https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700;800;900&display=swap',
-    bebas: 'https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap',
-    oswald: 'https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&display=swap',
+    patrickHand: 'https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap',
+    architectsDaughter: 'https://fonts.googleapis.com/css2?family=Architects+Daughter&display=swap',
+    dmSans: 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap',
+    nunito: 'https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800&display=swap',
   };
   
   const link = document.createElement('link');

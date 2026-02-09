@@ -6,6 +6,7 @@ import { useCallback } from 'react';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { refreshClientSideGrid } from '../grid/dataSource';
 
+import { Logger } from '@/utils/logger';
 export function useGridRefresh(opts: {
   modulesLoaded: boolean;
   gridRef: React.RefObject<any>;
@@ -22,6 +23,7 @@ export function useGridRefresh(opts: {
   suppressPersistRef: React.MutableRefObject<boolean>;
   debugFilters: React.MutableRefObject<boolean>;
   setClientRows: (rows: any[]) => void;
+  spotVisibilityFilterRef?: React.MutableRefObject<(task: any) => boolean>;
 }) {
   const {
     modulesLoaded,
@@ -39,22 +41,28 @@ export function useGridRefresh(opts: {
     suppressPersistRef,
     debugFilters,
     setClientRows,
+    spotVisibilityFilterRef,
   } = opts;
 
   const refreshGrid = useCallback(async () => {
-    if (!modulesLoaded || !gridRef.current?.api) return;
+    const api = gridRef.current?.api;
+    if (!modulesLoaded || !api || api.isDestroyed?.()) return;
 
     if (suppressPersistRef.current) {
       return;
     }
 
+    // Check actual row model type at runtime to avoid calling wrong API methods
+    const isInfiniteModel = api.getGridOption?.('rowModelType') === 'infinite';
+
     suppressPersistRef.current = true;
 
-    if (useClientSide) {
+    if (!isInfiniteModel) {
+      // Client-side row model
       try {
         if (!TasksCache.initialized) await TasksCache.init();
-        const sortModel = gridRef.current.api.getSortModel?.() || [{ colId: 'created_at', sort: 'desc' }];
-        const { rows, totalFiltered } = await refreshClientSideGrid(gridRef.current.api, TasksCache, {
+        const sortModel = api.getSortModel?.() || [{ colId: 'id', sort: 'desc' }];
+        const { rows, totalFiltered } = await refreshClientSideGrid(api, TasksCache, {
           search: searchRef.current,
           workspaceRef,
           statusMapRef,
@@ -64,16 +72,22 @@ export function useGridRefresh(opts: {
           tagMapRef,
           taskTagsRef,
           sortModel,
+          spotVisibilityFilterRef,
         });
 
         setClientRows(rows);
-        gridRef.current.api.refreshClientSideRowModel?.('everything');
+        api.refreshClientSideRowModel?.('everything');
       } catch (e) {
-        console.warn('refreshGrid (client-side) failed', e);
+        Logger.warn('workspaces', 'refreshGrid (client-side) failed', e);
       }
     } else {
+      // Infinite row model
       rowCache.current.clear();
-      gridRef.current.api.refreshInfiniteCache();
+      // Use purgeInfiniteCache() instead of refreshInfiniteCache() to completely
+      // clear all cached blocks and force a full reload. This prevents visual
+      // artifacts like duplicate/overlapping rows when tasks are created or deleted,
+      // as refreshInfiniteCache() can leave stale row nodes in the DOM during refresh.
+      api.purgeInfiniteCache?.() ?? api.refreshInfiniteCache?.();
     }
 
     setTimeout(() => {

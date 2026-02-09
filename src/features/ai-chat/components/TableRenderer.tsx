@@ -1,5 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from "react";
+import { LoadingWidget } from "./LoadingWidget";
 
+import { Logger } from '@/utils/logger';
 interface TableRow {
   cells: string[];
 }
@@ -187,7 +189,7 @@ const TableRenderer: React.FC<TableRendererProps> = (props) => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
     } catch (err) {
-      console.error('Failed to copy table:', err);
+      Logger.error('assistant', 'Failed to copy table:', err);
     }
   };
 
@@ -302,11 +304,12 @@ const TableRenderer: React.FC<TableRendererProps> = (props) => {
 
       {props.isStreaming && !tableData.isComplete && (
         <div className="text-sm text-gray-500 dark:text-gray-400 mt-3 flex items-center justify-center">
-          <span className="loading-dots">
-            <span></span>
-            <span></span>
-            <span></span>
-          </span>
+          <LoadingWidget
+            size={20}
+            strokeWidthRatio={10}
+            color="currentColor"
+            cycleDuration={0.9}
+          />
           <span className="ml-2">Building table...</span>
         </div>
       )}

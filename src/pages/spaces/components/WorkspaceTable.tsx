@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useRef, useEffect, lazy, Suspense, forwardRef, useCallback } from 'react';
 import { DeleteTaskDialog } from '@/components/tasks/DeleteTaskDialog';
+import { FormFillDialog } from './formFillDialog';
 import { useAuth } from '@/providers/AuthProvider';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { WorkspaceTableHandle } from './workspaceTable/types';
@@ -26,6 +27,7 @@ import {
   useDoneStatusId,
   useLatestRef,
   useNewTaskAnimation,
+  useWorkspaceSwitchAnimation,
 } from './workspaceTable/hooks';
 import {
   loadAgGridModules,
@@ -54,7 +56,9 @@ import { getAllowedNextStatusesFactory } from './workspaceTable/utils/mappers';
 import { normalizeFilterModelForQuery } from './workspaceTable/utils/filterUtils';
 import { buildGetRows } from './workspaceTable/grid/dataSource';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
+import { useSpotVisibility } from '@/hooks/useSpotVisibility';
 
+import { Logger } from '@/utils/logger';
 // Lazy load AgGridReact component
 const AgGridReact = lazy(() => import('ag-grid-react').then(module => ({ default: module.AgGridReact }))) as any;
 
@@ -93,6 +97,11 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   const gridRef = useRef<any>(null);
   const [emptyOverlayVisible, setEmptyOverlayVisible] = useState(false);
 
+  // Spot-based visibility filtering
+  const { isTaskVisible } = useSpotVisibility();
+  const spotVisibilityFilterRef = useRef(isTaskVisible);
+  spotVisibilityFilterRef.current = isTaskVisible;
+
   const exitEditMode = useCallback((api?: any) => {
     try {
       api?.deselectAll?.();
@@ -100,6 +109,11 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       // ignore
     }
   }, []);
+
+  // Workspace switch animation - staggered fade-in effect
+  const { animationClass } = useWorkspaceSwitchAnimation({
+    workspaceId,
+  });
 
   const handleSelectionChanged = useCallback(
     (e: any, onSelectionChangedCb?: (selectedIds: number[]) => void) => {
@@ -119,8 +133,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   );
 
   const handleRowClick = useCallback((e: any, onOpenTaskDialogCb?: (task: any) => void) => {
-    // Don't open dialog when clicking ID column, status cell, notes column, or config column
-    if (e?.column?.colId === 'id' || e?.column?.colId === 'status_id' || e?.column?.colId === 'notes' || e?.column?.colId === 'config') {
+    // Don't open dialog when clicking ID column, status cell, notes column, config column, or form column
+    if (e?.column?.colId === 'id' || e?.column?.colId === 'status_id' || e?.column?.colId === 'notes' || e?.column?.colId === 'config' || e?.column?.colId === 'form') {
       return;
     }
     
@@ -130,7 +144,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       const idCell = target.closest('.ag-cell[col-id="id"]');
       const notesCell = target.closest('.ag-cell[col-id="notes"]');
       const configCell = target.closest('.ag-cell[col-id="config"]');
-      if (statusCell || idCell || notesCell || configCell) return;
+      const formCell = target.closest('.ag-cell[col-id="form"]');
+      if (statusCell || idCell || notesCell || configCell || formCell) return;
     }
 
     if (onOpenTaskDialogCb && e?.data) onOpenTaskDialogCb(e.data);
@@ -156,7 +171,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   useEffect(() => {
     loadAgGridModules()
       .then(() => setModulesLoaded(true))
-      .catch(console.error);
+      .catch((err) => Logger.error('workspaces', 'Failed to load AG Grid modules:', err));
   }, []);
 
   // Redux state management
@@ -172,6 +187,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     categories,
     templates,
     forms,
+    formVersions,
+    taskForms,
     statusTransitions,
     approvals,
     approvalApprovers,
@@ -185,6 +202,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     taskCustomFieldValues,
     taskNotes,
     taskAttachments,
+    roles,
+    assetItems,
   } = reduxState as any;
   const { defaultCategoryId, workspaceNumericId, isAllWorkspaces } = derivedState as any;
   const metadataLoadedFlags = useMetadataLoadedFlags(reduxState);
@@ -200,16 +219,20 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     priorityMap,
     spotMap,
     userMap,
+    assetMap,
     filteredPriorities,
     tagMap,
     templateMap,
     formMap,
+    formVersionMap,
+    taskFormsMap,
     taskTagsMap,
     categoryMap,
     workspaceCustomFields,
     taskCustomFieldValueMap,
     approvalMap,
     stableTaskApprovalInstances,
+    roleMap,
   } = useWorkspaceTableLookups({
     statuses: globalStatuses,
     priorities,
@@ -218,6 +241,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     categories,
     templates,
     forms,
+    formVersions,
+    taskForms,
     statusTransitions,
     slas,
     tags,
@@ -227,6 +252,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     taskCustomFieldValues,
     approvals,
     taskApprovalInstances,
+    roles,
+    assetItems,
     defaultCategoryId,
     workspaceNumericId,
     isAllWorkspaces,
@@ -266,6 +293,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     userMapRef,
     tagMapRef,
     taskTagsRef,
+    spotVisibilityFilterRef,
   });
 
   // Sync metadata and refresh grid cells
@@ -297,6 +325,21 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     window.addEventListener('wh:rowDensityChanged', handler);
     return () => window.removeEventListener('wh:rowDensityChanged', handler);
   }, []);
+
+  // Show description below name setting
+  const [showDescriptionBelowName, setShowDescriptionBelowName] = useState<boolean>(() => {
+    try { return (localStorage.getItem(`wh_workspace_show_description_${workspaceId || 'all'}`) ?? 'false') === 'true'; } catch { return false; }
+  });
+  useEffect(() => {
+    const handler = (e: any) => {
+      const detail = e?.detail;
+      if (detail?.showDescription !== undefined && (detail?.workspaceId === workspaceId || detail?.workspaceId === 'all')) {
+        setShowDescriptionBelowName(detail.showDescription);
+      }
+    };
+    window.addEventListener('wh:displayOptionsChanged', handler);
+    return () => window.removeEventListener('wh:displayOptionsChanged', handler);
+  }, [workspaceId]);
 
   const getRowStyle = useMemo(() => (_params: any) => undefined, []);
   
@@ -349,7 +392,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           });
         } catch (e) {
           // Ignore errors, grid might not be ready
-          console.debug('Failed to refresh row classes for animation:', e);
+          Logger.debug('workspaces', 'Failed to refresh row classes for animation:', e);
         }
       }, 250); // Wait 250ms to ensure grid refresh has completed and rows are rendered
       
@@ -371,6 +414,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       externalFilterModelRef,
       normalizeFilterModelForQuery,
       setEmptyOverlayVisible,
+      spotVisibilityFilterRef,
     }),
     [rowCache, workspaceRef, searchRef, statusMapRef, priorityMapRef, spotMapRef, userMapRef, tagMapRef, taskTagsRef, externalFilterModelRef, setEmptyOverlayVisible]
   );
@@ -378,6 +422,13 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   useEffect(() => {
     setEmptyOverlayVisible(false);
   }, [workspaceId, searchText]);
+
+  // In client-side mode, set empty overlay based on clientRows length
+  useEffect(() => {
+    if (useClientSide) {
+      setEmptyOverlayVisible(clientRows.length === 0);
+    }
+  }, [useClientSide, clientRows]);
 
   // Grid refresh hook
   const refreshGrid = useGridRefresh({
@@ -396,6 +447,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     suppressPersistRef,
     debugFilters,
     setClientRows,
+    spotVisibilityFilterRef,
   });
 
   // Refresh approvals when a decision is recorded
@@ -403,6 +455,36 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
 
   // Use task deletion hook
   const { deleteDialogOpen, setDeleteDialogOpen, taskToDelete, handleDeleteTask, confirmDelete } = useTaskDeletion(gridRef, refreshGrid);
+
+  // Form fill dialog state
+  const [formDialogState, setFormDialogState] = useState<{
+    open: boolean;
+    taskId: number;
+    taskName?: string;
+    formId: number;
+    formVersionId: number;
+    existingTaskFormId?: number;
+    existingData?: Record<string, any>;
+  }>({
+    open: false,
+    taskId: 0,
+    formId: 0,
+    formVersionId: 0,
+  });
+
+  const handleOpenFormDialog = useCallback((params: {
+    taskId: number;
+    taskName?: string;
+    formId: number;
+    formVersionId: number;
+    existingTaskFormId?: number;
+    existingData?: Record<string, any>;
+  }) => {
+    setFormDialogState({
+      open: true,
+      ...params,
+    });
+  }, []);
 
   const columnDefs = useMemo(() => buildWorkspaceColumns({
     getUserDisplayName,
@@ -419,11 +501,13 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     formatDueDate,
     spotMap,
     spotsLoaded: metadataLoadedFlags.spotsLoaded,
+    assetMap,
+    assetsLoaded: metadataLoadedFlags.assetsLoaded,
     userMap,
     getDoneStatusId,
     groupField: (useClientSide && groupBy !== 'none') ? groupBy : undefined,
     categoryMap,
-    showDescriptions: rowDensity !== 'compact',
+    showDescriptions: showDescriptionBelowName,
     density: rowDensity,
     t,
     approvalMap,
@@ -443,18 +527,30 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
     taskAttachments,
     approvalApprovers,
     currentUserId: user?.id,
+    // Get current user's role IDs from the users data (includes global_roles from API)
+    currentUserRoleIds: (() => {
+      if (!user?.id) return [];
+      const currentUserData = userMap[Number(user.id)] || userMap[String(user.id)];
+      const globalRoles = currentUserData?.global_roles;
+      if (!Array.isArray(globalRoles)) return [];
+      return globalRoles.map((r: any) => typeof r === 'object' ? Number(r.id) : Number(r)).filter(Number.isFinite);
+    })(),
     onDeleteTask: handleDeleteTask,
-    onLogTask: (id: number) => console.info('Log action selected (placeholder) for task', id),
+    onLogTask: (id: number) => Logger.info('workspaces', 'Log action selected (placeholder) for task', id),
     slaMap,
+    taskFormsMap,
+    formVersionMap,
+    onOpenFormDialog: handleOpenFormDialog,
+    roleMap,
   } as any), [
-    statusMap, priorityMap, spotMap, userMap, tagMap, templateMap, formMap, taskTags, taskUsers,
+    statusMap, priorityMap, spotMap, userMap, tagMap, templateMap, formMap, formVersionMap, taskFormsMap, taskTags, taskUsers,
     getStatusIcon, formatDueDate, getAllowedNextStatuses, handleChangeStatus,
     metadataLoadedFlags.statusesLoaded, metadataLoadedFlags.prioritiesLoaded,
-    metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded,
-    filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, rowDensity, tagDisplayMode,
-    approvalMap, approvalApprovers, stableTaskApprovalInstances, user?.id, slas, slaMap,
+    metadataLoadedFlags.spotsLoaded, metadataLoadedFlags.usersLoaded, metadataLoadedFlags.assetsLoaded,
+    filteredPriorities, getUsersFromIds, useClientSide, groupBy, categoryMap, rowDensity, showDescriptionBelowName, tagDisplayMode,
+    approvalMap, approvalApprovers, stableTaskApprovalInstances, user?.id, slas, slaMap, roleMap, assetMap,
     visibleColumns, workspaceCustomFields, taskCustomFieldValueMap, customFields, taskNotes, taskAttachments, handleDeleteTask,
-    getDoneStatusId,
+    getDoneStatusId, handleOpenFormDialog,
   ]);
 
   const defaultColDef = useMemo(() => createDefaultColDef(), []);
@@ -576,6 +672,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           rowSelection={{ 
             mode: 'multiRow', 
             enableClickSelection: false,
+            enableSelectionWithoutKeys: true, // Allow programmatic selection via node.setSelected()
             checkboxes: false, // Disabled - using custom checkbox in ID column
             headerCheckbox: false,
           }}
@@ -583,8 +680,9 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           getRowClass={getRowClass}
           onGridReady={onGridReady}
           onFirstDataRendered={() => {
-            if (!gridRef.current?.api) return;
-            onFiltersChanged?.(!!gridRef.current.api.isAnyFilterPresent?.());
+            const api = gridRef.current?.api;
+            if (!api || api.isDestroyed?.()) return;
+            onFiltersChanged?.(!!api.isAnyFilterPresent?.());
             onRowDataUpdated();
           }}
           onRowDataUpdated={onRowDataUpdated}
@@ -606,7 +704,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           onColumnVisible={(e: any) => {
             handleColumnOrderChanged(e?.columnApi);
           }}
-          animateRows={false}
+          animateRows={true}
           suppressColumnVirtualisation={false}
           suppressNoRowsOverlay={false}
           loading={false}
@@ -621,7 +719,19 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         onConfirm={confirmDelete}
         taskName={taskToDelete?.name}
       />
-    </Suspense>
+
+      <FormFillDialog
+        open={formDialogState.open}
+        onOpenChange={(open) => setFormDialogState(prev => ({ ...prev, open }))}
+        taskId={formDialogState.taskId}
+        taskName={formDialogState.taskName}
+        formId={formDialogState.formId}
+        formVersionId={formDialogState.formVersionId}
+        existingTaskFormId={formDialogState.existingTaskFormId}
+        existingData={formDialogState.existingData}
+      />
+    </Suspense>,
+    animationClass
   );
 });
 

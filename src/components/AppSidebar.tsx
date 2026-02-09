@@ -25,13 +25,20 @@ import {
   Trophy, // Add Trophy icon for gamification
   LineChart, // Add LineChart icon for analytics
   Droplet, // Add Droplet icon for cleaning
+  Hotel, // Add Hotel icon for hotel analytics
+  HeartPulse, // Add HeartPulse icon for real-time status
+  Package, // Add Package icon for assets
+  QrCode, // Add QrCode icon for QR codes
+  Bug, // Add Bug icon for tech support
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
 import { RootState } from '@/store';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { usePluginEnabled } from '@/hooks/usePluginEnabled';
 // import { useAuth } from '@/providers/AuthProvider'; // Currently not used, uncomment when needed
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Collapsible,
   CollapsibleContent,
@@ -43,11 +50,14 @@ import WhagonsCheck from '@/assets/WhagonsCheck';
 
 import { iconService } from '@/database/iconService';
 import { Workspace } from '@/store/types';
+import { getDisplayVersion } from '@/utils/version';
 // Removed Messages feature
 import AppSidebarWorkspaces from './AppSidebarWorkspaces';
 import AppSidebarBoards from './AppSidebarBoards';
 import { genericCaches } from '@/store/genericSlices';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { getRtlConnected, subscribeRtlConnected } from '@/store/realTimeListener/RTL';
+import { useSuperAdmin } from '@/hooks/useSuperAdmin';
 import {
   DndContext,
   closestCenter,
@@ -62,6 +72,7 @@ import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } 
 import { CSS } from '@dnd-kit/utilities';
 import { useBranding } from '@/providers/BrandingProvider';
 
+import { Logger } from '@/utils/logger';
 // Global pinned state management
 let isPinnedGlobal = localStorage.getItem('sidebarPinned') === 'true';
 const pinnedStateCallbacks: ((pinned: boolean) => void)[] = [];
@@ -138,7 +149,7 @@ const getDefaultPluginsConfig = (): PluginConfig[] => [
     id: 'compliance',
     enabled: true,
     pinned: false,
-    name: 'Compliance',
+    name: 'Standards and Norms',
     icon: FileText,
     iconColor: '#10b981', // emerald-500 to match plugin card
     route: '/compliance/standards',
@@ -179,6 +190,42 @@ const getDefaultPluginsConfig = (): PluginConfig[] => [
     iconColor: '#eab308', // yellow-500
     route: '/motivation',
   },
+  {
+    id: 'hotel-analytics',
+    enabled: true,
+    pinned: false,
+    name: 'Hotel Analytics',
+    icon: Hotel,
+    iconColor: '#10b981', // emerald-500
+    route: '/hotel-analytics',
+  },
+  {
+    id: 'working-hours',
+    enabled: true,
+    pinned: false,
+    name: 'Working Hours',
+    icon: FileText,
+    iconColor: '#f97316',     // orange-500
+    route: '/working-hours',
+  },
+  {
+    id: 'assets',
+    enabled: false,
+    pinned: false,
+    name: 'Assets',
+    icon: Package,
+    iconColor: '#0ea5e9',     // sky-500
+    route: '/assets',
+  },
+  {
+    id: 'qr-codes',
+    enabled: false,
+    pinned: false,
+    name: 'QR Codes',
+    icon: QrCode,
+    iconColor: '#06b6d4',     // cyan-500
+    route: '/qr-codes',
+  },
 ];
 
 const loadPluginsConfig = (): PluginConfig[] => {
@@ -187,14 +234,22 @@ const loadPluginsConfig = (): PluginConfig[] => {
     if (stored) {
       const parsed = JSON.parse(stored);
       // Merge with defaults to handle new plugins
+      // Only use 'enabled' and 'pinned' from stored config, always use defaults for route/icon/etc
       const defaults = getDefaultPluginsConfig();
       return defaults.map(defaultPlugin => {
-        const stored = parsed.find((p: PluginConfig) => p.id === defaultPlugin.id);
-        return stored ? { ...defaultPlugin, ...stored } : defaultPlugin;
+        const storedPlugin = parsed.find((p: PluginConfig) => p.id === defaultPlugin.id);
+        if (storedPlugin) {
+          return {
+            ...defaultPlugin,
+            enabled: storedPlugin.enabled ?? defaultPlugin.enabled,
+            pinned: storedPlugin.pinned ?? defaultPlugin.pinned,
+          };
+        }
+        return defaultPlugin;
       });
     }
   } catch (error) {
-    console.error('Error loading plugins config:', error);
+    Logger.error('ui', 'Error loading plugins config:', error);
   }
   return getDefaultPluginsConfig();
 };
@@ -208,7 +263,7 @@ export const setPluginsConfig = (configs: PluginConfig[]) => {
     const toStore = configs.map(({ id, enabled, pinned }) => ({ id, enabled, pinned }));
     localStorage.setItem(PLUGINS_STORAGE_KEY, JSON.stringify(toStore));
   } catch (error) {
-    console.error('Error saving plugins config:', error);
+    Logger.error('ui', 'Error saving plugins config:', error);
   }
   pluginConfigCallbacks.forEach((callback) => callback(configs));
 };
@@ -234,7 +289,7 @@ export const togglePluginEnabled = (pluginId: string) => {
 export const togglePluginPinned = (pluginId: string) => {
   const configs = getPluginsConfig();
   const updated = configs.map(p => 
-    p.id === pluginId ? { ...p, pinned: !p.pinned } : p
+    p.id === pluginId ? { ...p, pinned: !p.pinned, enabled: true } : p
   );
   setPluginsConfig(updated);
 };
@@ -253,7 +308,7 @@ export const setPinnedPluginsOrder = (order: string[]) => {
   try {
     localStorage.setItem(PINNED_ORDER_STORAGE_KEY, JSON.stringify(order));
   } catch (error) {
-    console.error('Error saving pinned plugins order:', error);
+    Logger.error('ui', 'Error saving pinned plugins order:', error);
   }
 };
 
@@ -472,6 +527,11 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   const { t } = useLanguage();
   const { config } = useBranding();
   
+  // Get backend plugin statuses for plugin-guarded routes
+  const assetsPluginEnabled = usePluginEnabled('assets').isEnabled;
+  const qrCodesPluginEnabled = usePluginEnabled('qr-codes').isEnabled;
+  const workingHoursPluginEnabled = usePluginEnabled('working-hours').isEnabled;
+  
   // Check if primary color is a gradient
   const isPrimaryGradient = useMemo(() => {
     const primaryColor = config.primaryColor || '';
@@ -487,6 +547,13 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   const [defaultIcon, setDefaultIcon] = useState<any>(null);
   const [pinnedBoards, setPinnedBoardsState] = useState<number[]>([]);
   const [pinnedBoardsOrder, setPinnedBoardsOrderState] = useState<number[]>([]);
+  
+  // Subscribe to RTL connection status
+  const rtlConnected = useSyncExternalStore(subscribeRtlConnected, getRtlConnected);
+  
+  // Check if user is super admin (for tech support access)
+  const { isSuperAdmin } = useSuperAdmin();
+
   const hoverOpenTimerRef = useRef<number | null>(null);
   const hoverCloseTimerRef = useRef<number | null>(null);
   // const [boards, setBoards] = useState<{ id: string; name: string }[]>([]);
@@ -515,7 +582,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
             await cache.getAll();
           }
         } catch (error) {
-          console.error('Error loading boards:', error);
+          Logger.error('ui', 'Error loading boards:', error);
         }
       };
       loadBoards();
@@ -542,9 +609,15 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   }, []);
 
   // Prefer Redux once it has data; otherwise show local IndexedDB rows
-  const displayWorkspaces: Workspace[] = (workspaces && workspaces.length > 0)
-    ? workspaces as any
-    : (initialWorkspaces || []);
+  const displayWorkspaces: Workspace[] = useMemo(() => {
+    return (workspaces && workspaces.length > 0)
+      ? workspaces as any
+      : (initialWorkspaces || []);
+  }, [workspaces, initialWorkspaces]);
+
+  const workspaceIconKey = useMemo(() => displayWorkspaces
+    .map((workspace) => `${workspace.id}:${workspace.icon ?? ''}`)
+    .join('|'), [displayWorkspaces]);
 
   // Dedupe workspaces by id to avoid duplicate key warnings when state temporarily contains duplicates
   const uniqueWorkspaces = useMemo(() => {
@@ -555,6 +628,9 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
 
 
   // Note: clearError action not available in generic slices
+
+  // Subscribe to RTL connection status
+
 
   // Subscribe to pinned state changes
   useEffect(() => {
@@ -581,7 +657,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
           setPinnedBoardsOrderState(JSON.parse(storedOrder));
         }
       } catch (error) {
-        console.error('Error loading pinned boards:', error);
+        Logger.error('ui', 'Error loading pinned boards:', error);
       }
     };
     
@@ -616,7 +692,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
         const icon = await iconService.getIcon('building');
         setDefaultIcon(icon);
       } catch (error) {
-        console.error('Error loading default icon:', error);
+        Logger.error('ui', 'Error loading default icon:', error);
         // Set a fallback icon to prevent the component from not rendering
         setDefaultIcon('fa-building');
       }
@@ -630,19 +706,23 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   // Load workspace icons when workspaces change
   useEffect(() => {
     const loadWorkspaceIcons = async () => {
-      const iconNames = uniqueWorkspaces.map((workspace: Workspace) => workspace.icon).filter(Boolean);
-      if (iconNames.length > 0) {
-        try {
-          const icons = await iconService.loadIcons(iconNames);
-          setWorkspaceIcons(icons);
-        } catch (error) {
-          console.error('Error loading workspace icons:', error);
-        }
+      const iconNames = uniqueWorkspaces
+        .map((workspace: Workspace) => workspace.icon)
+        .filter((iconName): iconName is string => typeof iconName === 'string' && iconName.length > 0);
+      if (iconNames.length === 0) {
+        setWorkspaceIcons({});
+        return;
+      }
+      try {
+        const icons = await iconService.loadIcons(iconNames);
+        setWorkspaceIcons(icons);
+      } catch (error) {
+        Logger.error('ui', 'Error loading workspace icons:', error);
       }
     };
 
     loadWorkspaceIcons();
-  }, [uniqueWorkspaces]);
+  }, [uniqueWorkspaces, workspaceIconKey]);
 
   // Preload common icons on component mount
   useEffect(() => {
@@ -730,7 +810,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   // Temporarily commented out to debug workspace rendering
   /*
   if (!defaultIcon) {
-    console.log('AppSidebar: Default icon not loaded yet, skipping render');
+    Logger.info('ui', 'AppSidebar: Default icon not loaded yet, skipping render');
     return null;
   }
   */
@@ -739,8 +819,22 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   const [pinnedPluginsOrder, setPinnedPluginsOrderState] = useState<string[]>(getPinnedPluginsOrder());
   
   // Sort pinned plugins by saved order (excluding boards and activity from drag-and-drop ordering)
+  // Also filter out plugins that are not enabled in the backend
   const pinnedPlugins = useMemo(() => {
-    const pinned = pluginsConfig.filter(p => p.enabled && p.pinned && p.id !== 'boards' && p.id !== 'activity');
+    const pinned = pluginsConfig.filter(p => {
+      // Must be pinned to show in sidebar
+      if (!p.pinned) return false;
+      
+      // Exclude boards and activity from drag-and-drop ordering
+      if (p.id === 'boards' || p.id === 'activity') return false;
+      
+      // For plugin-guarded routes, check backend plugin status
+      if (p.id === 'assets' && !assetsPluginEnabled) return false;
+      if (p.id === 'qr-codes' && !qrCodesPluginEnabled) return false;
+      if (p.id === 'working-hours' && !workingHoursPluginEnabled) return false;
+      
+      return true;
+    });
     const order = pinnedPluginsOrder;
     
     if (order.length === 0) return pinned;
@@ -754,17 +848,12 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
       if (bIndex === -1) return -1;
       return aIndex - bIndex;
     });
-  }, [pluginsConfig, pinnedPluginsOrder]);
+  }, [pluginsConfig, pinnedPluginsOrder, assetsPluginEnabled, qrCodesPluginEnabled, workingHoursPluginEnabled]);
   
   // Plugins that are not visible in sidebar (pinned=false) are not shown anywhere
   const unpinnedPlugins: PluginConfig[] = [];
 
-  // Check if boards plugin is enabled and pinned
-  const boardsPluginEnabled = useMemo(() => {
-    const boardsPlugin = pluginsConfig.find(p => p.id === 'boards');
-    return boardsPlugin?.enabled ?? false;
-  }, [pluginsConfig]);
-  
+  // Check if boards plugin is pinned
   const boardsPluginPinned = useMemo(() => {
     const boardsPlugin = pluginsConfig.find(p => p.id === 'boards');
     return boardsPlugin?.pinned ?? false;
@@ -873,8 +962,8 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
               showEverythingButton={true}
             />
             
-            {/* Boards section - shown below workspaces if boards plugin is enabled AND pinned */}
-            {boardsPluginEnabled && boardsPluginPinned && (
+            {/* Boards section - shown below workspaces if boards plugin is pinned */}
+            {boardsPluginPinned && (
               <AppSidebarBoards
                 boards={boards}
                 pathname={pathname}
@@ -1041,33 +1130,93 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
+
+                  {/* Tech Support - Only visible to super admins */}
+                  {isSuperAdmin && (
+                    <>
+                      <SidebarSeparator className="my-1 border-[var(--sidebar-border)]" />
+                      <SidebarMenuItem>
+                        <SidebarMenuButton
+                          asChild
+                          tooltip={isCollapsed && !isMobile ? t('sidebar.techSupport', 'Tech Support') : undefined}
+                          className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
+                          style={{
+                            height: '30px',
+                            padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
+                            gap: '8px',
+                            fontWeight: pathname === '/tech-support' ? 600 : 400,
+                            fontSize: '12px',
+                            boxShadow: pathname === '/tech-support' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                          }}
+                        >
+                          <Link
+                            to="/tech-support"
+                            className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
+                          >
+                            <IconBadge color="#ef4444" size={18}>
+                              <Bug size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                            </IconBadge>
+                            {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.techSupport', 'Tech Support')}</span>}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </>
+                  )}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
           </CollapsibleContent>
         </Collapsible>
 
-        <div className="flex justify-center pt-2 pb-1">
-          <AssistantWidget
-            floating={false}
-            renderTrigger={(open) => (
-              <button
-                type="button"
-                onClick={open}
-                title={t('sidebar.copilot', 'Copilot')}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-full bg-[var(--sidebar-border)]/80 text-[var(--sidebar-text-secondary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] transition-colors"
-              >
-                <Sparkles className="h-4 w-4" />
-              </button>
-            )}
-          />
-        </div>
-
         {/* Messages create board dialog removed */}
 
-        {showExpandedContent && (
-          <div style={{ padding: '4px 16px', fontSize: '12px', color: 'var(--sidebar-text-tertiary)', fontWeight: 400, marginTop: '4px', flexShrink: 0 }}>
-            Version 5.0.0
+        {showExpandedContent ? (
+          <div style={{ padding: '4px 16px', fontSize: '12px', color: 'var(--sidebar-text-tertiary)', fontWeight: 400, marginTop: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span style={{ display: 'flex', alignItems: 'center', cursor: 'default' }}>
+                    <HeartPulse 
+                      size={14} 
+                      className={rtlConnected ? 'text-red-500 animate-heartbeat' : 'text-gray-400 opacity-50'}
+                    />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  {rtlConnected ? 'Real-time connected' : 'Real-time disconnected'}
+                </TooltipContent>
+              </Tooltip>
+              <span>Version {getDisplayVersion()}</span>
+            </div>
+            <AssistantWidget
+              floating={false}
+              renderTrigger={(open) => (
+                <button
+                  type="button"
+                  onClick={open}
+                  title={t('sidebar.copilot', 'Copilot')}
+                  className="h-5 w-5 inline-flex items-center justify-center rounded-full text-[var(--sidebar-text-secondary)] hover:text-[var(--sidebar-primary)] transition-colors"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                </button>
+              )}
+            />
+          </div>
+        ) : (
+          <div className="flex justify-center py-2">
+            <AssistantWidget
+              floating={false}
+              renderTrigger={(open) => (
+                <button
+                  type="button"
+                  onClick={open}
+                  title={t('sidebar.copilot', 'Copilot')}
+                  className="h-6 w-6 inline-flex items-center justify-center rounded-full text-[var(--sidebar-text-secondary)] hover:text-[var(--sidebar-primary)] transition-colors"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                </button>
+              )}
+            />
           </div>
         )}
       </SidebarFooter>

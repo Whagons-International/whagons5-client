@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { LANGUAGE_OPTIONS } from "@/config/languages";
 import { celebrateTaskCompletion, type CelebrationType } from "@/utils/confetti";
 import { setFontStyle, type FontStyle } from "@/utils/fontStyle";
-import { MOTIVATIONAL_QUOTES, HERO_IMAGES } from "../utils/constants";
 
 type DefaultsTabProps = {
   language: string;
@@ -125,11 +124,20 @@ export const DefaultsTab = ({
               <SelectItem value="raleway">
                 {t("settings.global.defaults.fontStyle.raleway", "Raleway")}
               </SelectItem>
-              <SelectItem value="bebas">
-                {t("settings.global.defaults.fontStyle.bebas", "Bebas Neue")}
+              <SelectItem value="tahoma">
+                {t("settings.global.defaults.fontStyle.tahoma", "Tahoma")}
               </SelectItem>
-              <SelectItem value="oswald">
-                {t("settings.global.defaults.fontStyle.oswald", "Oswald")}
+              <SelectItem value="patrickHand">
+                {t("settings.global.defaults.fontStyle.patrickHand", "Patrick Hand")}
+              </SelectItem>
+              <SelectItem value="architectsDaughter">
+                {t("settings.global.defaults.fontStyle.architectsDaughter", "Architects Daughter")}
+              </SelectItem>
+              <SelectItem value="dmSans">
+                {t("settings.global.defaults.fontStyle.dmSans", "DM Sans")}
+              </SelectItem>
+              <SelectItem value="nunito">
+                {t("settings.global.defaults.fontStyle.nunito", "Nunito")}
               </SelectItem>
             </SelectContent>
           </Select>

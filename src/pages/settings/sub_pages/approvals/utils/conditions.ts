@@ -277,7 +277,7 @@ export const createEmptyFormState = (): ApprovalFormState => ({
   trigger_conditions: [],
   require_rejection_comment: false,
   block_editing_during_approval: false,
-  deadline_type: "hours",
+  deadline_type: "none",
   deadline_value: "",
   order_index: 0,
   is_active: true,

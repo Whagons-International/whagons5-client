@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ColumnBuilderOptions } from './types';
 import { createVisibilityChecker } from './shared/utils';
+import { Logger } from '@/utils/logger';
 
 export function createBaseColumns(opts: ColumnBuilderOptions) {
   const {
@@ -17,11 +18,14 @@ export function createBaseColumns(opts: ColumnBuilderOptions) {
     taskAttachments,
     spotMap,
     spotsLoaded,
-    formatDueDate,
+    assetMap,
+    assetsLoaded,
     visibleColumns,
+    density,
   } = opts;
 
   const isVisible = createVisibilityChecker(visibleColumns);
+  const isCompact = density === 'compact';
 
   const t = opts.t || ((key: string, fallback?: string) => fallback || key);
   
@@ -62,64 +66,80 @@ export function createBaseColumns(opts: ColumnBuilderOptions) {
         
         if (!hasValidId) {
           return (
-            <div className="flex flex-col items-center justify-center gap-2 h-full w-full">
+            <div className="flex items-center justify-center gap-2 h-full w-full flex-row">
+              <div className={`wh-task-checkbox flex items-center justify-center ${isCompact ? 'w-5 h-5' : 'w-6 h-6'}`}>
+                <div className={`rounded-full border-2 border-muted bg-background opacity-50 ${isCompact ? 'w-4 h-4' : 'w-5 h-5'}`} />
+              </div>
               <span className="flex items-center justify-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground">
                 {id ?? ''}
               </span>
-              <div className="flex items-center justify-center w-6 h-6">
-                <div className="w-5 h-5 rounded-full border-2 border-muted bg-background opacity-50" />
-              </div>
             </div>
           );
         }
         
-        return (
-          <div className="flex flex-col items-center justify-center gap-2 h-full w-full">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex items-center justify-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground hover:bg-muted/80 cursor-pointer transition-colors"
-                  aria-label="Task actions"
-                >
-                  {id ?? ''}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="right" sideOffset={4} className="w-44">
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onLogTask?.(taskId); }}>
-                  Log
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDeleteTask?.(taskId); }}>
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            
-            {/* Custom circular checkbox - prevents row click */}
-            <div 
-              className="flex items-center justify-center w-6 h-6 cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (node) {
-                  node.setSelected(!isSelected);
-                  requestAnimationFrame(() => {
-                    api?.refreshCells?.({ rowNodes: [node], force: true });
-                  });
-                }
-              }}
-            >
-              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                isSelected 
-                  ? 'bg-primary border-primary' 
-                  : 'bg-background border-border hover:border-primary/50'
-              }`}>
-                {isSelected && (
-                  <div className="w-2.5 h-2.5 rounded-full bg-white dark:bg-background" />
-                )}
-              </div>
+        // Checkbox component - shared between compact and non-compact modes
+        const checkbox = (
+          <div 
+            className={`wh-task-checkbox flex items-center justify-center cursor-pointer ${isCompact ? 'w-5 h-5' : 'w-6 h-6'}`}
+            onClick={(e) => {
+              Logger.info('ui', '[Selection] Checkbox clicked', { taskId, isSelected, hasNode: !!node, hasApi: !!api });
+              e.stopPropagation();
+              if (node && api) {
+                const newValue = !isSelected;
+                Logger.info('ui', '[Selection] Calling setNodesSelected via API', { newValue, nodeId: node.id });
+                // Use grid API method for selection in AG Grid v34
+                api.setNodesSelected({ nodes: [node], newValue });
+                const afterSelect = node.isSelected?.();
+                Logger.info('ui', '[Selection] After setNodesSelected', { afterSelect });
+                requestAnimationFrame(() => {
+                  Logger.info('ui', '[Selection] Refreshing cells');
+                  api?.refreshCells?.({ rowNodes: [node], force: true });
+                });
+              } else {
+                Logger.warn('ui', '[Selection] No node or api available');
+              }
+            }}
+          >
+            <div className={`rounded-full border-2 flex items-center justify-center transition-colors ${isCompact ? 'w-4 h-4' : 'w-5 h-5'} ${
+              isSelected 
+                ? 'bg-primary border-primary' 
+                : 'bg-background border-border hover:border-primary/50'
+            }`}>
+              {isSelected && (
+                <div className={`rounded-full bg-white dark:bg-background ${isCompact ? 'w-2 h-2' : 'w-2.5 h-2.5'}`} />
+              )}
             </div>
+          </div>
+        );
+
+        const idBadge = (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center justify-center px-1.5 py-0.5 rounded-md bg-muted/60 border border-border text-[11px] font-mono text-muted-foreground hover:bg-muted/80 cursor-pointer transition-colors"
+                aria-label="Task actions"
+              >
+                {id ?? ''}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" side="right" sideOffset={4} className="w-44">
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onLogTask?.(taskId); }}>
+                Log
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDeleteTask?.(taskId); }}>
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+
+        return (
+          <div className="flex items-center justify-center gap-2 h-full w-full flex-row">
+            {checkbox}
+            {idBadge}
           </div>
         );
       },
@@ -254,6 +274,53 @@ export function createBaseColumns(opts: ColumnBuilderOptions) {
       },
       flex: 2,
       minWidth: 180,
+    },
+    {
+      field: 'asset_id',
+      headerName: t('workspace.columns.asset', 'Asset'),
+      sortable: true,
+      filter: 'agSetColumnFilter',
+      hide: !isVisible('asset_id'),
+      valueFormatter: (p: any) => {
+        const meta: any = assetMap?.[p.value as number];
+        return meta?.name || (p.value ? `#${p.value}` : '');
+      },
+      filterParams: {
+        values: (params: any) => {
+          const ids = Object.keys(assetMap || {}).map((k: any) => Number(k));
+          params.success(ids);
+        },
+        suppressMiniFilter: false,
+        valueFormatter: (p: any) => {
+          const meta: any = assetMap?.[p.value as number];
+          return meta?.name || `#${p.value}`;
+        },
+      },
+      cellRenderer: (p: any) => {
+        if (!p.data) {
+          return (
+            <div className="flex items-center h-full py-1">
+              <div className="h-3 w-24 bg-muted animate-pulse rounded" />
+            </div>
+          );
+        }
+        if (!assetsLoaded) return (<div className="flex items-center h-full py-1"><span className="opacity-0">.</span></div>);
+        if (p.value == null) return (<div className="flex items-center h-full py-2"><span className="text-[12px] text-muted-foreground"></span></div>);
+        const meta: any = assetMap?.[p.value as number];
+        if (!meta) return (<div className="flex items-center h-full py-2"><span className="opacity-0">.</span></div>);
+        const name = meta.name;
+        const tag = (
+          <div className="inline-flex items-center gap-1.5 text-[12px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+            <span className="truncate max-w-[140px]">{name}</span>
+          </div>
+        );
+        const node = (
+          <div className="flex items-center h-full py-1">{tag}</div>
+        );
+        return node;
+      },
+      flex: 2,
+      minWidth: 160,
     },
     {
       field: 'updated_at',

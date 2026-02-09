@@ -1,6 +1,7 @@
 import { api } from '@/store/api/internalApi';
 import { getFileUrl } from './assetApi';
 
+import { Logger } from '@/utils/logger';
 export interface WorkspaceResource {
   id: number;
   uuid: string;
@@ -11,6 +12,7 @@ export interface WorkspaceResource {
   file_extension: string;
   file_size: number;
   user_id: number;
+  folder?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -37,12 +39,16 @@ export const getWorkspaceResources = async (workspaceId: string): Promise<Worksp
 export const uploadWorkspaceResource = async (
   workspaceId: string,
   file: File,
-  fileName?: string
+  fileName?: string,
+  folder?: string
 ): Promise<WorkspaceResource> => {
   const formData = new FormData();
   formData.append('file', file);
   if (fileName) {
     formData.append('file_name', fileName);
+  }
+  if (folder) {
+    formData.append('folder', folder);
   }
   
   const response = await api.post<WorkspaceResourceResponse>(
@@ -85,7 +91,7 @@ export const deleteWorkspaceResource = async (
   } catch (error: any) {
     // Treat 404 as non-fatal (resource may have already been deleted)
     if (error?.response?.status === 404) {
-      console.warn(`Workspace resource ${resourceId} not found (may have already been deleted)`);
+      Logger.warn('api', `Workspace resource ${resourceId} not found (may have already been deleted)`);
       return;
     }
     // Rethrow any other errors

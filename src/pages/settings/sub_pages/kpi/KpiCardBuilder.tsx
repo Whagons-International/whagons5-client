@@ -20,6 +20,23 @@ import {
   faHashtag,
   faCode,
   faTrash,
+  faListCheck,
+  faCheckCircle,
+  faClock,
+  faCalendarCheck,
+  faTasks,
+  faChartPie,
+  faGauge,
+  faBullseye,
+  faTrophy,
+  faStar,
+  faFire,
+  faRocket,
+  faBolt,
+  faUsers,
+  faUserCheck,
+  faClipboardCheck,
+  IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/store/store';
@@ -64,6 +81,35 @@ const COLOR_OPTIONS = [
   { name: 'Orange', value: 'text-orange-500', badgeClass: 'bg-gradient-to-br from-orange-500 to-red-500', barClass: 'from-orange-500 via-orange-400 to-orange-500' },
 ];
 
+const ICON_OPTIONS: { name: string; value: string; icon: IconDefinition }[] = [
+  { name: 'Chart Bar', value: 'faChartBar', icon: faChartBar },
+  { name: 'Chart Line', value: 'faChartLine', icon: faChartLine },
+  { name: 'Chart Pie', value: 'faChartPie', icon: faChartPie },
+  { name: 'List Check', value: 'faListCheck', icon: faListCheck },
+  { name: 'Check Circle', value: 'faCheckCircle', icon: faCheckCircle },
+  { name: 'Tasks', value: 'faTasks', icon: faTasks },
+  { name: 'Clipboard Check', value: 'faClipboardCheck', icon: faClipboardCheck },
+  { name: 'Clock', value: 'faClock', icon: faClock },
+  { name: 'Calendar Check', value: 'faCalendarCheck', icon: faCalendarCheck },
+  { name: 'Gauge', value: 'faGauge', icon: faGauge },
+  { name: 'Bullseye', value: 'faBullseye', icon: faBullseye },
+  { name: 'Trophy', value: 'faTrophy', icon: faTrophy },
+  { name: 'Star', value: 'faStar', icon: faStar },
+  { name: 'Fire', value: 'faFire', icon: faFire },
+  { name: 'Rocket', value: 'faRocket', icon: faRocket },
+  { name: 'Bolt', value: 'faBolt', icon: faBolt },
+  { name: 'Users', value: 'faUsers', icon: faUsers },
+  { name: 'User Check', value: 'faUserCheck', icon: faUserCheck },
+  { name: 'Hashtag', value: 'faHashtag', icon: faHashtag },
+  { name: 'Percent', value: 'faPercent', icon: faPercent },
+];
+
+// Helper to get icon by value
+const getIconByValue = (value: string): IconDefinition => {
+  const found = ICON_OPTIONS.find(opt => opt.value === value);
+  return found?.icon || faChartBar;
+};
+
 export default function KpiCardBuilder({ isOpen, onClose, onSave, onDelete, editingCard }: KpiCardBuilderProps) {
   const { t } = useLanguage();
   const workspaces = useSelector((state: RootState) => (state as any).workspaces?.value ?? []);
@@ -79,6 +125,7 @@ export default function KpiCardBuilder({ isOpen, onClose, onSave, onDelete, edit
       color: 'text-blue-500',
       badgeClass: COLOR_OPTIONS[0].badgeClass,
       barClass: COLOR_OPTIONS[0].barClass,
+      icon: 'faChartBar',
     },
     workspace_id: null,
     is_enabled: true,
@@ -99,6 +146,7 @@ export default function KpiCardBuilder({ isOpen, onClose, onSave, onDelete, edit
           color: 'text-blue-500',
           badgeClass: COLOR_OPTIONS[0].badgeClass,
           barClass: COLOR_OPTIONS[0].barClass,
+          icon: 'faChartBar',
         },
         workspace_id: null,
         is_enabled: true,
@@ -377,62 +425,90 @@ export default function KpiCardBuilder({ isOpen, onClose, onSave, onDelete, edit
     </div>
   );
 
-  const renderStep3 = () => (
-    <div className="space-y-4">
-      <div>
-        <Label>{t('kpiCards.builder.color', 'Color Theme')}</Label>
-        <div className="grid grid-cols-4 gap-2 mt-2">
-          {COLOR_OPTIONS.map((colorOption) => (
-            <button
-              key={colorOption.value}
-              type="button"
-              onClick={() => handleColorChange(colorOption)}
-              className={`p-3 rounded-lg border-2 transition-all hover:scale-105 ${
-                formData.display_config?.color === colorOption.value
-                  ? 'border-primary'
-                  : 'border-border hover:border-primary/50'
-              }`}
-              title={colorOption.name}
-            >
-              <div className={`w-full h-8 rounded bg-gradient-to-br ${colorOption.badgeClass} text-white flex items-center justify-center`}>
-                <FontAwesomeIcon icon={faChartBar} />
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <Label htmlFor="helper_text">{t('kpiCards.builder.helperText', 'Helper Text (Optional)')}</Label>
-        <Input
-          id="helper_text"
-          value={formData.display_config?.helperText || ''}
-          onChange={(e) => setFormData({
-            ...formData,
-            display_config: { ...formData.display_config, helperText: e.target.value },
-          })}
-          placeholder={t('kpiCards.builder.helperTextPlaceholder', 'Additional information...')}
-          className="mt-1"
-        />
-      </div>
-
-      {/* Preview */}
-      <div className="mt-6 p-4 border rounded-lg bg-muted/20">
-        <p className="text-xs text-muted-foreground mb-2">{t('kpiCards.builder.preview', 'Preview')}</p>
-        <div className={`flex items-center gap-3 p-3 rounded-lg border bg-card`}>
-          <div className={`text-2xl ${formData.display_config?.color || 'text-blue-500'}`}>
-            <FontAwesomeIcon icon={faChartBar} />
-          </div>
-          <div>
-            <h3 className="font-bold">{formData.name || t('kpiCards.builder.untitled', 'Untitled Card')}</h3>
-            <p className="text-sm text-muted-foreground">
-              {formData.display_config?.helperText || t('kpiCards.builder.noHelperText', 'No helper text')}
-            </p>
+  const renderStep3 = () => {
+    const selectedIcon = getIconByValue(formData.display_config?.icon || 'faChartBar');
+    
+    return (
+      <div className="space-y-4">
+        <div>
+          <Label>{t('kpiCards.builder.icon', 'Icon')}</Label>
+          <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 mt-2">
+            {ICON_OPTIONS.map((iconOption) => (
+              <button
+                key={iconOption.value}
+                type="button"
+                onClick={() => setFormData({
+                  ...formData,
+                  display_config: { ...formData.display_config, icon: iconOption.value },
+                })}
+                className={`p-2 rounded-lg border-2 transition-all hover:scale-105 ${
+                  formData.display_config?.icon === iconOption.value
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border hover:border-primary/50'
+                }`}
+                title={iconOption.name}
+              >
+                <FontAwesomeIcon icon={iconOption.icon} className="text-lg" />
+              </button>
+            ))}
           </div>
         </div>
+
+        <div>
+          <Label>{t('kpiCards.builder.color', 'Color Theme')}</Label>
+          <div className="grid grid-cols-4 gap-2 mt-2">
+            {COLOR_OPTIONS.map((colorOption) => (
+              <button
+                key={colorOption.value}
+                type="button"
+                onClick={() => handleColorChange(colorOption)}
+                className={`p-3 rounded-lg border-2 transition-all hover:scale-105 ${
+                  formData.display_config?.color === colorOption.value
+                    ? 'border-primary'
+                    : 'border-border hover:border-primary/50'
+                }`}
+                title={colorOption.name}
+              >
+                <div className={`w-full h-8 rounded bg-gradient-to-br ${colorOption.badgeClass} text-white flex items-center justify-center`}>
+                  <FontAwesomeIcon icon={selectedIcon} />
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <Label htmlFor="helper_text">{t('kpiCards.builder.helperText', 'Helper Text (Optional)')}</Label>
+          <Input
+            id="helper_text"
+            value={formData.display_config?.helperText || ''}
+            onChange={(e) => setFormData({
+              ...formData,
+              display_config: { ...formData.display_config, helperText: e.target.value },
+            })}
+            placeholder={t('kpiCards.builder.helperTextPlaceholder', 'Additional information...')}
+            className="mt-1"
+          />
+        </div>
+
+        {/* Preview */}
+        <div className="mt-6 p-4 border rounded-lg bg-muted/20">
+          <p className="text-xs text-muted-foreground mb-2">{t('kpiCards.builder.preview', 'Preview')}</p>
+          <div className={`flex items-center gap-3 p-3 rounded-lg border bg-card`}>
+            <div className={`text-2xl ${formData.display_config?.color || 'text-blue-500'}`}>
+              <FontAwesomeIcon icon={selectedIcon} />
+            </div>
+            <div>
+              <h3 className="font-bold">{formData.name || t('kpiCards.builder.untitled', 'Untitled Card')}</h3>
+              <p className="text-sm text-muted-foreground">
+                {formData.display_config?.helperText || t('kpiCards.builder.noHelperText', 'No helper text')}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <>

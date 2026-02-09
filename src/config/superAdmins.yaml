@@ -1,0 +1,8 @@
+# Super Admin Configuration
+# Users listed here have access to tech support features across all tenants
+# These users can view error telemetry, debug information, and system diagnostics
+
+# Whitelisted emails - users with these emails are automatically super admins
+emails:
+  - malek.gabriel33@gmail.com
+  - matthiasmalek72@gmail.com

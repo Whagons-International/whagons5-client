@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTags } from "@fortawesome/free-solid-svg-icons";
 import { iconService } from '@/database/iconService';
 
+import { Logger } from '@/utils/logger';
 export const CategoryNameCellRenderer = (props: ICellRendererParams) => {
   const [icon, setIcon] = useState<any>(faTags);
   const categoryIcon = props.data?.icon;
@@ -26,7 +27,7 @@ export const CategoryNameCellRenderer = (props: ICellRendererParams) => {
         const loadedIcon = await iconService.getIcon(iconName);
         setIcon(loadedIcon || faTags);
       } catch (error) {
-        console.error('Error loading category icon:', error);
+        Logger.error('settings', 'Error loading category icon:', error);
         setIcon(faTags);
       }
     };

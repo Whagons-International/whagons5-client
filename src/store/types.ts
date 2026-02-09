@@ -29,6 +29,47 @@ export interface Team {
     deleted_at: Date | null;
 }
 
+// Dialog Layout Types for per-category task dialog customization
+export type StandardFieldId = 
+    | 'template'
+    | 'description'
+    | 'spot'
+    | 'responsible'
+    | 'priority'
+    | 'tags'
+    | 'start_date'
+    | 'due_date'
+    | 'recurrence'
+    | 'sla'
+    | 'approval';
+
+// Built-in tab IDs
+export type BuiltInTabId = 'basic' | 'dates' | 'additional';
+
+// Tab ID can be built-in or custom (custom tabs use string IDs like 'custom_1', 'custom_2', etc.)
+export type DialogTabId = BuiltInTabId | string;
+
+export interface DialogFieldConfig {
+    type: 'standard' | 'custom';
+    id: StandardFieldId | number; // StandardFieldId for standard, number for custom field ID
+}
+
+export interface DialogTabConfig {
+    enabled: boolean;
+    order: number;
+    label?: string; // Custom label for the tab (required for custom tabs)
+    isCustom?: boolean; // Whether this is a user-created custom tab
+}
+
+export interface DialogLayout {
+    tabs: {
+        [key: string]: DialogTabConfig | undefined;
+    };
+    fields: {
+        [key: string]: DialogFieldConfig[] | undefined;
+    };
+}
+
 export interface Category {
     id: number;
     name: string;
@@ -43,6 +84,7 @@ export interface Category {
     status_transition_group_id: number;
     reporting_team_ids: number[];
     celebration_effect?: string | null;
+    dialog_layout?: DialogLayout | null;
     created_at: string;
     updated_at: string;
     deleted_at: string | null;
@@ -51,7 +93,7 @@ export interface Category {
 export interface Template {
     id: number;
     name: string;
-    // New canonical columns per migration
+    alias?: string | null;
     category_id: number;
     priority_id: number | null;
     sla_id: number | null;
@@ -83,6 +125,7 @@ export interface Task {
     team_id: number;
     template_id: number | null;
     spot_id: number | null;
+    asset_id: number | null; // Link to asset item for asset-related tasks
     status_id: number;
     priority_id: number;
     approval_id: number | null;
@@ -96,6 +139,10 @@ export interface Task {
     // Store responsible user IDs as JSON array for efficient storage
     // Most tasks have few responsible users, so this avoids a large junction table
     user_ids: number[] | null;
+    
+    // Recurrence fields
+    recurrence_id: number | null;
+    recurrence_instance_number: number | null;
     
     created_at: string;
     updated_at: string;
@@ -142,6 +189,7 @@ export interface Priority {
 export interface Spot {
     id: number;
     name: string;
+    alias?: string | null;
     parent_id?: number | null;
     spot_type_id: number;
     is_branch: boolean;
@@ -201,7 +249,7 @@ export interface Approval {
     trigger_conditions?: ApprovalCondition[] | null;
     require_rejection_comment: boolean;
     block_editing_during_approval: boolean;
-    deadline_type: 'hours' | 'date' | string;
+    deadline_type: 'none' | 'hours' | 'date' | string;
     deadline_value?: string | null;
     order_index?: number;
     is_active: boolean;
@@ -247,6 +295,7 @@ export interface User {
     updated_at: string;
     deleted_at?: string | null;
     organization_name?: string | null;
+    spots?: number[] | null;
 }
 
 export interface Role {
@@ -536,10 +585,43 @@ export interface TaskAttachment {
 
 export interface TaskRecurrence {
     id: number;
-    task_id: number;
-    recurrence_pattern: string; // 'daily', 'weekly', 'monthly', etc.
-    interval: number; // every N days/weeks/months
-    end_date?: string | null;
+    
+    // RRule definition (iCal format, e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR")
+    rrule: string;
+    dtstart: string; // Original start date/time (wall clock time)
+    duration_minutes: number;
+    
+    // Human-readable description (from API)
+    human_readable?: string | null;
+    next_occurrences?: string[]; // Preview of next dates
+    
+    // Task template fields
+    name: string;
+    description?: string | null;
+    
+    // Foreign keys
+    workspace_id: number;
+    category_id: number;
+    team_id: number;
+    template_id?: number | null;
+    priority_id: number;
+    status_id: number;
+    
+    // Assigned users
+    user_ids: number[];
+    
+    // Creator
+    created_by?: number | null;
+    
+    // Recurrence state
+    is_active: boolean;
+    last_generated_at?: string | null;
+    count?: number | null; // Total occurrences limit (RRule COUNT)
+    occurrences_generated: number;
+    
+    // Custom field values
+    custom_field_values?: Record<string, any> | null;
+    
     created_at: string;
     updated_at: string;
 }
@@ -570,18 +652,52 @@ export interface Exception {
     created_at: string;
 }
 
-// Workflow Management (Coming Soon)
+// Workflow Management
+export interface WorkflowVersion {
+    id: number;
+    workflow_id: number;
+    version_number: number;
+    status: string;
+    change_notes?: string | null;
+    metadata?: Record<string, any> | null;
+    nodes?: WorkflowNodeRecord[];
+    edges?: WorkflowEdgeRecord[];
+    created_at: string;
+    updated_at: string;
+}
+
+export interface WorkflowNodeRecord {
+    id: number;
+    node_key: string;
+    type: string;
+    label: string;
+    config: Record<string, any>;
+    position: { x: number; y: number };
+    metadata?: Record<string, any> | null;
+}
+
+export interface WorkflowEdgeRecord {
+    id: number;
+    source_node_key: string;
+    target_node_key: string;
+    label?: string;
+    metadata?: Record<string, any> | null;
+}
+
 export interface Workflow {
     id: number;
     name: string;
     description?: string | null;
     workspace_id?: number | null;
     is_active: boolean;
-    trigger_conditions?: string | null; // JSON conditions for when workflow runs
-    actions?: string | null; // JSON array of actions to perform
+    current_version_id?: number | null;
+    activated_at?: string | null;
     created_by?: number | null;
+    updated_by?: number | null;
     created_at: string;
     updated_at: string;
+    current_version?: WorkflowVersion | null;
+    versions?: WorkflowVersion[];
 }
 
 // Boards (Communication Boards)
@@ -590,10 +706,23 @@ export interface Board {
     name: string;
     description?: string | null;
     visibility: 'public' | 'private';
+    birthday_messages_enabled: boolean;
+    birthday_message_template?: string | null;
     created_by: number;
     created_at: string;
     updated_at: string;
     deleted_at?: string | null;
+}
+
+export interface BoardBirthdayImage {
+    id: number;
+    board_id: number;
+    file_path: string;
+    file_name: string;
+    uploaded_by: number;
+    is_bundled: boolean;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface BoardMember {
@@ -622,3 +751,168 @@ export interface BoardMessage {
     updated_at: string;
     deleted_at?: string | null;
 }
+
+// Documents & Protocols
+export type DocumentType = 'MANUAL' | 'POLICY' | 'FORM' | 'CERTIFICATE' | 'SDS' | 'OTHER';
+export type AssociableType = 'spot' | 'spot_type' | 'team' | 'category' | 'workspace';
+
+export interface Document {
+    id: number;
+    uuid: string;
+    workspace_id: number;
+    
+    // Document metadata
+    title: string;
+    description?: string | null;
+    document_type?: DocumentType | null;
+    tags: string[];
+    
+    // File information
+    file_path: string;
+    file_url?: string | null;
+    file_name: string;
+    file_extension: string;
+    file_size: number;
+    
+    // Versioning
+    version: number;
+    parent_document_id?: number | null;
+    
+    // Validity
+    effective_date?: string | null;
+    expiration_date?: string | null;
+    is_expired?: boolean;
+    is_expiring_soon?: boolean;
+    
+    // Access control
+    is_public: boolean;
+    requires_acknowledgment: boolean;
+    
+    // Audit
+    created_by?: number | null;
+    updated_by?: number | null;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+    
+    // Relations (optional, when loaded)
+    associations?: DocumentAssociation[];
+    acknowledgments_count?: number;
+    creator?: {
+        id: number;
+        name: string;
+    };
+}
+
+export interface DocumentAssociation {
+    id: number;
+    document_id: number;
+    associable_type: AssociableType;
+    associable_id: number;
+    inherit_to_children: boolean;
+    created_at: string;
+    updated_at: string;
+    
+    // Relations (optional, when loaded)
+    document?: Document;
+}
+
+// Asset Management
+export type AssetStatus = 'active' | 'inactive' | 'maintenance' | 'retired';
+export type AssetCustomFieldType = 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'CHECKBOX' | 'RADIO' | 'DATE' | 'TIME' | 'DATETIME' | 'LIST' | 'MULTI_SELECT';
+
+export interface AssetType {
+    id: number;
+    name: string;
+    description?: string | null;
+    color?: string | null;
+    icon?: string | null;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+}
+
+export interface AssetItem {
+    id: number;
+    name: string;
+    display_order?: number;
+    parent_id?: number | null;
+    asset_type_id: number;
+    spot_id?: number | null;
+    serial_number?: string | null;
+    model?: string | null;
+    manufacturer?: string | null;
+    purchase_date?: string | null;
+    purchase_cost?: number | null;
+    warranty_expiration?: string | null;
+    status: AssetStatus;
+    qr_code?: string | null;
+    notes?: string | null;
+    assigned_user_id?: number | null;
+    assigned_team_id?: number | null;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+}
+
+export interface AssetMaintenanceSchedule {
+    id: number;
+    asset_item_id: number;
+    title: string;
+    description?: string | null;
+    frequency_value: number;
+    frequency_unit: 'days' | 'weeks' | 'months' | 'years';
+    next_due_date: string;
+    last_performed_at?: string | null;
+    workspace_id?: number | null;
+    category_id?: number | null;
+    assigned_team_id?: number | null;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+}
+
+export interface AssetMaintenanceLog {
+    id: number;
+    asset_item_id: number;
+    schedule_id?: number | null;
+    task_id?: number | null;
+    performed_by?: number | null;
+    performed_at: string;
+    notes?: string | null;
+    cost?: number | null;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+}
+
+export interface AssetCustomField {
+    id: number;
+    name: string;
+    field_type: AssetCustomFieldType;
+    options?: any[] | null;
+    validation_rules?: any[] | null;
+    asset_type_id: number;
+    is_required: boolean;
+    default_value?: string | null;
+    sort_order: number;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+}
+
+export interface AssetCustomFieldValue {
+    id: number;
+    asset_item_id: number;
+    field_id: number;
+    name: string;
+    type: AssetCustomFieldType;
+    value?: string | null;
+    value_numeric?: number | null;
+    value_date?: string | null;
+    value_json?: any | null;
+    created_at: string;
+    updated_at: string;
+}
+

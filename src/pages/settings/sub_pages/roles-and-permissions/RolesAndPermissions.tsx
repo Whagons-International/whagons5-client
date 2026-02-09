@@ -23,6 +23,7 @@ import {
 } from "../../components";
 import { useLanguage } from "@/providers/LanguageProvider";
 
+import { Logger } from '@/utils/logger';
 function RolesAndPermissions() {
   const { t } = useLanguage();
   const tu = (key: string, fallback: string) => t(`settings.rolesAndPermissions.${key}`, fallback);
@@ -75,7 +76,7 @@ function RolesAndPermissions() {
           setPermissions(response.data.data);
         }
       } catch (error) {
-        console.error('Failed to fetch permissions:', error);
+        Logger.error('settings', 'Failed to fetch permissions:', error);
       }
     };
     
@@ -322,7 +323,7 @@ function RolesAndPermissions() {
       
       setSelectedPermIds(new Set(ids));
     } catch (error) {
-      console.error('Failed to load role permissions', error);
+      Logger.error('settings', 'Failed to load role permissions', error);
       setSelectedPermIds(new Set());
     } finally {
       setIsLoadingRolePerms(false);

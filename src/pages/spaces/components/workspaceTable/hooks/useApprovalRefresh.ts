@@ -13,7 +13,10 @@ export function useApprovalRefresh(gridRef: React.RefObject<any>, refreshGrid: (
       setTimeout(() => {
         refreshGrid();
         try { 
-          gridRef.current?.api?.refreshInfiniteCache(); 
+          const api = gridRef.current?.api;
+          if (api && !api.isDestroyed?.()) {
+            api.refreshInfiniteCache?.();
+          }
         } catch {}
       }, 8000); // Wait 8 seconds for server to fully process approval and actions
     };

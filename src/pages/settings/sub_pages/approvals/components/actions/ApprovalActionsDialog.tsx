@@ -10,6 +10,7 @@ import type { AppDispatch } from '@/store/store';
 import { actionsApi } from '@/api/whagonsActionsApi';
 import toast from 'react-hot-toast';
 
+import { Logger } from '@/utils/logger';
 interface ApprovalActionsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -25,8 +26,25 @@ export function ApprovalActionsDialog({ open, onOpenChange, approval }: Approval
   // Load actions when approval changes
   useEffect(() => {
     if (approval) {
-      setApprovedActions((approval as any).on_approved_actions || []);
-      setRejectedActions((approval as any).on_rejected_actions || []);
+      // Handle both array and JSON string formats
+      const approved = (approval as any).on_approved_actions;
+      const rejected = (approval as any).on_rejected_actions;
+      
+      const parseActions = (val: unknown): any[] => {
+        if (Array.isArray(val)) return val;
+        if (typeof val === 'string') {
+          try {
+            const parsed = JSON.parse(val);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            return [];
+          }
+        }
+        return [];
+      };
+      
+      setApprovedActions(parseActions(approved));
+      setRejectedActions(parseActions(rejected));
     } else {
       setApprovedActions([]);
       setRejectedActions([]);
@@ -61,7 +79,7 @@ export function ApprovalActionsDialog({ open, onOpenChange, approval }: Approval
         onOpenChange(false);
       }
     } catch (error) {
-      console.error('Failed to save approval actions:', error);
+      Logger.error('settings', 'Failed to save approval actions:', error);
       toast.error('Failed to save approval actions');
     } finally {
       setIsSaving(false);
@@ -70,7 +88,7 @@ export function ApprovalActionsDialog({ open, onOpenChange, approval }: Approval
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-visible flex flex-col">
+      <DialogContent className="max-h-[90vh] overflow-visible flex flex-col" style={{ maxWidth: 960 }}>
         <DialogHeader className="space-y-3 pb-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 border border-amber-500/20">

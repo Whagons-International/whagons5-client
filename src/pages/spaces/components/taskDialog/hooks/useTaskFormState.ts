@@ -1,11 +1,26 @@
 import { useState, useRef } from 'react';
 
+export interface RecurrenceSettings {
+  enabled: boolean;
+  rrule: string;
+  humanReadable: string;
+  editScope?: 'this' | 'future';
+}
+
+const defaultRecurrenceSettings: RecurrenceSettings = {
+  enabled: false,
+  rrule: '',
+  humanReadable: '',
+  editScope: 'this',
+};
+
 export function useTaskFormState() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [priorityId, setPriorityId] = useState<number | null>(null);
   const [spotId, setSpotId] = useState<number | null>(null);
+  const [assetId, setAssetId] = useState<number | null>(null);
   const [statusId, setStatusId] = useState<number | null>(null);
   const [templateId, setTemplateId] = useState<number | null>(null);
   const [startDate, setStartDate] = useState<string>('');
@@ -19,6 +34,9 @@ export function useTaskFormState() {
   const [showDescription, setShowDescription] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Recurrence state
+  const [recurrenceSettings, setRecurrenceSettings] = useState<RecurrenceSettings>(defaultRecurrenceSettings);
 
   // Sharing state
   const [shareTeamId, setShareTeamId] = useState<number | null>(null);
@@ -38,6 +56,7 @@ export function useTaskFormState() {
     categoryId, setCategoryId,
     priorityId, setPriorityId,
     spotId, setSpotId,
+    assetId, setAssetId,
     statusId, setStatusId,
     templateId, setTemplateId,
     startDate, setStartDate,
@@ -51,6 +70,7 @@ export function useTaskFormState() {
     showDescription, setShowDescription,
     selectedTagIds, setSelectedTagIds,
     isSubmitting, setIsSubmitting,
+    recurrenceSettings, setRecurrenceSettings,
     shareTeamId, setShareTeamId,
     shareUserId, setShareUserId,
     sharePermission, setSharePermission,

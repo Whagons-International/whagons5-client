@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 
+import { Logger } from '@/utils/logger';
 export interface UseWorkspaceChangeReturn {
   error: string | null;
 }
@@ -27,7 +28,10 @@ export function useWorkspaceChange(opts: {
       setError(null);
       
       // Exit edit mode when workspace changes
-      exitEditMode(gridRef.current?.api);
+      const api = gridRef.current?.api;
+      if (api && !api.isDestroyed?.()) {
+        exitEditMode(api);
+      }
       
       try {
         // Ensure cache is initialized
@@ -44,37 +48,18 @@ export function useWorkspaceChange(opts: {
         
         const countResp = await TasksCache.queryTasks({ ...baseParams, startRow: 0, endRow: 0 });
         const taskCount = countResp?.rowCount ?? 0;
-        
-        // If no tasks found and we're viewing a specific workspace (not 'all'), 
-        // try fetching from API to ensure cache is up to date
-        if (taskCount === 0 && workspaceId !== 'all' && workspaceId !== 'shared') {
-          try {
-            await TasksCache.fetchTasks();
-          } catch (fetchError: any) {
-            const errorMessage = `[useWorkspaceChange] Failed to fetch tasks for workspace ${workspaceId}`;
-            const errorDetails = fetchError?.message || fetchError?.toString() || 'Unknown error';
-            
-            console.error(errorMessage, {
-              workspaceId,
-              error: errorDetails,
-              stack: fetchError?.stack,
-              response: fetchError?.response?.data,
-            });
-            
-            setError(errorMessage);
-            // Cache will be updated on next validation
-          }
-        }
-        
-        // Refresh grid after checking/fetching
-        if (gridRef.current?.api) {
+
+        // Refresh grid after checking
+        // Note: Sync stream (DataManager) handles task cache updates automatically
+        const currentApi = gridRef.current?.api;
+        if (currentApi && !currentApi.isDestroyed?.()) {
           refreshGrid();
         }
       } catch (error: any) {
         const errorMessage = `[useWorkspaceChange] Error during workspace change check for workspace ${workspaceId}`;
         const errorDetails = error?.message || error?.toString() || 'Unknown error';
         
-        console.error(errorMessage, {
+        Logger.error('workspaces', errorMessage, {
           workspaceId,
           error: errorDetails,
           stack: error?.stack,
@@ -84,7 +69,8 @@ export function useWorkspaceChange(opts: {
         setError(errorMessage);
         
         // Still try to refresh grid even if check failed
-        if (gridRef.current?.api) {
+        const currentApi = gridRef.current?.api;
+        if (currentApi && !currentApi.isDestroyed?.()) {
           refreshGrid();
         }
       }

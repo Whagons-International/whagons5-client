@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
 
+import { Logger } from '@/utils/logger';
 export interface WorkspaceStats {
   total: number;
   inProgress: number;
@@ -79,7 +80,7 @@ export function useWorkspaceStats(params: {
           isInitialLoadRef.current = false;
         }
       } catch (error) {
-        console.error('[Workspace Stats] Error loading stats:', error);
+        Logger.error('workspaces', '[Workspace Stats] Error loading stats:', error);
         if (!cancelled) {
           setStats((prev) => ({ ...prev, loading: false }));
           isInitialLoadRef.current = false;

@@ -4,6 +4,42 @@ import { TasksCache } from "../indexedDB/TasksCache";
 import { TaskEvents } from "../eventEmiters/taskEvents";
 import { api } from "@/store/api/internalApi";
 
+import { Logger } from '@/utils/logger';
+/**
+ * Apply pivot_changes from a task API response to the local taskUsers IndexedDB store.
+ * pivot_changes: { created: [{id, task_id, user_id, ...}], deleted_user_ids: [userId, ...] }
+ * This avoids fetching the whole table — the backend tells us exactly what changed.
+ */
+export async function applyTaskUserPivotChanges(taskId: number, pivotChanges: { created?: any[]; deleted_user_ids?: number[] }): Promise<void> {
+    // Lazy import to avoid circular dependency (CacheRegistry → genericSlices → store → tasksSlice)
+    const { getCacheForTable, syncReduxForTable } = await import('../indexedDB/CacheRegistry');
+    const cache = getCacheForTable('wh_task_user');
+    if (!cache) return;
+    try {
+        // Delete pivot rows by (task_id, user_id) match
+        if (pivotChanges.deleted_user_ids?.length) {
+            const deletedSet = new Set(pivotChanges.deleted_user_ids.map(Number));
+            const allRows = await cache.getAll();
+            for (const row of allRows) {
+                if (Number(row.task_id) === taskId && deletedSet.has(Number(row.user_id))) {
+                    await cache.remove(row.id);
+                }
+            }
+        }
+
+        // Add newly created pivot rows (with real server IDs)
+        if (pivotChanges.created?.length) {
+            for (const row of pivotChanges.created) {
+                await cache.add(row);
+            }
+        }
+
+        await syncReduxForTable('wh_task_user');
+    } catch (error) {
+        Logger.warn('redux', 'applyTaskUserPivotChanges: failed', error);
+    }
+}
+
 // Helper function to ensure task has all required properties
 const ensureTaskDefaults = (task: any): Task => {
     return {
@@ -34,33 +70,15 @@ export const addTaskAsync = createAsyncThunk(
             
             // Update IndexedDB on success
             await TasksCache.addTask(newTask);
-            
-            // Verify task was added correctly to IndexedDB
-            console.log('[addTaskAsync] Task added to IndexedDB:', {
-                id: newTask.id,
-                name: newTask.name,
-                start_date: newTask.start_date,
-                due_date: newTask.due_date,
-                user_ids: newTask.user_ids,
-                workspace_id: newTask.workspace_id,
-            });
-            
-            // Verify it can be retrieved
-            const verifyTask = await TasksCache.getTask(newTask.id.toString());
-            if (!verifyTask) {
-                console.error('[addTaskAsync] WARNING: Task not found in IndexedDB after adding!');
-            } else {
-                console.log('[addTaskAsync] Verified task in IndexedDB:', {
-                    id: verifyTask.id,
-                    hasStartDate: !!verifyTask.start_date,
-                    hasUserIds: !!verifyTask.user_ids,
-                    userIdsCount: verifyTask.user_ids?.length || 0,
-                });
+
+            // Sync taskUsers pivot table locally from pivot_changes in the response
+            if (payload?.pivot_changes) {
+                await applyTaskUserPivotChanges(newTask.id, payload.pivot_changes);
             }
             
             return newTask;
         } catch (error: any) {
-            console.error('Failed to add task:', error);
+            Logger.error('redux', 'Failed to add task:', error);
             const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to add task';
             // Preserve status code for permission checking
             const errorWithStatus = new Error(errorMessage) as any;
@@ -93,10 +111,15 @@ export const updateTaskAsync = createAsyncThunk(
             
             // Update IndexedDB on success
             await TasksCache.updateTask(id.toString(), updatedTask);
+
+            // Sync taskUsers pivot table locally from pivot_changes in the response
+            if (payload?.pivot_changes) {
+                await applyTaskUserPivotChanges(id, payload.pivot_changes);
+            }
             
             return updatedTask;
         } catch (error: any) {
-            console.error('Failed to update task:', error);
+            Logger.error('redux', 'Failed to update task:', error);
             const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to update task';
             // Preserve status code for permission checking (prevents duplicate toast for 403 errors)
             const errorWithStatus = new Error(errorMessage) as any;
@@ -123,13 +146,78 @@ export const removeTaskAsync = createAsyncThunk(
             const status = error.response?.status;
             // Only log non-403 errors (403 errors are expected permission denials)
             if (status !== 403) {
-                console.error('Failed to remove task:', error);
+                Logger.error('redux', 'Failed to remove task:', error);
             }
             const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to remove task';
             // Preserve status code for permission checking
             const errorWithStatus = new Error(errorMessage) as any;
             errorWithStatus.response = error.response;
             errorWithStatus.status = status;
+            return rejectWithValue(errorWithStatus);
+        }
+    }
+);
+
+// Async thunk for moving task (changing status) with optimistic updates
+export const moveTaskThunk = createAsyncThunk(
+    'tasks/moveTaskThunk',
+    async (
+        { taskId, newStatusId, previousStatusId }: { taskId: number; newStatusId: number; previousStatusId: number },
+        { dispatch, rejectWithValue }
+    ) => {
+        try {
+            // Get current task from cache for rollback
+            const task = await TasksCache.getTask(taskId.toString());
+            if (!task) {
+                throw new Error('Task not found');
+            }
+
+            // Optimistic update: dispatch local reducer to update Redux store
+            dispatch(updateTaskLocally({ id: taskId, updates: { status_id: newStatusId } }));
+
+            // Optimistic update: update TasksCache
+            await TasksCache.updateTask(taskId.toString(), {
+                ...task,
+                status_id: newStatusId,
+            });
+
+            // Call API
+            const response = await api.patch(`/tasks/${taskId}`, { status_id: newStatusId });
+            const payload = (response.data?.data ?? response.data?.row ?? response.data?.rows?.[0] ?? response.data) as any;
+            
+            // Merge with cached task to preserve all fields
+            const updatedTask = ensureTaskDefaults({
+                ...task,
+                ...payload,
+                status_id: newStatusId,
+                id: payload?.id ?? taskId,
+                updated_at: payload?.updated_at ?? response.data?.updated_at ?? new Date().toISOString(),
+            });
+
+            // Update IndexedDB with server response
+            await TasksCache.updateTask(taskId.toString(), updatedTask);
+
+            return updatedTask;
+        } catch (error: any) {
+            Logger.error('redux', 'Failed to move task:', error);
+            
+            // Rollback: restore previous status in Redux
+            dispatch(updateTaskLocally({ id: taskId, updates: { status_id: previousStatusId } }));
+
+            // Rollback: restore previous status in TasksCache
+            const task = await TasksCache.getTask(taskId.toString());
+            if (task) {
+                await TasksCache.updateTask(taskId.toString(), {
+                    ...task,
+                    status_id: previousStatusId,
+                });
+            }
+
+            const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to move task. Changes reverted.';
+            // Preserve status code for permission checking
+            const errorWithStatus = new Error(errorMessage) as any;
+            errorWithStatus.response = error.response;
+            errorWithStatus.status = error.response?.status;
             return rejectWithValue(errorWithStatus);
         }
     }
@@ -156,7 +244,7 @@ export const restoreTaskAsync = createAsyncThunk(
             
             return restoredTask;
         } catch (error: any) {
-            console.error('Failed to restore task:', error);
+            Logger.error('redux', 'Failed to restore task:', error);
             const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to restore task';
             return rejectWithValue(errorMessage);
         }
@@ -189,6 +277,19 @@ export const tasksSlice = createSlice({
         // Clear any stored error
         clearError: (state) => {
             state.error = null;
+        },
+        // Update a task locally in Redux state (no API call)
+        // Use this for optimistic updates when you're handling API calls separately
+        updateTaskLocally: (state, action: { payload: { id: number; updates: Partial<Task> } }) => {
+            const { id, updates } = action.payload;
+            const index = state.value.findIndex(task => task.id === id);
+            if (index !== -1) {
+                state.value[index] = ensureTaskDefaults({
+                    ...state.value[index],
+                    ...updates,
+                    updated_at: new Date().toISOString()
+                });
+            }
         }
     },
     extraReducers: (builder) => {
@@ -311,8 +412,24 @@ export const tasksSlice = createSlice({
             state.loading = false;
             state.error = action.payload as string;
         });
+
+        // Move task (change status) - optimistic update handled via updateTaskLocally in thunk
+        builder.addCase(moveTaskThunk.pending, (state) => {
+            state.error = null;
+        });
+        builder.addCase(moveTaskThunk.fulfilled, (state, action) => {
+            // Replace optimistic update with real data from API
+            const index = state.value.findIndex(task => task.id === action.payload.id);
+            if (index !== -1) {
+                state.value[index] = ensureTaskDefaults(action.payload);
+            }
+        });
+        builder.addCase(moveTaskThunk.rejected, (state, action) => {
+            // Rollback already handled in thunk via updateTaskLocally
+            state.error = action.payload as string;
+        });
     }
 });
 
-export const { getTasks, getTasksSuccess, getTasksFailure, clearError } = tasksSlice.actions;
+export const { getTasks, getTasksSuccess, getTasksFailure, clearError, updateTaskLocally } = tasksSlice.actions;
 export default tasksSlice.reducer;

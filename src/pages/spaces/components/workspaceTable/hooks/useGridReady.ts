@@ -31,7 +31,7 @@ export function useGridReady(opts: {
     try {
       const currentSort = params.api.getSortModel?.() || [];
       if (currentSort.length === 0) {
-        params.api.setSortModel([{ colId: 'created_at', sort: 'desc' }]);
+        params.api.setSortModel([{ colId: 'id', sort: 'desc' }]);
       }
     } catch {}
 
@@ -39,8 +39,8 @@ export function useGridReady(opts: {
       // Set sort again to ensure it's applied (in case the first call didn't work)
       try {
         const sortModel = params.api.getSortModel?.() || [];
-        if (sortModel.length === 0 || !sortModel.some((s: any) => s.colId === 'created_at')) {
-          params.api.setSortModel([{ colId: 'created_at', sort: 'desc' }]);
+        if (sortModel.length === 0 || !sortModel.some((s: any) => s.colId === 'id')) {
+          params.api.setSortModel([{ colId: 'id', sort: 'desc' }]);
         }
       } catch {}
       
@@ -51,8 +51,8 @@ export function useGridReady(opts: {
       // Ensure sort is set before refreshing
       try {
         const sortModel = params.api.getSortModel?.() || [];
-        if (sortModel.length === 0 || !sortModel.some((s: any) => s.colId === 'created_at')) {
-          params.api.setSortModel([{ colId: 'created_at', sort: 'desc' }]);
+        if (sortModel.length === 0 || !sortModel.some((s: any) => s.colId === 'id')) {
+          params.api.setSortModel([{ colId: 'id', sort: 'desc' }]);
         }
       } catch {}
       refreshGrid();

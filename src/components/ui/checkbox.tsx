@@ -57,9 +57,9 @@ const Checkbox = React.forwardRef<
                 d="M5 12.5 10 17 19 7"
                 vectorEffect="non-scaling-stroke"
                 pathLength={1}
-                style={{ strokeDasharray: 1 }}
-                initial={{ strokeDashoffset: (props.checked === true) ? 0 : 1 }}
-                animate={{ strokeDashoffset: (props.checked === true) ? 0 : 1 }}
+                style={{ strokeDasharray: 1, strokeDashoffset: props.checked === true ? 0 : 1 }}
+                initial={{ strokeDashoffset: props.checked === true ? 0 : 1 }}
+                animate={{ strokeDashoffset: props.checked === true ? 0 : 1 }}
                 transition={{ duration: 0.14, ease: "easeInOut" }}
               />
             </motion.svg>

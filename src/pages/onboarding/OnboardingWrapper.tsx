@@ -18,6 +18,7 @@ import { getTasksFromIndexedDB } from '@/store/reducers/tasksSlice';
 import RotatingBackground from '@/components/marketing/RotatingBackground';
 import { HERO_BACKGROUND_IMAGES } from '@/assets/marketing/heroBackgrounds';
 
+import { Logger } from '@/utils/logger';
 interface OnboardingWrapperProps {
   user: User;
 }
@@ -39,7 +40,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [quoteIndex, setQuoteIndex] = useState<number>(0);
   
-  const isSpanish = language === 'es-ES' || language.startsWith('es');
+  const isSpanish = language === 'es' || language.startsWith('es');
   
   const quotes = useMemo(() => {
     if (isSpanish) {
@@ -114,7 +115,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
       setLoading(false);
       return false;
     } catch (error) {
-      console.error('Failed to update user profile:', error);
+      Logger.error('auth', 'Failed to update user profile:', error);
       setLoading(false);
       return false;
     }
@@ -142,7 +143,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
       setLoading(false);
       return false;
     } catch (error) {
-      console.error('Failed to create and assign tenant:', error);
+      Logger.error('auth', 'Failed to create and assign tenant:', error);
       setLoading(false);
       return false;
     }
@@ -191,7 +192,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ user }) => {
             });
             // Refetch user data in the background without blocking UI
             refetchUser().catch(err => {
-              console.warn('Background user refetch failed:', err);
+              Logger.warn('auth', 'Background user refetch failed:', err);
             });
             setCurrentStep(2);
           }

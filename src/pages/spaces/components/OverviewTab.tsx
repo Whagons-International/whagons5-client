@@ -11,6 +11,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { AppDispatch, RootState } from "@/store";
 import { genericActions } from '@/store/genericSlices';
+import { Logger } from '@/utils/logger';
 import {
   Dialog,
   DialogContent,
@@ -95,7 +96,7 @@ function OverviewTab({
   
   // Get teams for this workspace based on workspace.teams array
   const workspaceTeamDetails = useMemo(() => {
-    if (!workspaceTeams || !allTeams.length) return [];
+    if (!workspaceTeams || !Array.isArray(workspaceTeams) || !allTeams.length) return [];
     return workspaceTeams
       .map(teamId => allTeams.find(team => team.id === teamId))
       .filter((team): team is NonNullable<typeof team> => team !== undefined);
@@ -164,11 +165,51 @@ function OverviewTab({
         setTotalIconsCount(allIcons.length);
         setAllIconsMetadata(allIcons);
       } catch (error) {
-        console.error('Error loading default and popular icons:', error);
+        Logger.error('ui', 'Error loading default and popular icons:', error);
       }
     };
     loadDefaultAndPopularIcons();
   }, []);
+
+  // Load more icons function (shared by scroll and initial load)
+  const loadMoreIcons = useCallback(async () => {
+    if (loadingMoreIcons || isSearching || loadedIconsCount >= totalIconsCount) return;
+    
+    setLoadingMoreIcons(true);
+    
+    try {
+      const startIndex = loadedIconsCount;
+      const endIndex = Math.min(startIndex + ICONS_PER_PAGE, totalIconsCount);
+      const iconsToLoad = allIconsMetadata.slice(startIndex, endIndex);
+      
+      // Load the actual icon data for this batch
+      const loadedIconsData = await Promise.all(
+        iconsToLoad.map(async (iconMeta) => {
+          const icon = await iconService.getIcon(iconMeta.name);
+          return {
+            name: iconMeta.name,
+            icon: icon,
+            keywords: iconMeta.keywords
+          };
+        })
+      );
+      
+      setDisplayedIcons(prev => [...prev, ...loadedIconsData]);
+      setLoadedIconsCount(endIndex);
+    } catch (error) {
+      Logger.error('ui', 'Error loading more icons:', error);
+    } finally {
+      setLoadingMoreIcons(false);
+    }
+  }, [loadedIconsCount, totalIconsCount, allIconsMetadata, loadingMoreIcons, isSearching]);
+
+  // Load more icons when dropdown opens (to ensure there's scrollable content)
+  useEffect(() => {
+    if (showIconDropdown && !isSearching && loadedIconsCount < totalIconsCount && loadedIconsCount === popularIcons.length) {
+      // Load first batch of additional icons when dropdown opens
+      loadMoreIcons();
+    }
+  }, [showIconDropdown, isSearching, loadedIconsCount, totalIconsCount, popularIcons.length, loadMoreIcons]);
 
   // Handle scroll to load more icons
   const handleScroll = useCallback(async () => {
@@ -181,36 +222,9 @@ function OverviewTab({
     
     // Load more when user scrolls to within 200px of bottom
     if (scrollTop + clientHeight >= scrollHeight - 200) {
-      if (loadedIconsCount < totalIconsCount) {
-        setLoadingMoreIcons(true);
-        
-        try {
-          const startIndex = loadedIconsCount;
-          const endIndex = Math.min(startIndex + ICONS_PER_PAGE, totalIconsCount);
-          const iconsToLoad = allIconsMetadata.slice(startIndex, endIndex);
-          
-          // Load the actual icon data for this batch
-          const loadedIconsData = await Promise.all(
-            iconsToLoad.map(async (iconMeta) => {
-              const icon = await iconService.getIcon(iconMeta.name);
-              return {
-                name: iconMeta.name,
-                icon: icon,
-                keywords: iconMeta.keywords
-              };
-            })
-          );
-          
-          setDisplayedIcons(prev => [...prev, ...loadedIconsData]);
-          setLoadedIconsCount(endIndex);
-        } catch (error) {
-          console.error('Error loading more icons:', error);
-        } finally {
-          setLoadingMoreIcons(false);
-        }
-      }
+      loadMoreIcons();
     }
-  }, [loadedIconsCount, totalIconsCount, allIconsMetadata, loadingMoreIcons, isSearching]);
+  }, [loadingMoreIcons, isSearching, loadMoreIcons]);
 
   // Handle icon search
   useEffect(() => {
@@ -230,7 +244,7 @@ function OverviewTab({
         setDisplayedIcons(searchResults);
         setLoadedIconsCount(searchResults.length);
       } catch (error) {
-        console.error('Error searching icons:', error);
+        Logger.error('ui', 'Error searching icons:', error);
         setDisplayedIcons([]);
         setLoadedIconsCount(0);
       } finally {
@@ -310,7 +324,7 @@ function OverviewTab({
           const icon = await iconService.getIcon(workspaceInfo.icon);
           setCurrentIcon(icon);
         } catch (error) {
-          console.error('Error loading current icon:', error);
+          Logger.error('ui', 'Error loading current icon:', error);
           setCurrentIcon(defaultIcon);
         }
       }
@@ -329,7 +343,7 @@ function OverviewTab({
           const icon = await iconService.getIcon(tempIcon);
           setCurrentIcon(icon);
         } catch (error) {
-          console.error('Error loading temp icon:', error);
+          Logger.error('ui', 'Error loading temp icon:', error);
           setCurrentIcon(defaultIcon);
         }
       }
@@ -414,7 +428,7 @@ function OverviewTab({
       // Navigate to home or workspace list after successful deletion
       navigate('/tasks'); // or wherever you want to redirect after deletion
     } catch (error) {
-      console.error('Failed to delete workspace:', error);
+      Logger.error('ui', 'Failed to delete workspace:', error);
       // Error is handled by the slice and will show in UI
     } finally {
       setIsDeleting(false);

@@ -1,5 +1,5 @@
 /**
- * Owner column definition with user avatars and assignment
+ * Assignee column definition with user avatars and assignment
  */
 
 import HoverPopover from '@/pages/spaces/components/HoverPopover';
@@ -23,7 +23,7 @@ export function createOwnerColumn(opts: ColumnBuilderOptions) {
   
   return {
     field: 'user_ids',
-    headerName: t('workspace.columns.owner', 'Owner'),
+    headerName: t('workspace.columns.owner', 'Assignee'),
     width: 140,
     filter: 'agSetColumnFilter',
     filterValueGetter: (p: any) => {
@@ -72,8 +72,8 @@ export function createOwnerColumn(opts: ColumnBuilderOptions) {
       const node = (
         <div className="flex items-center h-full py-1 gap-2">
           <div className="flex items-center -space-x-1.5">
-            {displayUsers.map((user: any) => (
-              <HoverPopover key={user.id} content={(
+            {displayUsers.map((user: any, index: number) => (
+              <HoverPopover key={`${user.id}-${index}`} content={(
                 <div className="flex flex-col items-center gap-3">
                   <Avatar className="h-16 w-16 border-2 border-background">
                     <UserInitial user={user} getUserDisplayName={getUserDisplayName} />

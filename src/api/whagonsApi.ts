@@ -3,6 +3,7 @@ import { getEnvVariables } from '@/lib/getEnvVariables';
 import { auth } from '@/firebase/firebaseConfig';
 import { ApiLoadingTracker } from './apiLoadingTracker';
 
+import { Logger } from '@/utils/logger';
 const { VITE_API_URL, VITE_DEVELOPMENT} = getEnvVariables();
 
 // Simple obfuscation key (in production, this should be more secure)
@@ -37,7 +38,7 @@ const deObfuscateToken = (obfuscatedToken: string): string => {
     }
     return original;
   } catch (error) {
-    console.error('Failed to deobfuscate token:', error);
+    Logger.error('api', 'Failed to deobfuscate token:', error);
     return '';
   }
 };
@@ -87,7 +88,7 @@ export const getTokenForUser = (firebaseUid: string): string | null => {
     const tokenData = JSON.parse(atob(cookieValue));
     // Validate that this token belongs to the current Firebase user
     if (tokenData.uid !== firebaseUid) {
-      console.warn('Token belongs to different user, clearing token');
+      Logger.warn('api', 'Token belongs to different user, clearing token');
       deleteCookie('auth_token');
       return null;
     }
@@ -96,7 +97,7 @@ export const getTokenForUser = (firebaseUid: string): string | null => {
     
     return deObfuscateToken(tokenData.token);
   } catch (error) {
-    console.error('Failed to parse stored token data:', error);
+    Logger.error('api', 'Failed to parse stored token data:', error);
     deleteCookie('auth_token');
     return null;
   }
@@ -141,7 +142,7 @@ export const updateAuthToken = (token: string) => {
   if (currentUser) {
     setTokenForUser(token, currentUser.uid);
   } else {
-    console.warn('No Firebase user found when updating auth token');
+    Logger.warn('api', 'No Firebase user found when updating auth token');
     // Fallback to old method for edge cases
     setCookie('auth_token', obfuscateToken(token), 90); // 90 days
   }
@@ -193,7 +194,7 @@ const refreshToken = async () => {
   }
 
   let token = await auth.currentUser?.getIdToken();
-  // console.log('Refreshing token', token);
+  // Logger.info('api', 'Refreshing token', token);
   if (!token) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     return refreshToken();
@@ -205,15 +206,15 @@ const refreshToken = async () => {
     });
 
     if (response.status === 200) {
-      // console.log('Successfully refreshed token');
+      // Logger.info('api', 'Successfully refreshed token');
       updateAuthToken(response.data.token);
       return response.data.token;
     } else {
-      console.error('Refresh token failed');
+      Logger.error('api', 'Refresh token failed');
       throw new Error('Refresh token failed');
     }
   } catch (error) {
-    console.error('Error refreshing token:', error);
+    Logger.error('api', 'Error refreshing token:', error);
     // If refresh fails, clear the stored token
     deleteCookie('auth_token');
     throw error;
@@ -245,7 +246,7 @@ initializeAuth();
 
 axios.defaults.headers.post['Access-Control-Allow-Origin'] = '*';
 
-console.log("Thing", `${PROTOCOL}://${getSubdomain()}${VITE_API_URL}/`, VITE_DEVELOPMENT)
+Logger.info('api', "Thing", `${PROTOCOL}://${getSubdomain()}${VITE_API_URL}/`, VITE_DEVELOPMENT)
 
 const web = axios.create({
   baseURL: `${PROTOCOL}://${getSubdomain()}${VITE_API_URL}/`,
@@ -267,14 +268,10 @@ api.interceptors.request.use(
     // Override the baseURL for this specific request to ensure correct tenant routing
     config.baseURL = correctBaseURL;
     
-    // Track GET requests for syncing indicator
-    if (config.method?.toLowerCase() === 'get') {
-      ApiLoadingTracker.increment();
-    }
     
     // Debug logging for invitation signup requests
     if (config.url?.includes('/invitations/signup/')) {
-      console.log('Invitation signup request:', {
+      Logger.info('api', 'Invitation signup request:', {
         url: config.url,
         subdomain: currentSubdomain,
         baseURL: config.baseURL,
@@ -285,10 +282,6 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
-    // Decrement on request error for GET requests
-    if (error.config?.method?.toLowerCase() === 'get') {
-      ApiLoadingTracker.decrement();
-    }
     return Promise.reject(error);
   }
 );
@@ -296,24 +289,20 @@ api.interceptors.request.use(
 // Add response interceptor
 api.interceptors.response.use(
   (response) => {
-    // Decrement GET request counter on successful response
-    if (response.config.method?.toLowerCase() === 'get') {
-      ApiLoadingTracker.decrement();
-    }
     
     // Handle 225 responses for tenant switching
     if (response.status === 225) {
-      console.log('225 response detected, switching tenant for:', response.config.url);
+      Logger.info('api', '225 response detected, switching tenant for:', response.config.url);
       
       // Extract new subdomain from response data
       const tenant = response.data?.tenant;
       const domain_prefix = tenant.split('.')[0];
-      console.log('Extracted domain_prefix:', domain_prefix);
+      Logger.info('api', 'Extracted domain_prefix:', domain_prefix);
       
       setSubdomain(domain_prefix);
-      console.log('Set subdomain in localStorage:', localStorage.getItem('whagons-subdomain'));
+      Logger.info('api', 'Set subdomain in localStorage:', localStorage.getItem('whagons-subdomain'));
       
-      console.log('Tenant switched to:', domain_prefix, 'Need to retry request...');
+      Logger.info('api', 'Tenant switched to:', domain_prefix, 'Need to retry request...');
       
       // Retry the original request - the request interceptor will use the new subdomain
       return api(response.config);
@@ -321,12 +310,7 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
-    // Decrement GET request counter on error
-    if (error.config?.method?.toLowerCase() === 'get') {
-      ApiLoadingTracker.decrement();
-    }
-    
-    console.log('error interceptor triggered:', error.response?.status, error.config?.url);
+    Logger.info('api', 'error interceptor triggered:', error.response?.status, error.config?.url);
     const originalRequest = error.config;
 
     // Handle 503 errors on /users/me (tenant database doesn't exist or is down)
@@ -336,7 +320,7 @@ api.interceptors.response.use(
       originalRequest.url === '/users/me' &&
       !originalRequest._retryWithoutSubdomain
     ) {
-      console.warn('503 on /users/me - tenant database unavailable, falling back to landlord');
+      Logger.warn('api', '503 on /users/me - tenant database unavailable, falling back to landlord');
       setSubdomain('');
       originalRequest._retryWithoutSubdomain = true;
       return api(originalRequest);
@@ -391,7 +375,7 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        // console.log('originalRequest.url', originalRequest.url);
+        // Logger.info('api', 'originalRequest.url', originalRequest.url);
         // Clear stored token on 401 and get a fresh one
         deleteCookie('auth_token');
         // Single-flight refresh so concurrent 401s share the same /login
@@ -405,7 +389,7 @@ api.interceptors.response.use(
           },
         });
       } catch (refreshError) {
-        console.error('Token refresh failed:', refreshError);
+        Logger.error('api', 'Token refresh failed:', refreshError);
         clearAuth();
         return Promise.reject(refreshError);
       }

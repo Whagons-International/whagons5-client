@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { getEnvVariables } from "@/lib/getEnvVariables";
 
+import { Logger } from '@/utils/logger';
 const { VITE_API_URL, VITE_CHAT_URL } = getEnvVariables();
 const CHAT_HOST = VITE_CHAT_URL || VITE_API_URL || window.location.origin;
 
@@ -252,7 +253,7 @@ export function useSpeechToText({
     const res = await fetch(url, { method: "POST", body: form });
     const text = await res.text();
     if (!res.ok) {
-      console.error("[STT] Groq transcription failed:", res.status, {
+      Logger.error('assistant', "[STT] Groq transcription failed:", res.status, {
         body: text,
         file: { name: file.name, type: file.type, size: file.size, sigHex16: sig },
       });
@@ -269,7 +270,7 @@ export function useSpeechToText({
       }
       return "";
     } catch (e) {
-      console.error("[STT] Failed to parse Groq JSON:", e);
+      Logger.error('assistant', "[STT] Failed to parse Groq JSON:", e);
       return "";
     }
   }, [getHttpBase]);
@@ -383,7 +384,7 @@ export function useSpeechToText({
       `${wsBase}/api/v1/stt/ws/${encodeURIComponent(conversationId)}` +
       `?include_timestamps=true&include_language_detection=true&audio_format=pcm_16000&commit_strategy=vad&language_code=${encodeURIComponent(lang)}`;
 
-    console.log("[STT] Connecting (ElevenLabs WS):", sttUrl);
+    Logger.info('assistant', "[STT] Connecting (ElevenLabs WS):", sttUrl);
     const ws = new WebSocket(sttUrl);
     sttWsRef.current = ws;
 
@@ -391,7 +392,7 @@ export function useSpeechToText({
       try {
         const data = JSON.parse(String(evt.data));
         if (data?.type === "stt_error") {
-          console.error("[STT] error:", data.error);
+          Logger.error('assistant', "[STT] error:", data.error);
           return;
         }
         if (data?.type !== "stt_event") return;
@@ -418,16 +419,16 @@ export function useSpeechToText({
           onTranscriptRef.current(text, { provider: "elevenlabs" });
         }
       } catch (e) {
-        console.error("[STT] Failed to parse message:", e);
+        Logger.error('assistant', "[STT] Failed to parse message:", e);
       }
     };
 
     ws.onerror = (e) => {
-      console.error("[STT] websocket error:", e);
+      Logger.error('assistant', "[STT] websocket error:", e);
     };
 
     ws.onclose = (e) => {
-      console.log("[STT] closed:", e.code, e.reason);
+      Logger.info('assistant', "[STT] closed:", e.code, e.reason);
       if (sttWsRef.current === ws) stopListening();
     };
 
@@ -479,7 +480,7 @@ export function useSpeechToText({
           setMediaRecorder(mr);
         }
       } catch (e) {
-        console.debug("[STT] MediaRecorder unavailable for visualizer:", e);
+        Logger.debug('assistant', "[STT] MediaRecorder unavailable for visualizer:", e);
         sttMediaRecorderRef.current = null;
         setMediaRecorder(null);
       }
@@ -626,7 +627,7 @@ export function useSpeechToText({
           try {
             socket.send(JSON.stringify(msg));
           } catch (err) {
-            console.error("[STT] send failed:", err);
+            Logger.error('assistant', "[STT] send failed:", err);
           }
         }
       };
@@ -653,7 +654,7 @@ export function useSpeechToText({
       setIsListening(true);
       isListeningRef.current = true;
     } catch (err) {
-      console.error("[STT] startListening failed:", err);
+      Logger.error('assistant', "[STT] startListening failed:", err);
       stopListening();
     }
   }, [appendToGroqRing, beginGroqUtterance, cancelGroqUtterance, conversationId, finalizeGroqUtterance, gettingResponse, isListening, languageCode, provider, startListeningElevenlabs, stopListening]);
@@ -675,7 +676,7 @@ export function useSpeechToText({
         try {
           onTranscriptRef.current(t);
         } catch (e) {
-          console.error("Failed to submit queued transcript:", e);
+          Logger.error('assistant', "Failed to submit queued transcript:", e);
         }
       }
     }

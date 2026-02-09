@@ -350,16 +350,14 @@ function Settings() {
         setActiveTab(tabFromUrl as SettingsTabKey);
         setPrevActiveTab(tabFromUrl as SettingsTabKey);
       } else {
-        // No tab in URL - restore from localStorage and update URL
+        // No tab in URL - ensure we default to 'basics' and update URL accordingly
         const saved = localStorage.getItem(SETTINGS_TAB_STORAGE_KEY);
-        if (saved === 'advanced' || saved === 'basics' || saved === 'favorites') {
-          const savedTab = saved as SettingsTabKey;
-          setActiveTab(savedTab);
-          setPrevActiveTab(savedTab);
-          // Update URL to reflect the saved tab
-          urlParams.set('tab', savedTab);
-          navigate(`/settings?${urlParams.toString()}`, { replace: true });
-        }
+        const defaultTab = (saved === 'advanced' || saved === 'basics' || saved === 'favorites') ? saved as SettingsTabKey : 'basics';
+        setActiveTab(defaultTab);
+        setPrevActiveTab(defaultTab);
+        // Update URL to reflect the chosen tab
+        urlParams.set('tab', defaultTab);
+        navigate(`/settings?${urlParams.toString()}`, { replace: true });
       }
     } catch {}
   }, [navigate, location.pathname]);

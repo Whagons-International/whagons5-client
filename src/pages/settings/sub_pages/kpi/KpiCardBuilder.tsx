@@ -522,7 +522,7 @@ export default function KpiCardBuilder({ isOpen, onClose, onSave, onDelete, edit
             }
           </DialogTitle>
           <DialogDescription>
-            {t('kpiCards.builder.description', 'Step {step} of 3', { step })}
+            {t('kpiCards.builder.description', `Step ${step} of 3`)}
           </DialogDescription>
         </DialogHeader>
 

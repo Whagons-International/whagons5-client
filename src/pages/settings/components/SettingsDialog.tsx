@@ -171,7 +171,7 @@ export function SettingsDialog({
                       onClick={submitNow}
                       variant={getSubmitVariant()}
                       disabled={isSubmitting || submitDisabled}
-                      className={type === 'create' ? "bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]" : type === 'edit' ? "font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-[0.98]" : ""}
+                      className={type === 'create' ? "bg-primary text-primary-foreground font-semibold shadow-md active:scale-[0.98]" : type === 'edit' ? "font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-[0.98]" : ""}
                     >
                       {isSubmitting ? (
                         <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />

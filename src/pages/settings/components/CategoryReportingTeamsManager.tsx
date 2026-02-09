@@ -176,10 +176,11 @@ export function CategoryReportingTeamsManager({
             <div className="space-y-3">
               {availableTeams.map((team) => (
                 <div key={team.id} className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-muted/50">
+                  {/* TODO: add cypress test once fixed */}
                   <Checkbox
                     id={`team-${team.id}`}
                     checked={selectedTeamIds.includes(team.id)}
-                    onCheckedChange={() => handleToggleTeam(team.id)}
+                    onCheckedChange={(checked) => handleToggleTeam(team.id)}
                   />
                   <Label
                     htmlFor={`team-${team.id}`}

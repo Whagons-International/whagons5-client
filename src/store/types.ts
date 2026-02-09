@@ -817,6 +817,7 @@ export interface AssetType {
 export interface AssetItem {
     id: number;
     name: string;
+    display_order?: number;
     parent_id?: number | null;
     asset_type_id: number;
     spot_id?: number | null;

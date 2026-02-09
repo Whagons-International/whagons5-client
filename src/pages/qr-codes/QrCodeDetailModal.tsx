@@ -77,6 +77,9 @@ export const QrCodeDetailModal: React.FC<QrCodeDetailModalProps> = ({
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
     const [logoSize, setLogoSize] = useState<number>(20); // percentage (10-30)
     const logoInputRef = useRef<HTMLInputElement>(null);
+    
+    // Use ref to track current blob URL for proper cleanup
+    const currentBlobUrlRef = useRef<string | null>(null);
 
     // Fetch QR code image when modal opens or format/size/logo changes
     useEffect(() => {
@@ -84,9 +87,10 @@ export const QrCodeDetailModal: React.FC<QrCodeDetailModalProps> = ({
             fetchQrImage();
         }
         return () => {
-            // Cleanup object URL on unmount
-            if (imageUrl && imageUrl.startsWith('blob:')) {
-                URL.revokeObjectURL(imageUrl);
+            // Cleanup object URL on unmount - use ref to get current blob URL
+            if (currentBlobUrlRef.current && currentBlobUrlRef.current.startsWith('blob:')) {
+                URL.revokeObjectURL(currentBlobUrlRef.current);
+                currentBlobUrlRef.current = null;
             }
         };
     }, [open, qrCode?.id, selectedFormat, selectedSize, logoFile, logoSize]);
@@ -129,12 +133,13 @@ export const QrCodeDetailModal: React.FC<QrCodeDetailModalProps> = ({
             const blob = response.data;
             const url = URL.createObjectURL(blob);
             
-            // Cleanup previous URL
-            if (imageUrl && imageUrl.startsWith('blob:')) {
-                URL.revokeObjectURL(imageUrl);
+            // Cleanup previous URL using ref
+            if (currentBlobUrlRef.current && currentBlobUrlRef.current.startsWith('blob:')) {
+                URL.revokeObjectURL(currentBlobUrlRef.current);
             }
             
             setImageUrl(url);
+            currentBlobUrlRef.current = url;
         } catch (error: any) {
             console.error('Failed to fetch QR code image:', error);
             setImageError(error?.response?.data?.message || 'Failed to load QR code image');

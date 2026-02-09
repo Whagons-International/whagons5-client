@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import {
     DndContext,
     closestCenter,
@@ -140,8 +141,8 @@ export const AssetsPage = () => {
 
         // Otherwise, sort by display_order from backend (default to 0)
         return [...filtered].sort((a, b) => {
-            const orderA = (a as any).display_order ?? 0;
-            const orderB = (b as any).display_order ?? 0;
+            const orderA = a.display_order ?? 0;
+            const orderB = b.display_order ?? 0;
             return orderA - orderB;
         });
     }, [assetItems, search, statusFilter, typeFilter, localAssetOrder]);
@@ -188,6 +189,9 @@ export const AssetsPage = () => {
                         display_order: index,
                     }));
 
+                    // Store the previous order for potential revert
+                    const previousOrder = [...currentOrder];
+                    
                     // Persist to backend
                     api.post('/asset-items-reorder', { items: reorderPayload })
                         .then(() => {
@@ -196,6 +200,10 @@ export const AssetsPage = () => {
                         })
                         .catch((err) => {
                             console.error('Failed to persist asset order:', err);
+                            // Show toast notification
+                            toast.error('Failed to save asset order. Changes reverted.');
+                            // Revert to previous order
+                            setLocalAssetOrder(previousOrder);
                         });
                 }, 500);
 

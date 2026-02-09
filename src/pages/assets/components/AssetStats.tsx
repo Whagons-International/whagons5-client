@@ -9,11 +9,9 @@ import {
     XCircle, 
     Wrench, 
     Archive,
-    TrendingUp,
     MapPin,
     Users,
-    AlertTriangle,
-    Calendar
+    AlertTriangle
 } from 'lucide-react';
 import type { AssetItem, AssetType } from '@/store/types';
 

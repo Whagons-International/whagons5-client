@@ -10,6 +10,7 @@
  */
 
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { AgGridReact } from 'ag-grid-react';
 import { 
   ColDef, 
@@ -19,14 +20,20 @@ import {
   ModuleRegistry,
   AllCommunityModule
 } from 'ag-grid-community';
-import { ServerSideRowModelModule } from 'ag-grid-enterprise';
+import { ServerSideRowModelModule, ServerSideRowModelApiModule, LicenseManager } from 'ag-grid-enterprise';
+import { AG_GRID_LICENSE } from '@/pages/spaces/components/workspaceTable/grid/agGridSetup';
 
-// Register AG Grid modules
-ModuleRegistry.registerModules([AllCommunityModule, ServerSideRowModelModule]);
+// Register AG Grid modules and license
+ModuleRegistry.registerModules([AllCommunityModule, ServerSideRowModelModule, ServerSideRowModelApiModule]);
+if (AG_GRID_LICENSE) {
+  LicenseManager.setLicenseKey(AG_GRID_LICENSE);
+}
 import { 
   Bug, RefreshCw, Search, X, Users, Database, Building2, 
   Activity, Wifi, WifiOff, AlertCircle, CheckCircle2, 
-  Trash2, Save, ShieldAlert, Lock
+  Trash2, Save, ShieldAlert, Lock, ArrowLeft, ClipboardList,
+  FolderKanban, Layers, UsersRound, Clock, History,
+  Plus, Pencil, Trash, Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,10 +54,12 @@ import {
   TelemetryError,
   getActiveSessions,
   getTenants,
+  getTenantDetails,
   getRteHealth,
   RteSession,
   RteTenant,
-  RteHealth
+  RteHealth,
+  TenantDetails
 } from '@/api/rteApi';
 import { Logger } from '@/utils/logger';
 import dayjs from 'dayjs';
@@ -268,9 +277,872 @@ function SessionsTab() {
   );
 }
 
+// Activity event type mapping for display
+const activityEventIcons: Record<string, React.ReactNode> = {
+  created: <Plus className="h-4 w-4 text-green-500" />,
+  updated: <Pencil className="h-4 w-4 text-blue-500" />,
+  deleted: <Trash className="h-4 w-4 text-red-500" />,
+};
+
+const activityEventColors: Record<string, string> = {
+  created: 'bg-green-500/10 text-green-700 border-green-500/20',
+  updated: 'bg-blue-500/10 text-blue-700 border-blue-500/20',
+  deleted: 'bg-red-500/10 text-red-700 border-red-500/20',
+};
+
+// Extract model name from full class path (e.g., "App\Models\User" -> "User")
+function extractModelName(fullPath: string): string {
+  if (!fullPath) return 'Unknown';
+  const parts = fullPath.split('\\');
+  return parts[parts.length - 1] || fullPath;
+}
+
+// Format a value for human-readable display
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined) return 'empty';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'string') {
+    // Check if it's a date
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+      return dayjs(value).format('MMM D, YYYY HH:mm');
+    }
+    return value.length > 50 ? value.substring(0, 50) + '...' : value;
+  }
+  if (typeof value === 'number') return String(value);
+  if (Array.isArray(value)) return `[${value.length} items]`;
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
+// Friendly field name mapping
+const friendlyFieldNames: Record<string, string> = {
+  status_id: 'status',
+  priority_id: 'priority',
+  category_id: 'category',
+  workspace_id: 'workspace',
+  team_id: 'team',
+  assigned_to: 'assignee',
+  created_by: 'creator',
+  due_date: 'due date',
+  start_date: 'start date',
+  end_date: 'end date',
+  is_active: 'active status',
+  is_enabled: 'enabled status',
+  parent_id: 'parent',
+  order: 'position',
+  sort_order: 'sort position',
+};
+
+// Get friendly field name
+function getFriendlyFieldName(field: string): string {
+  if (friendlyFieldNames[field]) return friendlyFieldNames[field];
+  // Convert snake_case to readable: some_field_name -> some field name
+  return field.replace(/_/g, ' ');
+}
+
+// Generate human-readable change description
+interface ChangeDetails {
+  summary: string;
+  naturalLanguage: string[];
+  details: { field: string; from?: string; to: string }[];
+}
+
+function describeChanges(
+  properties: Record<string, unknown> | null, 
+  action: string,
+  modelName: string,
+  userName: string
+): ChangeDetails {
+  if (!properties) return { summary: 'No details available', naturalLanguage: [], details: [] };
+  
+  const attributes = properties.attributes as Record<string, unknown> | undefined;
+  const old = properties.old as Record<string, unknown> | undefined;
+  
+  // Skip internal/timestamp fields
+  const skipFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'updated_clock'];
+  
+  const model = modelName.toLowerCase();
+  
+  if (action === 'created' && attributes) {
+    const fields = Object.keys(attributes).filter(k => !skipFields.includes(k));
+    const details = fields.map(field => ({
+      field,
+      to: formatValue(attributes[field])
+    }));
+    
+    // Find a name/title field for the summary
+    const nameField = attributes.name || attributes.title || attributes.subject || null;
+    const nameStr = nameField ? ` "${formatValue(nameField)}"` : '';
+    
+    return {
+      summary: `New ${model} created`,
+      naturalLanguage: [`${userName} created a new ${model}${nameStr}`],
+      details
+    };
+  }
+  
+  if (action === 'updated' && attributes && old) {
+    const changedFields = Object.keys(attributes).filter(k => 
+      !skipFields.includes(k) && JSON.stringify(old[k]) !== JSON.stringify(attributes[k])
+    );
+    
+    const details = changedFields.map(field => ({
+      field,
+      from: formatValue(old[field]),
+      to: formatValue(attributes[field])
+    }));
+    
+    // Generate natural language descriptions for each change
+    const naturalLanguage = changedFields.map(field => {
+      const friendlyName = getFriendlyFieldName(field);
+      const oldVal = formatValue(old[field]);
+      const newVal = formatValue(attributes[field]);
+      
+      // Special handling for common patterns
+      if (field.endsWith('_id')) {
+        return `${userName} changed ${model} ${friendlyName} from #${oldVal} to #${newVal}`;
+      }
+      if (typeof attributes[field] === 'boolean') {
+        const boolVal = attributes[field] as boolean;
+        return `${userName} ${boolVal ? 'enabled' : 'disabled'} ${model} ${friendlyName}`;
+      }
+      
+      return `${userName} changed ${model} ${friendlyName} from "${oldVal}" to "${newVal}"`;
+    });
+    
+    return {
+      summary: changedFields.length > 0 
+        ? `Changed ${changedFields.map(getFriendlyFieldName).join(', ')}`
+        : 'Updated (no visible changes)',
+      naturalLanguage: naturalLanguage.length > 0 ? naturalLanguage : [`${userName} updated ${model}`],
+      details
+    };
+  }
+  
+  if (action === 'deleted') {
+    return {
+      summary: `${model} deleted`,
+      naturalLanguage: [`${userName} deleted a ${model}`],
+      details: []
+    };
+  }
+  
+  return { summary: 'Changes recorded', naturalLanguage: [], details: [] };
+}
+
+// User info type
+interface UserInfo {
+  id: number;
+  name: string;
+  email: string;
+}
+
+// Activity Log Row interface
+interface ActivityLogRow {
+  id: number;
+  log_name: string;
+  description: string;
+  subject_type: string;
+  subject_id: number | string;
+  causer_type: string | null;
+  causer_id: number | null;
+  properties: Record<string, unknown> | null;
+  batch_uuid: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Reference data lookup tables (model -> table -> name field)
+const referenceTableMap: Record<string, { table: string; nameField: string }> = {
+  status_id: { table: 'wh_statuses', nameField: 'name' },
+  priority_id: { table: 'wh_priorities', nameField: 'name' },
+  category_id: { table: 'wh_categories', nameField: 'name' },
+  workspace_id: { table: 'wh_workspaces', nameField: 'name' },
+  team_id: { table: 'wh_teams', nameField: 'name' },
+  assigned_to: { table: 'wh_users', nameField: 'name' },
+  created_by: { table: 'wh_users', nameField: 'name' },
+  user_id: { table: 'wh_users', nameField: 'name' },
+};
+
+// Activity Detail Modal Component - fetches reference names on open
+interface ActivityDetailModalProps {
+  activity: ActivityLogRow | null;
+  onClose: () => void;
+  tenantName: string;
+  getUserName: (userId: number | null) => string;
+  parseProperties: (props: unknown) => Record<string, unknown> | null;
+}
+
+function ActivityDetailModal({ activity, onClose, tenantName, getUserName, parseProperties }: ActivityDetailModalProps) {
+  const [refNames, setRefNames] = useState<Map<string, string>>(new Map());
+  const [loadingRefs, setLoadingRefs] = useState(false);
+
+  // Fetch reference names when modal opens
+  useEffect(() => {
+    if (!activity || !tenantName) {
+      setRefNames(new Map());
+      return;
+    }
+
+    const props = parseProperties(activity.properties);
+    if (!props) return;
+
+    const attributes = props.attributes as Record<string, unknown> | undefined;
+    const old = props.old as Record<string, unknown> | undefined;
+    
+    // Collect all IDs we need to look up
+    const lookups: { field: string; table: string; nameField: string; ids: Set<number> }[] = [];
+    
+    for (const [field, config] of Object.entries(referenceTableMap)) {
+      const ids = new Set<number>();
+      
+      if (attributes && typeof attributes[field] === 'number') {
+        ids.add(attributes[field] as number);
+      }
+      if (old && typeof old[field] === 'number') {
+        ids.add(old[field] as number);
+      }
+      
+      if (ids.size > 0) {
+        lookups.push({ field, ...config, ids });
+      }
+    }
+
+    if (lookups.length === 0) return;
+
+    // Fetch all reference data
+    const fetchRefs = async () => {
+      setLoadingRefs(true);
+      const newRefNames = new Map<string, string>();
+      
+      try {
+        const { executeDbQuery } = await import('@/api/rteApi');
+        
+        for (const lookup of lookups) {
+          const idList = Array.from(lookup.ids).join(',');
+          const query = `SELECT id, ${lookup.nameField} as name FROM ${lookup.table} WHERE id IN (${idList})`;
+          
+          try {
+            const result = await executeDbQuery(tenantName, query);
+            for (const row of result.rows) {
+              const id = row.id as number;
+              const name = row.name as string;
+              // Key format: field:id -> name
+              newRefNames.set(`${lookup.field}:${id}`, name);
+            }
+          } catch (err) {
+            Logger.warn('ui', `Failed to fetch refs for ${lookup.table}:`, err);
+          }
+        }
+      } catch (err) {
+        Logger.error('ui', 'Failed to fetch reference names:', err);
+      } finally {
+        setRefNames(newRefNames);
+        setLoadingRefs(false);
+      }
+    };
+
+    fetchRefs();
+  }, [activity, tenantName, parseProperties]);
+
+  // Get display value - uses name if available, otherwise falls back to ID
+  const getDisplayValue = (field: string, value: unknown): string => {
+    if (value === null || value === undefined) return 'empty';
+    
+    // Check if we have a name for this field:id combo
+    if (typeof value === 'number' && referenceTableMap[field]) {
+      const name = refNames.get(`${field}:${value}`);
+      if (name) return name;
+      return `#${value}`; // Fallback to ID with # prefix
+    }
+    
+    return formatValue(value);
+  };
+
+  // Generate human-readable changes with names
+  const describeChangesWithNames = (
+    properties: Record<string, unknown> | null, 
+    action: string,
+    modelName: string,
+    userName: string
+  ): { naturalLanguage: string[]; details: { field: string; from?: string; to: string; fromRaw?: string; toRaw?: string }[] } => {
+    if (!properties) return { naturalLanguage: [], details: [] };
+    
+    const attributes = properties.attributes as Record<string, unknown> | undefined;
+    const old = properties.old as Record<string, unknown> | undefined;
+    
+    const skipFields = ['id', 'created_at', 'updated_at', 'deleted_at', 'updated_clock'];
+    const model = modelName.toLowerCase();
+    
+    if (action === 'created' && attributes) {
+      const fields = Object.keys(attributes).filter(k => !skipFields.includes(k));
+      const details = fields.map(field => ({
+        field,
+        to: getDisplayValue(field, attributes[field]),
+        toRaw: String(attributes[field] ?? '')
+      }));
+      
+      const nameField = attributes.name || attributes.title || attributes.subject || null;
+      const nameStr = nameField ? ` "${formatValue(nameField)}"` : '';
+      
+      return {
+        naturalLanguage: [`${userName} created a new ${model}${nameStr}`],
+        details
+      };
+    }
+    
+    if (action === 'updated' && attributes && old) {
+      const changedFields = Object.keys(attributes).filter(k => 
+        !skipFields.includes(k) && JSON.stringify(old[k]) !== JSON.stringify(attributes[k])
+      );
+      
+      const details = changedFields.map(field => ({
+        field,
+        from: getDisplayValue(field, old[field]),
+        to: getDisplayValue(field, attributes[field]),
+        fromRaw: String(old[field] ?? ''),
+        toRaw: String(attributes[field] ?? '')
+      }));
+      
+      // Generate natural language with names
+      const naturalLanguage = changedFields.map(field => {
+        const friendlyName = getFriendlyFieldName(field);
+        const oldVal = getDisplayValue(field, old[field]);
+        const newVal = getDisplayValue(field, attributes[field]);
+        
+        if (typeof attributes[field] === 'boolean') {
+          const boolVal = attributes[field] as boolean;
+          return `${userName} ${boolVal ? 'enabled' : 'disabled'} ${model} ${friendlyName}`;
+        }
+        
+        return `${userName} changed ${model} ${friendlyName} from "${oldVal}" to "${newVal}"`;
+      });
+      
+      return {
+        naturalLanguage: naturalLanguage.length > 0 ? naturalLanguage : [`${userName} updated ${model}`],
+        details
+      };
+    }
+    
+    if (action === 'deleted') {
+      return {
+        naturalLanguage: [`${userName} deleted a ${model}`],
+        details: []
+      };
+    }
+    
+    return { naturalLanguage: [], details: [] };
+  };
+
+  if (!activity) return null;
+
+  const model = extractModelName(activity.subject_type);
+  const user = getUserName(activity.causer_id);
+  const props = parseProperties(activity.properties);
+  const { naturalLanguage, details } = describeChangesWithNames(
+    props, 
+    activity.description?.toLowerCase() || '',
+    model,
+    user
+  );
+
+  return (
+    <Dialog open={!!activity} onOpenChange={() => onClose()}>
+      <DialogContent className="max-w-3xl max-h-[90vh]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <History className="h-5 w-5" />
+            Activity Details
+            <span className="text-muted-foreground font-normal text-sm ml-2">
+              {model} #{activity.subject_id}
+            </span>
+          </DialogTitle>
+        </DialogHeader>
+        <ScrollArea className="max-h-[70vh]">
+          <div className="space-y-4 pr-4">
+            {/* Natural language summary */}
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="py-4">
+                <div className="space-y-2">
+                  {loadingRefs ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />
+                      Loading details...
+                    </div>
+                  ) : (
+                    naturalLanguage.map((sentence, idx) => (
+                      <div key={idx} className="flex items-start gap-2">
+                        {idx === 0 && activityEventIcons[activity.description?.toLowerCase()]}
+                        <span className="text-sm">{sentence}</span>
+                      </div>
+                    ))
+                  )}
+                  <div className="text-xs text-muted-foreground mt-2">
+                    {dayjs(activity.created_at).format('MMMM D, YYYY [at] h:mm:ss A')} ({dayjs(activity.created_at).fromNow()})
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Field-level changes */}
+            {details.length > 0 && (
+              <Card>
+                <CardHeader className="py-3">
+                  <CardTitle className="text-sm">Field Changes</CardTitle>
+                </CardHeader>
+                <CardContent className="py-3">
+                  <div className="space-y-3">
+                    {details.map((change, idx) => (
+                      <div key={idx} className="flex items-start gap-2 text-sm">
+                        <span className="font-medium text-muted-foreground min-w-[120px] capitalize">
+                          {getFriendlyFieldName(change.field)}:
+                        </span>
+                        {change.from !== undefined ? (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="bg-red-500/10 text-red-700 px-2 py-0.5 rounded text-xs line-through">
+                              {change.from}
+                            </span>
+                            <span className="text-muted-foreground">→</span>
+                            <span className="bg-green-500/10 text-green-700 px-2 py-0.5 rounded text-xs">
+                              {change.to}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="bg-green-500/10 text-green-700 px-2 py-0.5 rounded text-xs">
+                            {change.to}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Info Grid */}
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm">Details</CardTitle>
+              </CardHeader>
+              <CardContent className="py-3">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Action:</span>
+                    <Badge 
+                      variant="outline" 
+                      className={`ml-2 capitalize ${activityEventColors[activity.description?.toLowerCase()] || ''}`}
+                    >
+                      {activity.description}
+                    </Badge>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Model:</span>
+                    <span className="ml-2 font-medium">{model}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Record ID:</span>
+                    <span className="ml-2 font-mono">{activity.subject_id}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">By:</span>
+                    <span className="ml-2">{user}</span>
+                    {activity.causer_id && (
+                      <span className="ml-1 text-muted-foreground">(#{activity.causer_id})</span>
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Time:</span>
+                    <span className="ml-2">{dayjs(activity.created_at).format('YYYY-MM-DD HH:mm:ss')}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Relative:</span>
+                    <span className="ml-2">{dayjs(activity.created_at).fromNow()}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Raw JSON */}
+            {activity.properties && (
+              <Card>
+                <CardHeader className="py-3">
+                  <CardTitle className="text-sm text-muted-foreground">Raw Data</CardTitle>
+                </CardHeader>
+                <CardContent className="py-3">
+                  <pre className="bg-muted p-3 rounded-md text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-[200px] overflow-y-auto">
+                    {JSON.stringify(parseProperties(activity.properties), null, 2)}
+                  </pre>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Activity Tab Component
+function ActivityTab() {
+  const gridRef = useRef<AgGridReact>(null);
+  const [tenants, setTenants] = useState<RteTenant[]>([]);
+  const [selectedTenant, setSelectedTenant] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [rowData, setRowData] = useState<ActivityLogRow[]>([]);
+  const [totalRows, setTotalRows] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(100);
+  const [selectedActivity, setSelectedActivity] = useState<ActivityLogRow | null>(null);
+  const [usersMap, setUsersMap] = useState<Map<number, UserInfo>>(new Map());
+
+  // Load tenants on mount
+  useEffect(() => {
+    getTenants().then(data => {
+      const connected = data.tenants.filter(t => t.connected);
+      setTenants(connected);
+      if (connected.length > 0 && !selectedTenant) {
+        setSelectedTenant(connected[0].name);
+      }
+    }).catch(err => {
+      Logger.error('ui', 'Failed to load tenants:', err);
+    });
+  }, []);
+
+  // Load users for the selected tenant
+  const loadUsers = useCallback(async () => {
+    if (!selectedTenant) return;
+    
+    try {
+      const { getTableRows } = await import('@/api/rteApi');
+      const data = await getTableRows(selectedTenant, 'wh_users', {
+        page: 1,
+        per_page: 1000, // Get all users
+      });
+      
+      const map = new Map<number, UserInfo>();
+      (data.rows || []).forEach((user: Record<string, unknown>) => {
+        if (typeof user.id === 'number') {
+          map.set(user.id, {
+            id: user.id,
+            name: String(user.name || user.email || `User ${user.id}`),
+            email: String(user.email || '')
+          });
+        }
+      });
+      setUsersMap(map);
+    } catch (err) {
+      Logger.warn('ui', 'Failed to load users for activity log:', err);
+    }
+  }, [selectedTenant]);
+
+  // Load activity log when tenant changes
+  const loadActivityLog = useCallback(async (page: number = 1) => {
+    if (!selectedTenant) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const { getTableRows } = await import('@/api/rteApi');
+      
+      const data = await getTableRows(selectedTenant, 'activity_log', {
+        page,
+        per_page: pageSize,
+        sort_by: 'created_at',
+        sort_order: 'desc',
+      });
+      
+      setRowData((data.rows || []) as ActivityLogRow[]);
+      setTotalRows(data.total);
+      setCurrentPage(page);
+    } catch (err) {
+      Logger.error('ui', 'Failed to load activity log:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load activity log');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedTenant, pageSize]);
+
+  // Load data when tenant changes
+  useEffect(() => {
+    if (selectedTenant) {
+      loadUsers();
+      loadActivityLog(1);
+    }
+  }, [selectedTenant, loadActivityLog, loadUsers]);
+
+  // Get user display name
+  const getUserName = useCallback((userId: number | null): string => {
+    if (!userId) return 'System';
+    const user = usersMap.get(userId);
+    return user?.name || `User #${userId}`;
+  }, [usersMap]);
+
+  // Parse properties which may be a JSON string
+  const parseProperties = useCallback((props: unknown): Record<string, unknown> | null => {
+    if (!props) return null;
+    if (typeof props === 'string') {
+      try {
+        return JSON.parse(props);
+      } catch {
+        return null;
+      }
+    }
+    if (typeof props === 'object') return props as Record<string, unknown>;
+    return null;
+  }, []);
+
+  // Column definitions for AG Grid
+  const columnDefs = useMemo<ColDef[]>(() => [
+    {
+      field: 'description',
+      headerName: 'Action',
+      width: 110,
+      cellStyle: { display: 'flex', alignItems: 'center' },
+      cellRenderer: (params: { value: string; data: ActivityLogRow }) => {
+        const event = params.value?.toLowerCase() || '';
+        return (
+          <div className="flex items-center gap-2">
+            {activityEventIcons[event] || <Eye className="h-4 w-4 text-gray-500" />}
+            <Badge 
+              variant="outline" 
+              className={`text-xs capitalize ${activityEventColors[event] || 'bg-gray-500/10'}`}
+            >
+              {params.value}
+            </Badge>
+          </div>
+        );
+      },
+    },
+    {
+      field: 'subject_type',
+      headerName: 'Model',
+      width: 120,
+      cellStyle: { display: 'flex', alignItems: 'center' },
+      cellRenderer: (params: { value: string }) => (
+        <span className="font-medium">{extractModelName(params.value)}</span>
+      ),
+    },
+    {
+      field: 'subject_id',
+      headerName: 'ID',
+      width: 70,
+      cellStyle: { display: 'flex', alignItems: 'center' },
+      cellRenderer: (params: { value: number | string }) => (
+        <span className="font-mono text-xs">{params.value}</span>
+      ),
+    },
+    {
+      field: 'causer_id',
+      headerName: 'By',
+      width: 140,
+      cellStyle: { display: 'flex', alignItems: 'center' },
+      cellRenderer: (params: { value: number | null }) => {
+        if (!params.value) {
+          return <span className="text-muted-foreground italic">System</span>;
+        }
+        const userName = getUserName(params.value);
+        return (
+          <div className="flex items-center gap-1 truncate" title={userName}>
+            <Users className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+            <span className="text-xs truncate">{userName}</span>
+          </div>
+        );
+      },
+    },
+    {
+      field: 'properties',
+      headerName: 'What Happened',
+      flex: 1,
+      minWidth: 300,
+      cellStyle: { display: 'flex', alignItems: 'center' },
+      cellRenderer: (params: { value: unknown; data: ActivityLogRow }) => {
+        const model = extractModelName(params.data.subject_type);
+        const user = getUserName(params.data.causer_id);
+        const props = parseProperties(params.value);
+        const { naturalLanguage } = describeChanges(
+          props, 
+          params.data.description?.toLowerCase() || '',
+          model,
+          user
+        );
+        const text = naturalLanguage[0] || 'Activity recorded';
+        return (
+          <span className="text-xs truncate" title={text}>{text}</span>
+        );
+      },
+    },
+    {
+      field: 'created_at',
+      headerName: 'When',
+      width: 160,
+      cellStyle: { display: 'flex', alignItems: 'center' },
+      cellRenderer: (params: { value: string }) => (
+        <div className="flex flex-col">
+          <span className="text-xs">{dayjs(params.value).format('MMM D, HH:mm:ss')}</span>
+          <span className="text-xs text-muted-foreground">{dayjs(params.value).fromNow()}</span>
+        </div>
+      ),
+    },
+  ], [getUserName, parseProperties]);
+
+  // Default column settings
+  const defaultColDef = useMemo<ColDef>(() => ({
+    resizable: true,
+    sortable: false,
+    suppressHeaderMenuButton: true,
+  }), []);
+
+  // Pagination
+  const totalPages = Math.ceil(totalRows / pageSize);
+  
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      loadActivityLog(newPage);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-280px)] gap-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Select value={selectedTenant} onValueChange={setSelectedTenant}>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="Select tenant" />
+            </SelectTrigger>
+            <SelectContent>
+              {tenants.map(tenant => (
+                <SelectItem key={tenant.name} value={tenant.name}>
+                  <div className="flex items-center gap-2">
+                    <Database className="h-4 w-4" />
+                    {tenant.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          {totalRows > 0 && (
+            <Badge variant="outline">
+              {totalRows.toLocaleString()} activities
+            </Badge>
+          )}
+        </div>
+        
+        <Button variant="outline" size="sm" onClick={() => loadActivityLog(currentPage)} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-destructive/10 text-destructive p-4 rounded-lg flex items-center gap-2">
+          <AlertCircle className="h-5 w-5" />
+          {error}
+        </div>
+      )}
+
+      {/* Grid */}
+      <div className="flex-1 border rounded-lg overflow-hidden">
+        {loading && rowData.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        ) : !selectedTenant ? (
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
+            <History className="h-12 w-12" />
+            <span>Select a tenant to view activity</span>
+          </div>
+        ) : rowData.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
+            <History className="h-12 w-12" />
+            <span>No activity logged yet</span>
+          </div>
+        ) : (
+          <div className="ag-theme-quartz h-full">
+            <AgGridReact
+              ref={gridRef}
+              columnDefs={columnDefs}
+              rowData={rowData}
+              defaultColDef={defaultColDef}
+              animateRows={true}
+              suppressCellFocus={true}
+              rowHeight={50}
+              onRowClicked={(event) => {
+                if (event.data) {
+                  setSelectedActivity(event.data);
+                }
+              }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Pagination */}
+      {totalRows > pageSize && (
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">
+            Showing {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, totalRows)} of {totalRows.toLocaleString()}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(1)}
+              disabled={currentPage === 1 || loading}
+            >
+              First
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1 || loading}
+            >
+              Prev
+            </Button>
+            <span className="text-sm px-2">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages || loading}
+            >
+              Next
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(totalPages)}
+              disabled={currentPage === totalPages || loading}
+            >
+              Last
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Activity Detail Dialog */}
+      <ActivityDetailModal
+        activity={selectedActivity}
+        onClose={() => setSelectedActivity(null)}
+        tenantName={selectedTenant}
+        getUserName={getUserName}
+        parseProperties={parseProperties}
+      />
+    </div>
+  );
+}
+
 // Tenants Tab Component
 function TenantsTab() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [tenants, setTenants] = useState<RteTenant[]>([]);
   const [stats, setStats] = useState({ total: 0, connected: 0 });
   const [loading, setLoading] = useState(true);
@@ -292,6 +1164,10 @@ function TenantsTab() {
   useEffect(() => {
     fetchTenants();
   }, [fetchTenants]);
+
+  const handleTenantClick = useCallback((tenantName: string) => {
+    navigate(`/tech-support/tenants/${encodeURIComponent(tenantName)}`);
+  }, [navigate]);
 
   if (loading) {
     return (
@@ -326,7 +1202,11 @@ function TenantsTab() {
       {/* Tenants Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {tenants.map((tenant) => (
-          <Card key={tenant.id} className={!tenant.connected ? 'opacity-60' : ''}>
+          <Card 
+            key={tenant.id} 
+            className={`cursor-pointer transition-all hover:shadow-md hover:border-primary/50 ${!tenant.connected ? 'opacity-60' : ''}`}
+            onClick={() => handleTenantClick(tenant.name)}
+          >
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -355,6 +1235,230 @@ function TenantsTab() {
             </CardContent>
           </Card>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// Tenant Detail Tab Component
+function TenantDetailTab({ tenantName }: { tenantName: string }) {
+  const navigate = useNavigate();
+  const [details, setDetails] = useState<TenantDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchDetails = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getTenantDetails(tenantName);
+      setDetails(data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch tenant details');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantName]);
+
+  useEffect(() => {
+    fetchDetails();
+  }, [fetchDetails]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" onClick={() => navigate('/tech-support/tenants')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Tenants
+        </Button>
+        <div className="bg-destructive/10 text-destructive p-4 rounded-lg flex items-center gap-2">
+          <AlertCircle className="h-5 w-5" />
+          {error}
+        </div>
+      </div>
+    );
+  }
+
+  if (!details) return null;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/tech-support/tenants')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Building2 className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">{details.name}</h2>
+              <p className="text-sm text-muted-foreground font-mono">{details.domain}</p>
+            </div>
+          </div>
+          {details.connected ? (
+            <Badge variant="default" className="bg-green-500">Connected</Badge>
+          ) : (
+            <Badge variant="secondary">Disconnected</Badge>
+          )}
+        </div>
+        <Button variant="outline" size="sm" onClick={fetchDetails}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-500/10 rounded-lg">
+                <Users className="h-5 w-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{details.stats.total_users}</p>
+                <p className="text-xs text-muted-foreground">Total Users</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-500/10 rounded-lg">
+                <Activity className="h-5 w-5 text-green-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{details.stats.active_users}</p>
+                <p className="text-xs text-muted-foreground">Active Users</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-500/10 rounded-lg">
+                <ClipboardList className="h-5 w-5 text-purple-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{details.stats.total_tasks.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Total Tasks</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-orange-500/10 rounded-lg">
+                <FolderKanban className="h-5 w-5 text-orange-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{details.stats.total_workspaces}</p>
+                <p className="text-xs text-muted-foreground">Workspaces</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-cyan-500/10 rounded-lg">
+                <Layers className="h-5 w-5 text-cyan-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{details.stats.total_categories}</p>
+                <p className="text-xs text-muted-foreground">Categories</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-pink-500/10 rounded-lg">
+                <UsersRound className="h-5 w-5 text-pink-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{details.stats.total_teams}</p>
+                <p className="text-xs text-muted-foreground">Teams</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Additional Info */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Database Info */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              Database
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Name:</span>
+              <span className="font-mono">{details.database}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Recent Errors:</span>
+              <Badge variant={details.recent_errors > 0 ? "destructive" : "secondary"}>
+                {details.recent_errors}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Active Sessions */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Wifi className="h-4 w-4" />
+              Active Sessions ({details.active_sessions})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {details.sessions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No active sessions</p>
+            ) : (
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {details.sessions.map((session) => (
+                  <div key={session.session_id} className="flex items-center justify-between text-sm p-2 bg-muted/50 rounded">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full" />
+                      <span>{session.user_email}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      <span className="text-xs">{dayjs(session.connected_at).fromNow()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
@@ -1055,7 +2159,7 @@ function DatabaseTab() {
         )}
         
         {/* Grid Container */}
-        <div style={{ height: '500px', width: '100%' }}>
+        <div className="flex-1 min-h-0">
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -1066,7 +2170,7 @@ function DatabaseTab() {
               <span>Select a table from the sidebar</span>
             </div>
           ) : (
-            <div className="ag-theme-quartz" style={{ height: 500, width: '100%' }}>
+            <div className="ag-theme-quartz h-full w-full">
               <AgGridReact
                 ref={gridRef}
                 columnDefs={columnDefs}
@@ -1513,15 +2617,42 @@ function ErrorsTab() {
   );
 }
 
+// Valid tab values
+const VALID_TABS = ['sessions', 'activity', 'errors', 'database', 'tenants'] as const;
+type TabValue = typeof VALID_TABS[number];
+
 // Main TechSupport Component
 export default function TechSupport() {
   const { t } = useLanguage();
+  const { tab, tenantName } = useParams<{ tab?: string; tenantName?: string }>();
+  const navigate = useNavigate();
   const { isSuperAdmin, isLoading } = useSuperAdmin();
   const [health, setHealth] = useState<RteHealth | null>(null);
+
+  // Check if we're viewing a tenant detail page
+  const isViewingTenantDetail = !!tenantName;
+
+  // Determine current tab from URL, default to 'sessions'
+  // If viewing tenant detail, current tab is 'tenants'
+  const currentTab: TabValue = isViewingTenantDetail 
+    ? 'tenants' 
+    : (VALID_TABS.includes(tab as TabValue) ? (tab as TabValue) : 'sessions');
+
+  // Redirect to default tab if no tab specified or invalid tab (but not when viewing tenant detail)
+  useEffect(() => {
+    if (!isViewingTenantDetail && (!tab || !VALID_TABS.includes(tab as TabValue))) {
+      navigate('/tech-support/sessions', { replace: true });
+    }
+  }, [tab, navigate, isViewingTenantDetail]);
 
   useEffect(() => {
     getRteHealth().then(setHealth).catch(console.error);
   }, []);
+
+  // Handle tab change
+  const handleTabChange = useCallback((value: string) => {
+    navigate(`/tech-support/${value}`);
+  }, [navigate]);
 
   // Show loading state
   if (isLoading) {
@@ -1574,11 +2705,15 @@ export default function TechSupport() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="sessions" className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid w-full max-w-md grid-cols-4">
+      <Tabs value={currentTab} onValueChange={handleTabChange} className="flex-1 flex flex-col min-h-0">
+        <TabsList className="grid w-full max-w-2xl grid-cols-5">
           <TabsTrigger value="sessions" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Sessions
+          </TabsTrigger>
+          <TabsTrigger value="activity" className="flex items-center gap-2">
+            <History className="h-4 w-4" />
+            Activity
           </TabsTrigger>
           <TabsTrigger value="errors" className="flex items-center gap-2">
             <Bug className="h-4 w-4" />
@@ -1598,6 +2733,10 @@ export default function TechSupport() {
           <SessionsTab />
         </TabsContent>
 
+        <TabsContent value="activity" className="flex-1 mt-6">
+          <ActivityTab />
+        </TabsContent>
+
         <TabsContent value="errors" className="flex-1 mt-6 min-h-0">
           <ErrorsTab />
         </TabsContent>
@@ -1607,7 +2746,11 @@ export default function TechSupport() {
         </TabsContent>
 
         <TabsContent value="tenants" className="flex-1 mt-6">
-          <TenantsTab />
+          {isViewingTenantDetail ? (
+            <TenantDetailTab tenantName={decodeURIComponent(tenantName!)} />
+          ) : (
+            <TenantsTab />
+          )}
         </TabsContent>
       </Tabs>
     </div>

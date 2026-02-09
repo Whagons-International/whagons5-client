@@ -176,6 +176,8 @@ export const HomeRoutes = () => {
 
             {/* Tech Support (Super Admin only) */}
             <Route path="/tech-support" element={<TechSupport />} />
+            <Route path="/tech-support/tenants/:tenantName" element={<TechSupport />} />
+            <Route path="/tech-support/:tab" element={<TechSupport />} />
           </Routes>
         </Suspense>
       </MainLayout>

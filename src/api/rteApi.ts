@@ -509,6 +509,48 @@ export async function deleteTableRow(params: DeleteRowParams): Promise<{ success
 }
 
 /**
+ * Tenant details with statistics
+ */
+export interface TenantDetails {
+  id: number;
+  name: string;
+  domain: string;
+  database: string;
+  connected: boolean;
+  active_sessions: number;
+  stats: {
+    total_users: number;
+    active_users: number;
+    total_tasks: number;
+    total_workspaces: number;
+    total_categories: number;
+    total_teams: number;
+  };
+  recent_errors: number;
+  sessions: RteSession[];
+}
+
+/**
+ * Get detailed tenant information including stats
+ */
+export async function getTenantDetails(tenantName: string): Promise<TenantDetails> {
+  const baseUrl = getRteBaseUrl();
+  const headers = await getAuthHeaders();
+  
+  const response = await fetch(`${baseUrl}/api/telemetry/tenants/${encodeURIComponent(tenantName)}`, {
+    method: 'GET',
+    headers,
+  });
+  
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`RTE API error: ${response.status} - ${error}`);
+  }
+  
+  return response.json();
+}
+
+/**
  * Get RTE base URL (exported for WebSocket connections)
  */
 export { getRteBaseUrl };

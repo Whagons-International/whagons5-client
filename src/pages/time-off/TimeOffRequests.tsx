@@ -7,7 +7,9 @@ import {
   faClock,
   faCheck,
   faTimes,
-  faHourglass
+  faHourglass,
+  faUserCheck,
+  faGavel
 } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import { useDispatch } from "react-redux";
@@ -34,7 +36,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { useLanguage } from "@/providers/LanguageProvider";
 import { genericActions } from "@/store/genericSlices";
-import { TimeOffRequest, TimeOffType, TimeOffBalance } from "@/pages/settings/sub_pages/working-hours/types";
+import { TimeOffRequest, TimeOffType, TimeOffBalance, TimeOffApprovalInstance } from "@/pages/settings/sub_pages/working-hours/types";
+import { decideTimeOffApprovalAndSync } from "@/store/actions/approvalDecisions";
 import dayjs from "dayjs";
 
 interface TimeOffRequestsProps {
@@ -54,6 +57,12 @@ function TimeOffRequests({ userId }: TimeOffRequestsProps) {
   const { value: types } = useSelector(
     (state: RootState) => state.timeOffTypes
   ) as { value: TimeOffType[]; loading: boolean };
+  const { value: approvalInstances } = useSelector(
+    (state: RootState) => state.timeOffApprovalInstances
+  ) as { value: TimeOffApprovalInstance[]; loading: boolean };
+  const { value: users } = useSelector(
+    (state: RootState) => state.users
+  ) as { value: any[]; loading: boolean };
 
   // Filter requests for current user
   const myRequests = useMemo(() => {
@@ -63,6 +72,18 @@ function TimeOffRequests({ userId }: TimeOffRequestsProps) {
       .filter(r => r.user_id === targetUserId)
       .sort((a, b) => dayjs(b.start_date).valueOf() - dayjs(a.start_date).valueOf());
   }, [requests, userId, currentUser?.id]);
+
+  // Requests pending my approval (where I am an approver)
+  const pendingMyApproval = useMemo(() => {
+    if (!currentUser?.id) return [];
+    const myPendingInstanceRequestIds = approvalInstances
+      .filter(i => i.approver_user_id === currentUser.id && i.status === 'pending')
+      .map(i => i.time_off_request_id);
+    
+    return requests
+      .filter(r => myPendingInstanceRequestIds.includes(r.id) && r.status === 'pending')
+      .sort((a, b) => dayjs(b.start_date).valueOf() - dayjs(a.start_date).valueOf());
+  }, [requests, approvalInstances, currentUser?.id]);
 
   // Calculate balances
   const balances = useMemo(() => {
@@ -107,6 +128,15 @@ function TimeOffRequests({ userId }: TimeOffRequestsProps) {
     end_half_day: false,
     reason: ''
   });
+
+  // Decision dialog state
+  const [decisionDialog, setDecisionDialog] = useState<{
+    open: boolean;
+    requestId: number | null;
+    decision: 'approved' | 'rejected' | null;
+  }>({ open: false, requestId: null, decision: null });
+  const [decisionComment, setDecisionComment] = useState('');
+  const [isDeciding, setIsDeciding] = useState(false);
 
   // Reset form
   const resetForm = () => {
@@ -174,13 +204,55 @@ function TimeOffRequests({ userId }: TimeOffRequestsProps) {
     }));
   };
 
+  // Handle approval decision
+  const handleDecision = async () => {
+    if (!decisionDialog.requestId || !decisionDialog.decision) return;
+    setIsDeciding(true);
+    try {
+      await decideTimeOffApprovalAndSync({
+        time_off_request_id: decisionDialog.requestId,
+        decision: decisionDialog.decision,
+        comment: decisionComment || null,
+      });
+      setDecisionDialog({ open: false, requestId: null, decision: null });
+      setDecisionComment('');
+    } catch (err: any) {
+      console.error('Failed to record decision:', err);
+    } finally {
+      setIsDeciding(false);
+    }
+  };
+
+  // Get user name by id
+  const getUserName = (userId: number): string => {
+    const user = users.find(u => u.id === userId);
+    return user?.name || `User #${userId}`;
+  };
+
+  // Get approval instances for a request
+  const getRequestInstances = (requestId: number): TimeOffApprovalInstance[] => {
+    return approvalInstances
+      .filter(i => i.time_off_request_id === requestId)
+      .sort((a, b) => a.order_index - b.order_index);
+  };
+
+  // Check if current user can approve a request
+  const canApprove = (requestId: number): boolean => {
+    if (!currentUser?.id) return false;
+    return approvalInstances.some(
+      i => i.time_off_request_id === requestId &&
+           i.approver_user_id === currentUser.id &&
+           i.status === 'pending'
+    );
+  };
+
   // Status badge
   const getStatusBadge = (status: TimeOffRequest['status']) => {
     const config = {
-      pending: { icon: faHourglass, class: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
-      approved: { icon: faCheck, class: 'bg-green-100 text-green-800', label: 'Approved' },
-      rejected: { icon: faTimes, class: 'bg-red-100 text-red-800', label: 'Rejected' },
-      cancelled: { icon: faTimes, class: 'bg-gray-100 text-gray-600', label: 'Cancelled' }
+      pending: { icon: faHourglass, class: 'bg-yellow-100 text-yellow-800', label: tt('status.pending', 'Pending') },
+      approved: { icon: faCheck, class: 'bg-green-100 text-green-800', label: tt('status.approved', 'Approved') },
+      rejected: { icon: faTimes, class: 'bg-red-100 text-red-800', label: tt('status.rejected', 'Rejected') },
+      cancelled: { icon: faTimes, class: 'bg-gray-100 text-gray-600', label: tt('status.cancelled', 'Cancelled') }
     };
     const c = config[status];
     return (
@@ -188,6 +260,123 @@ function TimeOffRequests({ userId }: TimeOffRequestsProps) {
         <FontAwesomeIcon icon={c.icon} className="h-3 w-3" />
         {c.label}
       </span>
+    );
+  };
+
+  // Approval instance status badge
+  const getInstanceStatusBadge = (status: string) => {
+    const config: Record<string, { class: string; label: string }> = {
+      pending: { class: 'bg-yellow-50 text-yellow-700 border-yellow-200', label: tt('status.pending', 'Pending') },
+      approved: { class: 'bg-green-50 text-green-700 border-green-200', label: tt('status.approved', 'Approved') },
+      rejected: { class: 'bg-red-50 text-red-700 border-red-200', label: tt('status.rejected', 'Rejected') },
+      cancelled: { class: 'bg-gray-50 text-gray-500 border-gray-200', label: tt('status.cancelled', 'Cancelled') },
+    };
+    const c = config[status] || config.pending;
+    return (
+      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] border ${c.class}`}>
+        {c.label}
+      </span>
+    );
+  };
+
+  // Render approval instances for a request
+  const renderApprovalInstances = (requestId: number) => {
+    const instances = getRequestInstances(requestId);
+    if (instances.length === 0) return null;
+
+    return (
+      <div className="mt-2 flex flex-wrap gap-2">
+        {instances.map(instance => (
+          <div key={instance.id} className="flex items-center gap-1 text-xs text-muted-foreground">
+            <FontAwesomeIcon icon={faUserCheck} className="h-3 w-3" />
+            <span>{getUserName(instance.approver_user_id)}</span>
+            {getInstanceStatusBadge(instance.status)}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Render request row
+  const renderRequestRow = (request: TimeOffRequest, showUser = false) => {
+    const type = types.find(t => t.id === request.time_off_type_id);
+    const showApproveReject = canApprove(request.id) && request.status === 'pending';
+
+    return (
+      <div
+        key={request.id}
+        className="flex items-start justify-between p-4 border rounded-lg"
+      >
+        <div className="flex items-start gap-4 flex-1">
+          <div
+            className="w-4 h-4 rounded-full mt-1 shrink-0"
+            style={{ backgroundColor: type?.color || '#6B7280' }}
+          />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              {showUser && (
+                <span className="font-medium">{getUserName(request.user_id)} - </span>
+              )}
+              <span className="font-medium">{type?.name || 'Unknown Type'}</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {dayjs(request.start_date).format('MMM D, YYYY')}
+              {request.start_half_day && ' (PM)'}
+              {' - '}
+              {dayjs(request.end_date).format('MMM D, YYYY')}
+              {request.end_half_day && ' (AM)'}
+              {' · '}
+              {request.total_days} {request.total_days === 1 ? 'day' : 'days'}
+            </p>
+            {request.reason && (
+              <p className="text-sm text-muted-foreground italic mt-1">
+                {request.reason}
+              </p>
+            )}
+            {request.rejection_reason && (
+              <p className="text-sm text-red-600 mt-1">
+                {tt('fields.rejectionReason', 'Reason')}: {request.rejection_reason}
+              </p>
+            )}
+            {renderApprovalInstances(request.id)}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0 ml-4">
+          {getStatusBadge(request.status)}
+          {request.status === 'pending' && request.user_id === currentUser?.id && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-red-500"
+              onClick={() => handleCancelRequest(request.id)}
+            >
+              {tt('actions.cancel', 'Cancel')}
+            </Button>
+          )}
+          {showApproveReject && (
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-green-600 border-green-300 hover:bg-green-50"
+                onClick={() => setDecisionDialog({ open: true, requestId: request.id, decision: 'approved' })}
+              >
+                <FontAwesomeIcon icon={faCheck} className="h-3 w-3 mr-1" />
+                {tt('actions.approve', 'Approve')}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-red-600 border-red-300 hover:bg-red-50"
+                onClick={() => setDecisionDialog({ open: true, requestId: request.id, decision: 'rejected' })}
+              >
+                <FontAwesomeIcon icon={faTimes} className="h-3 w-3 mr-1" />
+                {tt('actions.reject', 'Reject')}
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
     );
   };
 
@@ -230,7 +419,7 @@ function TimeOffRequests({ userId }: TimeOffRequestsProps) {
                     {balance.remaining_days} <span className="text-sm font-normal text-muted-foreground">/ {balance.max_days}</span>
                   </>
                 ) : (
-                  <span className="text-lg">Unlimited</span>
+                  <span className="text-lg">{tt('balance.unlimited', 'Unlimited')}</span>
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -249,7 +438,27 @@ function TimeOffRequests({ userId }: TimeOffRequestsProps) {
         ))}
       </div>
 
-      {/* Requests List */}
+      {/* Pending My Approval */}
+      {pendingMyApproval.length > 0 && (
+        <Card className="border-orange-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-orange-600">
+              <FontAwesomeIcon icon={faGavel} />
+              {tt('approvals.title', 'Pending Your Approval')}
+              <span className="ml-auto text-sm bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+                {pendingMyApproval.length}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {pendingMyApproval.map(request => renderRequestRow(request, true))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* My Requests List */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -264,52 +473,7 @@ function TimeOffRequests({ userId }: TimeOffRequestsProps) {
             </div>
           ) : (
             <div className="space-y-4">
-              {myRequests.map(request => {
-                const type = types.find(t => t.id === request.time_off_type_id);
-                return (
-                  <div
-                    key={request.id}
-                    className="flex items-center justify-between p-4 border rounded-lg"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div
-                        className="w-4 h-4 rounded-full"
-                        style={{ backgroundColor: type?.color || '#6B7280' }}
-                      />
-                      <div>
-                        <p className="font-medium">{type?.name || 'Unknown Type'}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {dayjs(request.start_date).format('MMM D, YYYY')}
-                          {request.start_half_day && ' (PM)'}
-                          {' - '}
-                          {dayjs(request.end_date).format('MMM D, YYYY')}
-                          {request.end_half_day && ' (AM)'}
-                          {' · '}
-                          {request.total_days} {request.total_days === 1 ? 'day' : 'days'}
-                        </p>
-                        {request.reason && (
-                          <p className="text-sm text-muted-foreground italic mt-1">
-                            {request.reason}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      {getStatusBadge(request.status)}
-                      {request.status === 'pending' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-500"
-                          onClick={() => handleCancelRequest(request.id)}
-                        >
-                          {tt('actions.cancel', 'Cancel')}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+              {myRequests.map(request => renderRequestRow(request))}
             </div>
           )}
         </CardContent>
@@ -421,6 +585,77 @@ function TimeOffRequests({ userId }: TimeOffRequestsProps) {
             </Button>
             <Button onClick={handleSubmit} disabled={isSubmitting}>
               {isSubmitting ? tt('actions.submitting', 'Submitting...') : tt('actions.submit', 'Submit Request')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Decision Dialog */}
+      <Dialog open={decisionDialog.open} onOpenChange={(open) => {
+        if (!open) {
+          setDecisionDialog({ open: false, requestId: null, decision: null });
+          setDecisionComment('');
+        }
+      }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>
+              {decisionDialog.decision === 'approved'
+                ? tt('decision.approveTitle', 'Approve Request')
+                : tt('decision.rejectTitle', 'Reject Request')}
+            </DialogTitle>
+            <DialogDescription>
+              {decisionDialog.decision === 'approved'
+                ? tt('decision.approveDesc', 'Are you sure you want to approve this time-off request?')
+                : tt('decision.rejectDesc', 'Please provide a reason for rejecting this request.')}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>
+                {tt('decision.comment', 'Comment')}
+                {decisionDialog.decision === 'rejected' && (
+                  <span className="text-red-500 ml-1">*</span>
+                )}
+              </Label>
+              <Textarea
+                value={decisionComment}
+                onChange={(e) => setDecisionComment(e.target.value)}
+                placeholder={
+                  decisionDialog.decision === 'approved'
+                    ? tt('decision.commentPlaceholderApprove', 'Optional comment...')
+                    : tt('decision.commentPlaceholderReject', 'Reason for rejection...')
+                }
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDecisionDialog({ open: false, requestId: null, decision: null });
+                setDecisionComment('');
+              }}
+            >
+              {tt('actions.cancel', 'Cancel')}
+            </Button>
+            <Button
+              onClick={handleDecision}
+              disabled={isDeciding || (decisionDialog.decision === 'rejected' && !decisionComment.trim())}
+              className={
+                decisionDialog.decision === 'approved'
+                  ? 'bg-green-600 hover:bg-green-700'
+                  : 'bg-red-600 hover:bg-red-700'
+              }
+            >
+              {isDeciding
+                ? tt('actions.processing', 'Processing...')
+                : decisionDialog.decision === 'approved'
+                  ? tt('actions.confirmApprove', 'Approve')
+                  : tt('actions.confirmReject', 'Reject')}
             </Button>
           </DialogFooter>
         </DialogContent>

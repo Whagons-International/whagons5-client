@@ -54,3 +54,48 @@ export async function decideApprovalAndSync(payload: DecideApprovalPayload): Pro
   return data;
 }
 
+// ── Time-Off Request Approval Decisions ──────────────────────────
+
+export interface DecideTimeOffApprovalPayload {
+  time_off_request_id: number;
+  decision: ApprovalDecision;
+  comment?: string | null;
+  approver_user_id?: number | null;
+}
+
+type DecideTimeOffApprovalResponseData = {
+  request?: any;
+  instances?: any[];
+  approval_status?: string;
+};
+
+/**
+ * Record an approval decision on a time-off request and sync local caches.
+ */
+export async function decideTimeOffApprovalAndSync(
+  payload: DecideTimeOffApprovalPayload
+): Promise<DecideTimeOffApprovalResponseData> {
+  const { time_off_request_id, ...body } = payload;
+  const resp = await actionsApi.post(`/time-off-requests/${time_off_request_id}/decide`, body);
+  const data: DecideTimeOffApprovalResponseData = resp?.data?.data ?? {};
+
+  // 1) Update time-off approval instances in IndexedDB
+  const instances = Array.isArray(data?.instances) ? data.instances : [];
+  if (instances.length > 0) {
+    await Promise.all(
+      instances
+        .filter((r) => r && r.id !== undefined && r.id !== null)
+        .map((r) => genericCaches.timeOffApprovalInstances.update(r.id, r))
+    );
+    await syncReduxForTable('wh_time_off_approval_instances');
+  }
+
+  // 2) If the request was updated (approved/rejected), update time-off requests cache
+  if (data?.request && data.request.id !== undefined && data.request.id !== null) {
+    await genericCaches.timeOffRequests.update(data.request.id, data.request);
+    await syncReduxForTable('wh_time_off_requests');
+  }
+
+  return data;
+}
+

@@ -23,6 +23,7 @@ export interface ComboboxOption {
   value: string
   label: string
   description?: string
+  searchExtra?: string // Additional text for search matching (e.g., alias)
 }
 
 export interface GroupedComboboxOptions {
@@ -120,7 +121,7 @@ export function Combobox({
     return (
       <CommandItem
         key={option.value}
-        value={option.label}
+        value={option.searchExtra ? `${option.label} ${option.searchExtra}` : option.label}
         onSelect={() => {
           onValueChange?.(option.value)
           setOpen(false)

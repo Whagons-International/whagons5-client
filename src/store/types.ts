@@ -93,7 +93,7 @@ export interface Category {
 export interface Template {
     id: number;
     name: string;
-    // New canonical columns per migration
+    alias?: string | null;
     category_id: number;
     priority_id: number | null;
     sla_id: number | null;
@@ -175,6 +175,7 @@ export interface Priority {
 export interface Spot {
     id: number;
     name: string;
+    alias?: string | null;
     parent_id?: number | null;
     spot_type_id: number;
     is_branch: boolean;

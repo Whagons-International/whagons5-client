@@ -147,6 +147,7 @@ export function BasicTab(props: any) {
         value: String(tpl.id),
         label: tpl.name,
         description: category ? category.name : undefined,
+        searchExtra: tpl.alias || undefined,
       };
     };
     
@@ -208,6 +209,7 @@ export function BasicTab(props: any) {
     const toOption = (spot: any) => ({
       value: String(spot.id),
       label: spot.name,
+      searchExtra: spot.alias || undefined,
     });
     
     const spotMap = new Map(workspaceSpots.map((s: any) => [s.id, s]));
@@ -424,6 +426,7 @@ export function BasicTab(props: any) {
                     value: String(t.id),
                     label: t.name,
                     description: category ? category.name : undefined,
+                    searchExtra: t.alias || undefined,
                   };
                 })}
                 groupedOptions={templateGroupedOptions}
@@ -560,6 +563,7 @@ export function BasicTab(props: any) {
               options={workspaceSpots.map((s: any) => ({
                 value: String(s.id),
                 label: s.name,
+                searchExtra: s.alias || undefined,
               }))}
               groupedOptions={spotGroupedOptions}
               favoriteValues={spotFavoriteValues}

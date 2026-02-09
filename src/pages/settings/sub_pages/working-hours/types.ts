@@ -206,6 +206,26 @@ export interface TimeOffType {
   updated_at: string;
 }
 
+export interface TimeOffApprovalInstance {
+  id: number;
+  time_off_request_id: number;
+  approval_id: number | null;
+  approver_user_id: number;
+  source_approver_id: number;
+  order_index: number;
+  is_required: boolean;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  notified_at: string | null;
+  responded_at: string | null;
+  response_comment: string | null;
+  approver_user?: {
+    id: number;
+    name: string;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
 export interface TimeOffRequest {
   id: number;
   user_id: number;
@@ -227,6 +247,7 @@ export interface TimeOffRequest {
     email: string;
   };
   time_off_type?: TimeOffType;
+  approval_instances?: TimeOffApprovalInstance[];
   created_at: string;
   updated_at: string;
 }

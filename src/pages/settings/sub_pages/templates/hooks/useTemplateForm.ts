@@ -6,6 +6,7 @@ import { genericActions } from "@/store/genericSlices";
 
 const initialFormData: TemplateFormData = {
   name: '',
+  alias: '',
   description: '',
   instructions: '',
   category_id: '',
@@ -77,6 +78,7 @@ export function useTemplateForm(
 
       setEditFormData({
         name: editingTemplate.name || '',
+        alias: (editingTemplate as any).alias || '',
         description: (editingTemplate as any).description || '',
         instructions: (editingTemplate as any).instructions || '',
         category_id: categoryId?.toString() || '',

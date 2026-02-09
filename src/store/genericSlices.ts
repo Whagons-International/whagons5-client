@@ -37,7 +37,7 @@ const genericSliceConfigs = [
     // Reference Tables
     { name: 'statuses', table: 'wh_statuses', endpoint: '/statuses', store: 'statuses', hashFields: ['id','name','action','color','icon','system','initial','updated_at'] },
     { name: 'priorities', table: 'wh_priorities', endpoint: '/priorities', store: 'priorities', hashFields: ['id','name','color','category_id','updated_at'] },
-    { name: 'spots', table: 'wh_spots', endpoint: '/spots', store: 'spots', hashFields: ['id','name','parent_id','spot_type_id','is_branch','updated_at'] },
+    { name: 'spots', table: 'wh_spots', endpoint: '/spots', store: 'spots', hashFields: ['id','name','alias','parent_id','spot_type_id','is_branch','updated_at'] },
     { name: 'tags', table: 'wh_tags', endpoint: '/tags', store: 'tags', hashFields: ['id','name','color','icon','category_id','updated_at'] },
     { name: 'spotTypes', table: 'wh_spot_types', endpoint: '/spot-types', store: 'spot_types', hashFields: ['id','name','color','updated_at'] },
     { name: 'statusTransitions', table: 'wh_status_transitions', endpoint: '/status-transitions', store: 'status_transitions', hashFields: ['id','status_transition_group_id','from_status','to_status','initial','updated_at'] },
@@ -77,7 +77,7 @@ const genericSliceConfigs = [
     { name: 'categoryCustomFields', table: 'wh_category_custom_field', endpoint: '/category-custom-fields', store: 'category_custom_fields', hashFields: ['id','field_id','category_id','is_required','order','default_value','updated_at'] },
     { name: 'customFields', table: 'wh_custom_fields', endpoint: '/custom-fields', store: 'custom_fields', hashFields: ['id','name','field_type','options','validation_rules','updated_at'] },
     { name: 'teams', table: 'wh_teams', endpoint: '/teams', store: 'teams', hashFields: ['id','name','description','color','icon','is_active','parent_team_id','team_lead_id','updated_at'] },
-    { name: 'templates', table: 'wh_templates', endpoint: '/templates', store: 'templates', hashFields: ['id','name','description','instructions','category_id','priority_id','sla_id','approval_id','default_spot_id','spots_not_applicable','expected_duration','default_user_ids','form_id','enabled','is_private','updated_at'] },
+    { name: 'templates', table: 'wh_templates', endpoint: '/templates', store: 'templates', hashFields: ['id','name','alias','description','instructions','category_id','priority_id','sla_id','approval_id','default_spot_id','spots_not_applicable','expected_duration','default_user_ids','form_id','enabled','is_private','updated_at'] },
     { name: 'messages', table: 'wh_messages', endpoint: '/messages', store: 'messages', hashFields: ['id','title','content','workspace_id','team_id','spot_id','created_by','starts_at','ends_at','is_pinned','updated_at'] },
     { name: 'workflows', table: 'wh_workflows', endpoint: '/workflows', store: 'workflows', hashFields: ['id','name','description','workspace_id','is_active','current_version_id','created_by','updated_by','activated_at','updated_at'] },
     { name: 'workspaces', table: 'wh_workspaces', endpoint: '/workspaces', store: 'workspaces', hashFields: ['id','name','description','color','icon','teams','view_modes','allow_ad_hoc_tasks','type','category_id','spots','created_by','updated_at'] },
@@ -120,6 +120,8 @@ const genericSliceConfigs = [
     { name: 'scheduleAssignments', table: 'wh_schedule_assignments', endpoint: '/schedule-assignments', store: 'schedule_assignments', hashFields: ['id','working_schedule_id','assignable_type','assignable_id','priority','effective_from','effective_to','is_active','created_by','updated_at'] },
     { name: 'timeOffTypes', table: 'wh_time_off_types', endpoint: '/time-off-types', store: 'time_off_types', hashFields: ['id','name','code','description','color','requires_approval','approval_id','max_days_per_year','is_paid','is_active','updated_at'] },
     { name: 'timeOffRequests', table: 'wh_time_off_requests', endpoint: '/time-off-requests', store: 'time_off_requests', hashFields: ['id','user_id','time_off_type_id','start_date','end_date','start_half_day','end_half_day','total_days','reason','status','approved_by','approved_at','rejection_reason','created_by','updated_at'] },
+    { name: 'timeOffApprovalInstances', table: 'wh_time_off_approval_instances', endpoint: '/time-off-approval-instances', store: 'time_off_approval_instances', hashFields: ['id','time_off_request_id','approval_id','approver_user_id','source_approver_id','order_index','is_required','status','notified_at','responded_at','response_comment','updated_at'] },
+    { name: 'timeOffApprovalDecisions', table: 'wh_time_off_approval_decisions', endpoint: '/time-off-approval-decisions', store: 'time_off_approval_decisions', hashFields: ['id','time_off_request_id','approval_id','approver_user_id','decided_by_user_id','decision','comment','updated_at'] },
 
     // Asset Management Plugin
     { name: 'assetTypes', table: 'wh_asset_types', endpoint: '/asset-types', store: 'asset_types', hashFields: ['id','name','color','icon','updated_at'] },

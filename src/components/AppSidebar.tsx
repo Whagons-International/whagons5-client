@@ -275,7 +275,7 @@ export const togglePluginEnabled = (pluginId: string) => {
 export const togglePluginPinned = (pluginId: string) => {
   const configs = getPluginsConfig();
   const updated = configs.map(p => 
-    p.id === pluginId ? { ...p, pinned: !p.pinned } : p
+    p.id === pluginId ? { ...p, pinned: !p.pinned, enabled: true } : p
   );
   setPluginsConfig(updated);
 };
@@ -805,8 +805,8 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   // Also filter out plugins that are not enabled in the backend
   const pinnedPlugins = useMemo(() => {
     const pinned = pluginsConfig.filter(p => {
-      // Must be enabled in UI config AND pinned
-      if (!p.enabled || !p.pinned) return false;
+      // Must be pinned to show in sidebar
+      if (!p.pinned) return false;
       
       // Exclude boards and activity from drag-and-drop ordering
       if (p.id === 'boards' || p.id === 'activity') return false;
@@ -836,12 +836,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   // Plugins that are not visible in sidebar (pinned=false) are not shown anywhere
   const unpinnedPlugins: PluginConfig[] = [];
 
-  // Check if boards plugin is enabled and pinned
-  const boardsPluginEnabled = useMemo(() => {
-    const boardsPlugin = pluginsConfig.find(p => p.id === 'boards');
-    return boardsPlugin?.enabled ?? false;
-  }, [pluginsConfig]);
-  
+  // Check if boards plugin is pinned
   const boardsPluginPinned = useMemo(() => {
     const boardsPlugin = pluginsConfig.find(p => p.id === 'boards');
     return boardsPlugin?.pinned ?? false;
@@ -950,8 +945,8 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
               showEverythingButton={true}
             />
             
-            {/* Boards section - shown below workspaces if boards plugin is enabled AND pinned */}
-            {boardsPluginEnabled && boardsPluginPinned && (
+            {/* Boards section - shown below workspaces if boards plugin is pinned */}
+            {boardsPluginPinned && (
               <AppSidebarBoards
                 boards={boards}
                 pathname={pathname}

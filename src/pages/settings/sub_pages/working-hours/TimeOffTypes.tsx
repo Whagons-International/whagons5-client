@@ -1,13 +1,10 @@
 import { useMemo, useState } from "react";
-import { useSelector } from "react-redux";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faUmbrellaBeach,
   faPlus,
-  faChartBar,
   faCircleInfo
 } from "@fortawesome/free-solid-svg-icons";
-import { RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import {
@@ -33,6 +30,8 @@ function TimeOffTypes() {
     filteredItems,
     loading,
     error,
+    searchQuery,
+    setSearchQuery,
     createItem,
     updateItem,
     deleteItem,
@@ -219,34 +218,27 @@ function TimeOffTypes() {
     setIsEditDialogOpen(false);
   };
 
-  // Stats
-  const stats = useMemo(() => [
-    {
-      label: tt('stats.total', 'Total Types'),
-      value: types.length,
-      icon: faUmbrellaBeach,
-      color: 'text-blue-500'
-    },
-    {
-      label: tt('stats.active', 'Active'),
-      value: types.filter(t => t.is_active).length,
-      icon: faChartBar,
-      color: 'text-green-500'
-    }
-  ], [types, tt]);
-
   return (
     <SettingsLayout
-      title={tt('title', 'Time-Off Types')}
-      description={tt('description', 'Configure time-off categories like vacation, sick leave, etc.')}
+      title={tt('title', 'Absence Categories')}
+      description={tt('description', 'Configure absence categories like vacation, sick leave, etc.')}
       icon={faUmbrellaBeach}
-      stats={stats}
-      onSearch={() => {}}
-      searchPlaceholder={tt('search', 'Search time-off types...')}
-      actions={
+      statistics={{
+        title: tt('stats.title', 'Statistics'),
+        items: [
+          { label: tt('stats.total', 'Total Categories'), value: String(types.length) },
+          { label: tt('stats.active', 'Active'), value: String(types.filter(t => t.is_active).length) }
+        ]
+      }}
+      search={{
+        placeholder: tt('search', 'Search absence categories...'),
+        value: searchQuery,
+        onChange: setSearchQuery
+      }}
+      headerActions={
         <Button onClick={() => setIsCreateDialogOpen(true)}>
           <FontAwesomeIcon icon={faPlus} className="mr-2" />
-          {tt('actions.create', 'Create Type')}
+          {tt('actions.create', 'Create Category')}
         </Button>
       }
     >

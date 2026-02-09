@@ -109,6 +109,11 @@ export function BasicTab(props: any) {
     tags,
     selectedTagIds,
     setSelectedTagIds,
+    // Assets
+    assetItems,
+    assetTypes,
+    assetId,
+    setAssetId,
     // Date and recurrence fields (only shown when from scheduler)
     isFromScheduler,
     startDate,
@@ -142,6 +147,7 @@ export function BasicTab(props: any) {
         value: String(tpl.id),
         label: tpl.name,
         description: category ? category.name : undefined,
+        searchExtra: tpl.alias || undefined,
       };
     };
     
@@ -203,6 +209,7 @@ export function BasicTab(props: any) {
     const toOption = (spot: any) => ({
       value: String(spot.id),
       label: spot.name,
+      searchExtra: spot.alias || undefined,
     });
     
     const spotMap = new Map(workspaceSpots.map((s: any) => [s.id, s]));
@@ -273,6 +280,22 @@ export function BasicTab(props: any) {
     
     return { favorites, recent, all: tags };
   }, [currentWorkspace?.id, tags, history]);
+
+  // Build options for assets (simple list, no favorites/recent for now)
+  const assetOptions = useMemo(() => {
+    if (!assetItems?.length) return [];
+    const typeMap = new Map((assetTypes || []).map((t: any) => [t.id, t]));
+    return assetItems
+      .filter((a: any) => a.status === 'active') // Only show active assets
+      .map((asset: any) => {
+        const assetType = typeMap.get(asset.asset_type_id);
+        return {
+          value: String(asset.id),
+          label: asset.name,
+          description: assetType?.name || undefined,
+        };
+      });
+  }, [assetItems, assetTypes]);
 
   // Favorite handlers
   const handleTemplateToggleFavorite = useCallback((value: string) => {
@@ -403,6 +426,7 @@ export function BasicTab(props: any) {
                     value: String(t.id),
                     label: t.name,
                     description: category ? category.name : undefined,
+                    searchExtra: t.alias || undefined,
                   };
                 })}
                 groupedOptions={templateGroupedOptions}
@@ -539,6 +563,7 @@ export function BasicTab(props: any) {
               options={workspaceSpots.map((s: any) => ({
                 value: String(s.id),
                 label: s.name,
+                searchExtra: s.alias || undefined,
               }))}
               groupedOptions={spotGroupedOptions}
               favoriteValues={spotFavoriteValues}
@@ -577,6 +602,24 @@ export function BasicTab(props: any) {
           />
         </div>
       </div>
+
+      {/* Asset */}
+      {assetOptions.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <Label className="text-sm font-medium font-[500] text-foreground">{t('taskDialog.asset', 'Asset')}</Label>
+          <div className="[&_button]:border [&_button]:border-border [&_button]:bg-background [&_button]:rounded-[10px] [&_button]:text-sm [&_button]:text-foreground [&_button]:transition-all [&_button]:duration-150 [&_button:hover]:border-border/70 [&_button]:focus-visible:border-primary [&_button]:focus-visible:ring-[3px] [&_button]:focus-visible:ring-ring [&_button]:focus-visible:bg-background">
+            <Combobox
+              options={assetOptions}
+              value={assetId ? String(assetId) : undefined}
+              onValueChange={(v) => setAssetId?.(v ? parseInt(v, 10) : null)}
+              placeholder={t('taskDialog.selectAsset', 'Select asset (optional)')}
+              searchPlaceholder={t('taskDialog.searchAssets', 'Search assets...')}
+              emptyText={t('taskDialog.noAssetsFound', 'No assets found.')}
+              className="w-full"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Priority and Tags - Same line */}
       {(mode === 'create' || mode === 'edit') && tags ? (

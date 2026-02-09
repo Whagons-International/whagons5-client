@@ -22,6 +22,8 @@ const SharedWithMe = lazy(() => import('@/pages/shared/SharedWithMe'));
 const BroadcastsPage = lazy(() => import('@/pages/broadcasts/BroadcastsPage'));
 const ActivityMonitor = lazy(() => import('@/pages/activity/ActivityMonitor'));
 const GamificationComingSoon = lazy(() => import('@/pages/gamification/GamificationComingSoon'));
+const GamificationLeaderboard = lazy(() => import('@/pages/gamification/Leaderboard'));
+const GamificationHistory = lazy(() => import('@/pages/gamification/PointHistory'));
 const AnalyticsComingSoon = lazy(() => import('@/pages/analytics/AnalyticsComingSoon'));
 const MotivationComingSoon = lazy(() => import('@/pages/motivation/MotivationComingSoon'));
 const HotelAnalytics = lazy(() => import('@/pages/hotel-analytics/HotelAnalytics'));
@@ -123,7 +125,8 @@ export const HomeRoutes = () => {
             <Route path="/boards/:boardId" element={<BoardDetail />} />
             <Route path="/broadcasts" element={<BroadcastsPage />} />
             <Route path="/activity" element={<ActivityMonitor />} />
-            <Route path="/gamification" element={<GamificationComingSoon />} />
+            <Route path="/gamification" element={<Suspense fallback={null}><PluginGuard pluginSlug="gamification"><GamificationLeaderboard /></PluginGuard></Suspense>} />
+            <Route path="/gamification/history" element={<Suspense fallback={null}><PluginGuard pluginSlug="gamification"><GamificationHistory /></PluginGuard></Suspense>} />
             <Route path="/analytics" element={<AnalyticsComingSoon />} />
             <Route path="/motivation" element={<MotivationComingSoon />} />
             <Route path="/hotel-analytics" element={<HotelAnalytics />} />

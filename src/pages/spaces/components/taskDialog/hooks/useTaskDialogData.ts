@@ -24,6 +24,8 @@ export function useTaskDialogData() {
   const { value: categoryCustomFields = [] } = useSelector((s: RootState) => (s as any).categoryCustomFields || { value: [] });
   const { value: taskCustomFieldValues = [] } = useSelector((s: RootState) => (s as any).taskCustomFieldValues || { value: [] });
   const { value: userTeams = [] } = useSelector((s: RootState) => (s as any).userTeams || { value: [] });
+  const { value: assetItems = [] } = useSelector((s: RootState) => (s as any).assetItems || { value: [] });
+  const { value: assetTypes = [] } = useSelector((s: RootState) => (s as any).assetTypes || { value: [] });
   
   const { user } = useAuth();
 
@@ -76,6 +78,8 @@ export function useTaskDialogData() {
     categoryCustomFields,
     taskCustomFieldValues,
     userTeams,
+    assetItems,
+    assetTypes,
     user,
     userTeamIds,
     approvalMap,

@@ -16,6 +16,8 @@ export interface ColumnBuilderOptions {
   getUsersFromIds: (ids: any[], userMap: Record<number, any>) => any[];
   spotMap: Record<number, any>;
   spotsLoaded: boolean;
+  assetMap: Record<number, any>;
+  assetsLoaded: boolean;
   userMap: Record<number, any>;
   groupField?: string;
   showDescriptions: boolean;

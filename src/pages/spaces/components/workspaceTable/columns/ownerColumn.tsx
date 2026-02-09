@@ -72,8 +72,8 @@ export function createOwnerColumn(opts: ColumnBuilderOptions) {
       const node = (
         <div className="flex items-center h-full py-1 gap-2">
           <div className="flex items-center -space-x-1.5">
-            {displayUsers.map((user: any) => (
-              <HoverPopover key={user.id} content={(
+            {displayUsers.map((user: any, index: number) => (
+              <HoverPopover key={`${user.id}-${index}`} content={(
                 <div className="flex flex-col items-center gap-3">
                   <Avatar className="h-16 w-16 border-2 border-background">
                     <UserInitial user={user} getUserDisplayName={getUserDisplayName} />

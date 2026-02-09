@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
-import { useDispatch } from 'react-redux';
+import React, { useState, lazy, Suspense } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Wrench, Calendar, AlertTriangle, Clock } from 'lucide-react';
+import { Plus, Wrench, Calendar, AlertTriangle, Clock, ClipboardList } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { genericActions } from '@/store/genericSlices';
 import { MaintenanceScheduleForm } from './MaintenanceScheduleForm';
 import { MaintenanceLogForm } from './MaintenanceLogForm';
-import type { AssetMaintenanceSchedule, AssetMaintenanceLog } from '@/store/types';
-import type { AppDispatch } from '@/store/store';
+import type { AssetMaintenanceSchedule, AssetMaintenanceLog, AssetItem } from '@/store/types';
+import type { AppDispatch, RootState } from '@/store/store';
+
+// Lazy load TaskDialog
+const TaskDialog = lazy(() => import('@/pages/spaces/components/TaskDialog'));
 
 interface MaintenanceTabProps {
     assetItemId: number;
@@ -39,6 +42,18 @@ export const MaintenanceTab = ({ assetItemId, schedules, logs, teams, users }: M
     const [editingSchedule, setEditingSchedule] = useState<AssetMaintenanceSchedule | null>(null);
     const [logFormOpen, setLogFormOpen] = useState(false);
     const [logScheduleId, setLogScheduleId] = useState<number | null>(null);
+    const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
+    const [selectedScheduleForTask, setSelectedScheduleForTask] = useState<AssetMaintenanceSchedule | null>(null);
+
+    // Get asset info for task creation
+    const asset = useSelector((state: RootState) =>
+        ((state as any).assetItems?.value || []).find((a: AssetItem) => a.id === assetItemId)
+    );
+
+    const handleCreateTaskFromSchedule = (schedule: AssetMaintenanceSchedule) => {
+        setSelectedScheduleForTask(schedule);
+        setCreateTaskDialogOpen(true);
+    };
 
     const handleCreateSchedule = async (data: any) => {
         await dispatch(genericActions.assetMaintenanceSchedules.addAsync(data) as any);
@@ -137,6 +152,16 @@ export const MaintenanceTab = ({ assetItemId, schedules, logs, teams, users }: M
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 ml-2">
+                                        {isOverdue(schedule) && (
+                                            <Button
+                                                variant="default"
+                                                size="sm"
+                                                onClick={() => handleCreateTaskFromSchedule(schedule)}
+                                            >
+                                                <ClipboardList className="h-3 w-3 mr-1" />
+                                                {t('assets.maintenance.createTask', 'Create Task')}
+                                            </Button>
+                                        )}
                                         <Button
                                             variant="outline"
                                             size="sm"
@@ -238,6 +263,21 @@ export const MaintenanceTab = ({ assetItemId, schedules, logs, teams, users }: M
                 scheduleId={logScheduleId}
                 users={users}
             />
+
+            {/* Create Task from Maintenance Schedule */}
+            <Suspense fallback={null}>
+                <TaskDialog
+                    open={createTaskDialogOpen}
+                    onOpenChange={setCreateTaskDialogOpen}
+                    mode="create"
+                    task={selectedScheduleForTask && asset ? {
+                        asset_id: assetItemId,
+                        name: `${t('assets.maintenance.maintenanceTask', 'Maintenance')}: ${asset.name} - ${selectedScheduleForTask.title}`,
+                        description: selectedScheduleForTask.description || null,
+                        spot_id: asset.spot_id,
+                    } : undefined}
+                />
+            </Suspense>
         </div>
     );
 };

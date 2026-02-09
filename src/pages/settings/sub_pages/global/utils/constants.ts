@@ -444,6 +444,23 @@ export const MOTIVATIONAL_QUOTES: Record<string, string[]> = {
     "El éxito no te encuentra. Tienes que salir y conseguirlo.",
     "Cuanto más trabajes por algo, mayor será la satisfacción cuando lo logres.",
   ],
+  pt: [
+    "O sucesso não é final, o fracasso não é fatal: é a coragem de continuar que conta.",
+    "A única forma de fazer um grande trabalho é amar o que você faz.",
+    "A inovação distingue um líder de um seguidor.",
+    "O futuro pertence àqueles que acreditam na beleza de seus sonhos.",
+    "A excelência não é uma habilidade, é uma atitude.",
+    "Não observe o relógio; faça o que ele faz. Continue.",
+    "O único limite para nossa realização de amanhã serão nossas dúvidas de hoje.",
+    "O sucesso geralmente vem para aqueles que estão muito ocupados para procurá-lo.",
+    "A maneira de começar é parar de falar e começar a fazer.",
+    "Inovação é a capacidade de ver a mudança como uma oportunidade, não como uma ameaça.",
+    "Sua limitação é apenas sua imaginação.",
+    "Grandes coisas nunca vêm das zonas de conforto.",
+    "Sonhe. Deseje. Faça.",
+    "O sucesso não apenas te encontra. Você tem que sair e conseguir.",
+    "Quanto mais você trabalha por algo, maior será a satisfação quando conseguir.",
+  ],
 };
 
 // Helper function to get quotes for a specific language (defaults to English)

@@ -12,6 +12,8 @@ import { Plus, QrCode, Search, LayoutGrid, List, ExternalLink, Eye, BarChart3, C
 import { useLanguage } from '@/providers/LanguageProvider';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import toast from 'react-hot-toast';
+import { GenerateQrCodeModal } from './GenerateQrCodeModal';
+import { QrCodeDetailModal } from './QrCodeDetailModal';
 
 interface QrCodeItem {
     id: number;
@@ -37,8 +39,10 @@ interface QrCodeItem {
 const entityTypeLabels: Record<string, { label: string; color: string }> = {
     spot: { label: 'Spot', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
     task: { label: 'Task', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' },
+    workspace: { label: 'Workspace', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400' },
     form: { label: 'Form', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' },
     document: { label: 'Document', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' },
+    template: { label: 'Template', color: 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400' },
     asset: { label: 'Asset', color: 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-400' },
 };
 
@@ -58,11 +62,47 @@ export const QrCodesPage = () => {
         (state: RootState) => (state as any).qrCodes || { value: [], loading: false }
     );
 
+    // Get entities from Redux store for name resolution
+    const spots = useSelector((state: RootState) => state.spots?.value || []);
+    const tasks = useSelector((state: RootState) => state.tasks?.value || []);
+    const workspaces = useSelector((state: RootState) => state.workspaces?.value || []);
+    const forms = useSelector((state: RootState) => state.forms?.value || []);
+    const documents = useSelector((state: RootState) => state.documents?.value || []);
+    const templates = useSelector((state: RootState) => state.templates?.value || []);
+
+    // Helper function to get entity name by type and ID
+    const getEntityName = useMemo(() => {
+        const entityMaps: Record<string, Map<number, string>> = {
+            spot: new Map(spots.map((s: any) => [s.id, s.name])),
+            task: new Map(tasks.map((t: any) => [t.id, t.name || `Task #${t.id}`])),
+            workspace: new Map(workspaces.map((w: any) => [w.id, w.name])),
+            form: new Map(forms.map((f: any) => [f.id, f.name])),
+            document: new Map(documents.map((d: any) => [d.id, d.title || d.name || `Document #${d.id}`])),
+            template: new Map(templates.map((t: any) => [t.id, t.name])),
+        };
+
+        return (entityType: string, entityId: number): string => {
+            const map = entityMaps[entityType];
+            if (map) {
+                return map.get(entityId) || `#${entityId}`;
+            }
+            return `#${entityId}`;
+        };
+    }, [spots, tasks, workspaces, forms, documents, templates]);
+
     // Local state
     const [search, setSearch] = useState('');
     const [entityTypeFilter, setEntityTypeFilter] = useState('all');
     const [statusFilter, setStatusFilter] = useState('all');
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedQrCode, setSelectedQrCode] = useState<QrCodeItem | null>(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+    const handleQrCodeClick = (qr: QrCodeItem) => {
+        setSelectedQrCode(qr);
+        setIsDetailModalOpen(true);
+    };
 
     // Fetch data on mount
     useEffect(() => {
@@ -243,7 +283,7 @@ export const QrCodesPage = () => {
                     </div>
                 </div>
                 <div className="flex gap-2 ml-4">
-                    <Button size="sm" disabled>
+                    <Button size="sm" onClick={() => setIsModalOpen(true)}>
                         <Plus className="h-4 w-4 mr-1" />
                         {t('qrCodes.generate', 'Generate QR Code')}
                     </Button>
@@ -269,7 +309,7 @@ export const QrCodesPage = () => {
                     {filteredQrCodes.map((qr: QrCodeItem) => {
                         const entityInfo = entityTypeLabels[qr.entity_type] || { label: qr.entity_type, color: 'bg-gray-100 text-gray-800' };
                         return (
-                            <Card key={qr.id} className="group hover:shadow-md transition-shadow cursor-pointer">
+                            <Card key={qr.id} className="group hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleQrCodeClick(qr)}>
                                 <CardHeader className="pb-2">
                                     <div className="flex items-start justify-between">
                                         <div className="flex items-center gap-2">
@@ -288,8 +328,8 @@ export const QrCodesPage = () => {
                                         <Badge className={`border-0 text-xs ${entityInfo.color}`}>
                                             {entityInfo.label}
                                         </Badge>
-                                        <span className="text-xs text-muted-foreground">
-                                            #{qr.entity_id}
+                                        <span className="text-xs text-muted-foreground truncate max-w-[150px]" title={getEntityName(qr.entity_type, qr.entity_id)}>
+                                            {getEntityName(qr.entity_type, qr.entity_id)}
                                         </span>
                                     </div>
                                     {qr.description && (
@@ -316,9 +356,8 @@ export const QrCodesPage = () => {
                                             variant="ghost"
                                             size="icon"
                                             className="h-7 w-7"
-                                            title={t('qrCodes.download', 'Download')}
-                                            onClick={(e) => { e.stopPropagation(); }}
-                                            disabled
+                                            title={t('qrCodes.viewQrCode', 'View QR Code')}
+                                            onClick={(e) => { e.stopPropagation(); handleQrCodeClick(qr); }}
                                         >
                                             <Download className="h-3 w-3" />
                                         </Button>
@@ -348,7 +387,7 @@ export const QrCodesPage = () => {
                             {filteredQrCodes.map((qr: QrCodeItem) => {
                                 const entityInfo = entityTypeLabels[qr.entity_type] || { label: qr.entity_type, color: 'bg-gray-100 text-gray-800' };
                                 return (
-                                    <TableRow key={qr.id} className="cursor-pointer">
+                                    <TableRow key={qr.id} className="cursor-pointer" onClick={() => handleQrCodeClick(qr)}>
                                         <TableCell className="font-medium">
                                             <div className="flex items-center gap-2">
                                                 <QrCode className="h-4 w-4 text-cyan-500 flex-shrink-0" />
@@ -356,9 +395,14 @@ export const QrCodesPage = () => {
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge className={`border-0 text-xs ${entityInfo.color}`}>
-                                                {entityInfo.label} #{qr.entity_id}
-                                            </Badge>
+                                            <div className="flex flex-col gap-0.5">
+                                                <Badge className={`border-0 text-xs w-fit ${entityInfo.color}`}>
+                                                    {entityInfo.label}
+                                                </Badge>
+                                                <span className="text-xs text-muted-foreground truncate max-w-[200px]" title={getEntityName(qr.entity_type, qr.entity_id)}>
+                                                    {getEntityName(qr.entity_type, qr.entity_id)}
+                                                </span>
+                                            </div>
                                         </TableCell>
                                         <TableCell className="text-muted-foreground text-sm">
                                             {actionLabels[qr.action] || qr.action}
@@ -398,6 +442,17 @@ export const QrCodesPage = () => {
                     </Table>
                 </div>
             )}
+
+            <GenerateQrCodeModal
+                open={isModalOpen}
+                onOpenChange={setIsModalOpen}
+            />
+
+            <QrCodeDetailModal
+                open={isDetailModalOpen}
+                onOpenChange={setIsDetailModalOpen}
+                qrCode={selectedQrCode}
+            />
         </PageContainer>
     );
 };

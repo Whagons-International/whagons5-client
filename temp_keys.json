@@ -1,0 +1,42 @@
+[
+  {
+    "key": "common.loading",
+    "value": "Loading..."
+  },
+  {
+    "key": "common.back",
+    "value": "Back"
+  },
+  {
+    "key": "common.unknown",
+    "value": "Unknown"
+  },
+  {
+    "key": "common.cancel",
+    "value": "Cancel"
+  },
+  {
+    "key": "common.save",
+    "value": "Save"
+  },
+  {
+    "key": "common.create",
+    "value": "Create"
+  },
+  {
+    "key": "common.update",
+    "value": "Update"
+  },
+  {
+    "key": "common.delete",
+    "value": "Delete"
+  },
+  {
+    "key": "common.creating",
+    "value": "Creating..."
+  },
+  {
+    "key": "common.updating",
+    "value": "Updating..."
+  }
+]

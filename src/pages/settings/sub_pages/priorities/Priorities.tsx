@@ -2,10 +2,11 @@ import { useMemo, useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowUpWideShort, faPlus, faChartBar, faGlobe, faTags, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faArrowUpWideShort, faPlus, faGlobe, faChartBar, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { RootState } from "@/store/store";
 import type { Priority } from "@/store/types";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { UrlTabs } from "@/components/ui/url-tabs";
 import {
   SettingsLayout,
@@ -31,12 +32,9 @@ function Priorities() {
   const { value: categories } = useSelector((state: RootState) => state.categories);
 
   const {
-    filteredItems,
     loading,
     error,
     searchQuery,
-    setSearchQuery,
-    handleSearch,
     createItem,
     updateItem,
     deleteItem,
@@ -100,15 +98,16 @@ function Priorities() {
     }
   }, [editingItem]);
 
-  // Separate global and category priorities
-  const globalPriorities = useMemo(() => {
-    return (priorities as any[]).filter((p: any) => p.category_id === null || p.category_id === undefined);
+  // Count global vs category priorities
+  const globalCount = useMemo(() => {
+    return (priorities as any[]).filter((p: any) => p.category_id === null || p.category_id === undefined).length;
   }, [priorities]);
 
-  const categoryPriorities = useMemo(() => {
-    return (priorities as any[]).filter((p: any) => p.category_id !== null && p.category_id !== undefined);
+  const categoryCount = useMemo(() => {
+    return (priorities as any[]).filter((p: any) => p.category_id !== null && p.category_id !== undefined).length;
   }, [priorities]);
 
+  // Priorities grouped by category (for statistics)
   const prioritiesByCategory = useMemo(() => {
     const counts = new Map<number, number>();
     (priorities as any[]).forEach((p: any) => {
@@ -130,17 +129,8 @@ function Priorities() {
       .sort((a, b) => b.count - a.count);
   }, [priorities, categories]);
 
-  const globalColumns = useMemo<ColDef[]>(() => [
-    {
-      field: "name",
-      headerName: "Priority",
-      flex: 2,
-      minWidth: 200,
-      cellRenderer: PriorityNameCellRenderer
-    }
-  ], []);
-
-  const categoryColumns = useMemo<ColDef[]>(() => [
+  // Unified columns for all priorities
+  const columns = useMemo<ColDef[]>(() => [
     {
       field: "name",
       headerName: "Priority",
@@ -149,26 +139,29 @@ function Priorities() {
       cellRenderer: PriorityNameCellRenderer
     },
     {
-      colId: "category_name",
-      headerName: "Category",
-      flex: 2,
-      minWidth: 200,
-      rowGroup: true,
-      rowGroupIndex: 0,
+      colId: "scope",
+      headerName: "Scope",
+      flex: 1.5,
+      minWidth: 180,
       valueGetter: (params: any) => {
         const catId = params.data?.category_id as number | null | undefined;
-        if (!catId) return 'Unassigned';
+        if (!catId) return 'Global';
         const cat = (categories as any[])?.find((c: any) => c.id === Number(catId));
-        return cat?.name || 'Unassigned';
+        return cat?.name || 'Unknown Category';
       },
       cellRenderer: (params: ICellRendererParams) => {
         const catId = params.data?.category_id as number | null | undefined;
         if (!catId) {
-          return <span className="text-muted-foreground">Unassigned</span>;
+          return (
+            <div className="flex items-center gap-2 h-full">
+              <FontAwesomeIcon icon={faGlobe} className="w-3.5 h-3.5 text-blue-500" />
+              <span className="text-sm font-medium text-blue-700 dark:text-blue-400">Global</span>
+            </div>
+          );
         }
         const cat = (categories as any[])?.find((c: any) => c.id === Number(catId));
         if (!cat) {
-          return <span className="text-muted-foreground">Unassigned</span>;
+          return <span className="text-muted-foreground text-sm">Unknown</span>;
         }
         return (
           <ColorIndicatorCellRenderer value={cat.name} name={cat.name} color={cat.color || "#6b7280"} />
@@ -179,6 +172,22 @@ function Priorities() {
       filter: true
     }
   ], [categories]);
+
+  // Filter and sort priorities: globals first, then category priorities
+  const filteredPriorities = useMemo(() => {
+    let list = priorities as any[];
+    if (searchQuery) {
+      list = list.filter((item: Priority) =>
+        item.name?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    // Sort: global priorities (no category_id) first, then the rest
+    return [...list].sort((a, b) => {
+      const aIsGlobal = a.category_id === null || a.category_id === undefined ? 0 : 1;
+      const bIsGlobal = b.category_id === null || b.category_id === undefined ? 0 : 1;
+      return aIsGlobal - bIsGlobal;
+    });
+  }, [priorities, searchQuery]);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,7 +215,9 @@ function Priorities() {
     const updates = {
       name: editFormData.name,
       color: editFormData.color,
-      category_id: editFormData.category_id ? parseInt(editFormData.category_id) : editingItem.category_id ?? null
+      category_id: editFormData.category_id && editFormData.category_id !== 'none'
+        ? parseInt(editFormData.category_id)
+        : null
     } as Partial<Priority>;
 
     await updateItem(editingItem.id, updates);
@@ -237,64 +248,53 @@ function Priorities() {
       loading={{ isLoading: loading, message: "Loading priorities..." }}
       error={error ? { message: error, onRetry: () => window.location.reload() } : undefined}
       headerActions={
-        <Button 
-          onClick={() => setIsCreateDialogOpen(true)} 
-          size="default"
-          className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
-        >
-          <FontAwesomeIcon icon={faPlus} className="mr-2" />
-          Add Priority
-        </Button>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-xs font-normal gap-1.5 py-1 px-2.5">
+            <FontAwesomeIcon icon={faGlobe} className="w-3 h-3 text-blue-500" />
+            {globalCount} Global
+          </Badge>
+          <Badge variant="outline" className="text-xs font-normal gap-1.5 py-1 px-2.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+            {categoryCount} Category
+          </Badge>
+          <Button 
+            onClick={() => setIsCreateDialogOpen(true)} 
+            size="default"
+            className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-[0.98]"
+          >
+            <FontAwesomeIcon icon={faPlus} className="mr-2" />
+            Add Priority
+          </Button>
+        </div>
       }
     >
       <UrlTabs
         tabs={[
           {
-            value: "global",
+            value: "priorities",
             label: (
               <div className="flex items-center gap-2">
-                <FontAwesomeIcon icon={faGlobe} className="w-4 h-4" />
-                <span>Global Priorities</span>
+                <FontAwesomeIcon icon={faArrowUpWideShort} className="w-4 h-4" />
+                <span>Priorities</span>
               </div>
             ),
             content: (
               <div className="flex h-full flex-col">
                 <div className="flex-1 min-h-0">
                   <SettingsGrid
-                    rowData={globalPriorities.filter((item: Priority) => 
-                      !searchQuery || item.name?.toLowerCase().includes(searchQuery.toLowerCase())
-                    )}
-                    columnDefs={globalColumns}
-                    onRowClicked={handleEdit}
-                    gridOptions={{}}
-                    noRowsMessage="No global priorities found"
-                  />
-                </div>
-              </div>
-            )
-          },
-          {
-            value: "category",
-            label: (
-              <div className="flex items-center gap-2">
-                <FontAwesomeIcon icon={faTags} className="w-4 h-4" />
-                <span>Category Priorities</span>
-              </div>
-            ),
-            content: (
-              <div className="flex h-full flex-col">
-                <div className="flex-1 min-h-0">
-                  <SettingsGrid
-                    rowData={categoryPriorities.filter((item: Priority) => 
-                      !searchQuery || item.name?.toLowerCase().includes(searchQuery.toLowerCase())
-                    )}
-                    columnDefs={categoryColumns}
+                    rowData={filteredPriorities}
+                    columnDefs={columns}
                     onRowClicked={handleEdit}
                     gridOptions={{
-                      groupDisplayType: 'groupRows',
-                      groupDefaultExpanded: -1
+                      getRowStyle: (params: any) => {
+                        const catId = params.data?.category_id;
+                        if (catId === null || catId === undefined) {
+                          return { backgroundColor: 'var(--color-blue-50, #eff6ff)', fontWeight: '500' } as any;
+                        }
+                        return undefined as any;
+                      }
                     }}
-                    noRowsMessage="No category priorities found"
+                    noRowsMessage="No priorities found. Click 'Add Priority' to create one."
                   />
                 </div>
               </div>
@@ -310,15 +310,15 @@ function Priorities() {
             ),
             content: (
               <StatisticsTab
-                globalCount={globalPriorities.length}
-                categoryCount={categoryPriorities.length}
+                globalCount={globalCount}
+                categoryCount={categoryCount}
                 totalCount={priorities.length}
                 prioritiesByCategory={prioritiesByCategory as any}
               />
             )
           }
         ]}
-        defaultValue="global"
+        defaultValue="priorities"
         basePath="/settings/priorities"
         className="h-full flex flex-col"
       />

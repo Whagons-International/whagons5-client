@@ -121,11 +121,13 @@ function Spots() {
   // Form state for controlled components
   const [createFormData, setCreateFormData] = useState<{
     name: string;
+    alias: string;
     spot_type_id: string;
     parent_id: string;
     is_branch: boolean;
   }>({
     name: '',
+    alias: '',
     spot_type_id: '1',
     parent_id: '',
     is_branch: false
@@ -147,11 +149,13 @@ function Spots() {
 
   const [editFormData, setEditFormData] = useState<{
     name: string;
+    alias: string;
     spot_type_id: string;
     parent_id: string;
     is_branch: boolean;
   }>({
     name: '',
+    alias: '',
     spot_type_id: '1',
     parent_id: '',
     is_branch: false
@@ -162,6 +166,7 @@ function Spots() {
     if (editingSpot) {
       setEditFormData({
         name: editingSpot.name || '',
+        alias: (editingSpot as any).alias || '',
         spot_type_id: editingSpot.spot_type_id?.toString() || '1',
         parent_id: editingSpot.parent_id?.toString() || '',
         is_branch: editingSpot.is_branch || false
@@ -346,6 +351,7 @@ function Spots() {
 
     const spotData = {
       name: createFormData.name,
+      alias: createFormData.alias.trim() || null,
       parent_id: createFormData.parent_id ? parseInt(createFormData.parent_id) : null,
       spot_type_id: parseInt(createFormData.spot_type_id) || 1,
       is_branch: createFormData.is_branch
@@ -355,6 +361,7 @@ function Spots() {
     // Reset form after successful creation
     setCreateFormData({
       name: '',
+      alias: '',
       spot_type_id: '1',
       parent_id: '',
       is_branch: false
@@ -367,6 +374,7 @@ function Spots() {
 
     const updates = {
       name: editFormData.name,
+      alias: editFormData.alias.trim() || null,
       parent_id: editFormData.parent_id ? parseInt(editFormData.parent_id) : null,
       spot_type_id: parseInt(editFormData.spot_type_id) || 1,
       is_branch: editFormData.is_branch
@@ -787,6 +795,13 @@ function Spots() {
             onChange={(value) => setCreateFormData(prev => ({ ...prev, name: value }))}
             required
           />
+          <TextField
+            id="alias"
+            label={ts('dialogs.create.fields.alias', 'Alias')}
+            value={createFormData.alias}
+            onChange={(value) => setCreateFormData(prev => ({ ...prev, alias: value }))}
+            placeholder="e.g. CONF-C, LOBBY-1"
+          />
           <SelectField
             id="spot_type_id"
             label={ts('dialogs.create.fields.spotType', 'Spot Type')}
@@ -849,6 +864,13 @@ function Spots() {
               value={editFormData.name}
               onChange={(value) => setEditFormData(prev => ({ ...prev, name: value }))}
               required
+            />
+            <TextField
+              id="edit-alias"
+              label={ts('dialogs.edit.fields.alias', 'Alias')}
+              value={editFormData.alias}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, alias: value }))}
+              placeholder="e.g. CONF-C, LOBBY-1"
             />
             <SelectField
               id="edit-spot_type_id"

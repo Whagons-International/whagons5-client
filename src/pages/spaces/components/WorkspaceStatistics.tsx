@@ -1074,37 +1074,6 @@ function WorkspaceStatistics({ workspaceId }: WorkspaceStatisticsProps) {
         )}
         </div>
 
-        {/* Latest Tasks List */}
-        <div style={{ opacity: hasNoData ? 0.4 : 1 }}>
-        {statistics.latestTasks.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">{t('workspace.statistics.latestTasks', 'Latest Tasks')}</CardTitle>
-              <CardDescription className="text-xs">{t('workspace.statistics.latestTasksDesc', 'Most recently created tasks')}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {statistics.latestTasks.map((task: Task) => {
-                  const category = (categories as Category[]).find((c: Category) => c.id === task.category_id);
-                  return (
-                    <div key={task.id} className="flex items-center justify-between p-2 border rounded-md hover:bg-accent/50">
-                      <div className="flex-1">
-                        <div className="text-sm font-medium">{task.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {category?.name || 'Uncategorized'} • {dayjs(task.created_at).format('MMM DD, YYYY HH:mm')}
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="ml-2">
-                        {task.status_id}
-                      </Badge>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-        </div>
 
       </div>
     </div>

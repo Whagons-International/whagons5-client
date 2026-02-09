@@ -253,6 +253,7 @@ function Templates() {
 
       const templateData: any = {
         name: createFormData.name.trim(),
+        alias: createFormData.alias?.trim() || null,
         description: createFormData.description || null,
         category_id: parseInt(createFormData.category_id),
         priority_id: createFormData.priority_id ? parseInt(createFormData.priority_id) : null,
@@ -294,6 +295,7 @@ function Templates() {
 
       const updates: any = {
         name: editFormData.name.trim(),
+        alias: editFormData.alias?.trim() || null,
         description: editFormData.description || null,
         category_id: parseInt(editFormData.category_id),
         priority_id: editFormData.priority_id ? parseInt(editFormData.priority_id) : null,

@@ -1,17 +1,38 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent,
+    DragOverlay,
+    DragStartEvent,
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    rectSortingStrategy,
+} from '@dnd-kit/sortable';
 import { genericInternalActions, genericActions } from '@/store/genericSlices';
 import { RootState, AppDispatch } from '@/store/store';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Settings2 } from 'lucide-react';
+import { Plus, Settings2, Package, BarChart3 } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
+import { UrlTabs } from '@/components/ui/url-tabs';
 import { AssetFilters } from './components/AssetFilters';
-import { AssetItemCard } from './components/AssetItemCard';
+import { AssetItemCard, DraggableAssetCard } from './components/AssetItemCard';
 import { AssetForm } from './components/AssetForm';
+import { AssetStats } from './components/AssetStats';
+import { api } from '@/store/api/internalApi';
 import type { AssetItem, AssetType } from '@/store/types';
 
 const statusConfig: Record<string, { label: string; className: string }> = {
@@ -49,18 +70,44 @@ export const AssetsPage = () => {
     const [typeFilter, setTypeFilter] = useState('all');
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
+    const [localAssetOrder, setLocalAssetOrder] = useState<number[]>([]);
+    const [activeId, setActiveId] = useState<number | null>(null);
+    
+    // Debounce timer for persisting order
+    const reorderTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // DnD sensors
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
 
     // Fetch data on mount
     useEffect(() => {
-        dispatch(genericInternalActions.assetItems.getFromIndexedDB());
-        dispatch(genericInternalActions.assetItems.fetchFromAPI());
-        dispatch(genericInternalActions.assetTypes.getFromIndexedDB());
-        dispatch(genericInternalActions.assetTypes.fetchFromAPI());
+        dispatch(genericInternalActions.assetItems.getFromIndexedDB(undefined));
+        dispatch(genericInternalActions.assetItems.fetchFromAPI(undefined));
+        dispatch(genericInternalActions.assetTypes.getFromIndexedDB(undefined));
+        dispatch(genericInternalActions.assetTypes.fetchFromAPI(undefined));
     }, [dispatch]);
+
+    // Cleanup reorder timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (reorderTimeoutRef.current) {
+                clearTimeout(reorderTimeoutRef.current);
+            }
+        };
+    }, []);
 
     // Filter assets
     const filteredAssets = useMemo(() => {
-        return (assetItems as AssetItem[]).filter((asset) => {
+        const filtered = (assetItems as AssetItem[]).filter((asset) => {
             if (asset.deleted_at) return false;
 
             // Search filter
@@ -81,7 +128,96 @@ export const AssetsPage = () => {
 
             return true;
         });
-    }, [assetItems, search, statusFilter, typeFilter]);
+
+        // Apply custom ordering if available (local override)
+        if (localAssetOrder.length > 0) {
+            const orderMap = new Map(localAssetOrder.map((id, index) => [id, index]));
+            return [...filtered].sort((a, b) => {
+                const orderA = orderMap.get(a.id) ?? Infinity;
+                const orderB = orderMap.get(b.id) ?? Infinity;
+                return orderA - orderB;
+            });
+        }
+
+        // Otherwise, sort by display_order from backend (default to 0)
+        return [...filtered].sort((a, b) => {
+            const orderA = a.display_order ?? 0;
+            const orderB = b.display_order ?? 0;
+            return orderA - orderB;
+        });
+    }, [assetItems, search, statusFilter, typeFilter, localAssetOrder]);
+
+    // Update local order when filtered assets change
+    useEffect(() => {
+        if (localAssetOrder.length === 0 && filteredAssets.length > 0) {
+            setLocalAssetOrder(filteredAssets.map(a => a.id));
+        }
+    }, [filteredAssets.length]);
+
+    // Reset order when filters change
+    useEffect(() => {
+        setLocalAssetOrder([]);
+    }, [search, statusFilter, typeFilter]);
+
+    // Get asset IDs for SortableContext
+    const assetIds = useMemo(() => filteredAssets.map(a => a.id), [filteredAssets]);
+
+    // DnD handlers
+    const handleDragStart = useCallback((event: DragStartEvent) => {
+        setActiveId(event.active.id as number);
+    }, []);
+
+    const handleDragEnd = useCallback((event: DragEndEvent) => {
+        const { active, over } = event;
+        setActiveId(null);
+
+        if (over && active.id !== over.id) {
+            setLocalAssetOrder((items) => {
+                const currentOrder = items.length > 0 ? items : filteredAssets.map(a => a.id);
+                const oldIndex = currentOrder.indexOf(active.id as number);
+                const newIndex = currentOrder.indexOf(over.id as number);
+                const newOrder = arrayMove(currentOrder, oldIndex, newIndex);
+
+                // Debounce the API call to avoid too many requests during rapid reordering
+                if (reorderTimeoutRef.current) {
+                    clearTimeout(reorderTimeoutRef.current);
+                }
+                reorderTimeoutRef.current = setTimeout(() => {
+                    // Build the items array with new display_order values
+                    const reorderPayload = newOrder.map((id, index) => ({
+                        id,
+                        display_order: index,
+                    }));
+
+                    // Store the previous order for potential revert
+                    const previousOrder = [...currentOrder];
+                    
+                    // Persist to backend
+                    api.post('/asset-items-reorder', { items: reorderPayload })
+                        .then(() => {
+                            // Refresh assets from API to get updated display_order values
+                            dispatch(genericInternalActions.assetItems.fetchFromAPI(undefined));
+                        })
+                        .catch((err) => {
+                            console.error('Failed to persist asset order:', err);
+                            // Show toast notification
+                            toast.error('Failed to save asset order. Changes reverted.');
+                            // Revert to previous order
+                            setLocalAssetOrder(previousOrder);
+                        });
+                }, 500);
+
+                return newOrder;
+            });
+        }
+    }, [filteredAssets, dispatch]);
+
+    const handleDragCancel = useCallback(() => {
+        setActiveId(null);
+    }, []);
+
+    // Get active asset for DragOverlay
+    const activeAsset = activeId ? filteredAssets.find(a => a.id === activeId) : null;
 
     // Lookup helpers
     const getTypeName = (typeId: number) => {
@@ -113,11 +249,9 @@ export const AssetsPage = () => {
 
     const activeTypes = (assetTypes as AssetType[]).filter(t => !t.deleted_at);
 
-    return (
-        <PageContainer
-            title={t('assets.title', 'Assets')}
-            subtitle={t('assets.subtitle', 'Track and manage your organization\'s assets')}
-        >
+    // Assets list content
+    const assetsListContent = (
+        <>
             {/* Actions bar */}
             <div className="flex items-center justify-between mb-6">
                 <AssetFilters
@@ -157,19 +291,41 @@ export const AssetsPage = () => {
                     </p>
                 </div>
             ) : viewMode === 'grid' ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {filteredAssets.map((asset: AssetItem) => (
-                        <AssetItemCard
-                            key={asset.id}
-                            asset={asset}
-                            assetType={getType(asset.asset_type_id)}
-                            spotName={getSpotName(asset.spot_id)}
-                            assignedUserName={getUserName(asset.assigned_user_id)}
-                            assignedTeamName={getTeamName(asset.assigned_team_id)}
-                            onClick={() => navigate(`/assets/${asset.id}`)}
-                        />
-                    ))}
-                </div>
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    onDragCancel={handleDragCancel}
+                >
+                    <SortableContext items={assetIds} strategy={rectSortingStrategy}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-fr">
+                            {filteredAssets.map((asset: AssetItem) => (
+                                <DraggableAssetCard
+                                    key={asset.id}
+                                    asset={asset}
+                                    assetType={getType(asset.asset_type_id)}
+                                    spotName={getSpotName(asset.spot_id)}
+                                    assignedUserName={getUserName(asset.assigned_user_id)}
+                                    assignedTeamName={getTeamName(asset.assigned_team_id)}
+                                    onClick={() => navigate(`/assets/${asset.id}`)}
+                                />
+                            ))}
+                        </div>
+                    </SortableContext>
+                    <DragOverlay>
+                        {activeAsset ? (
+                            <AssetItemCard
+                                asset={activeAsset}
+                                assetType={getType(activeAsset.asset_type_id)}
+                                spotName={getSpotName(activeAsset.spot_id)}
+                                assignedUserName={getUserName(activeAsset.assigned_user_id)}
+                                assignedTeamName={getTeamName(activeAsset.assigned_team_id)}
+                                onClick={() => {}}
+                            />
+                        ) : null}
+                    </DragOverlay>
+                </DndContext>
             ) : (
                 <div className="rounded-md border">
                     <Table>
@@ -209,6 +365,44 @@ export const AssetsPage = () => {
                     </Table>
                 </div>
             )}
+        </>
+    );
+
+    // Tab configuration
+    const tabs = [
+        {
+            value: 'list',
+            label: (
+                <span className="flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    {t('assets.tabs.assets', 'Assets')}
+                </span>
+            ),
+            content: <div className="pt-6">{assetsListContent}</div>,
+        },
+        {
+            value: 'stats',
+            label: (
+                <span className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    {t('assets.tabs.stats', 'Statistics')}
+                </span>
+            ),
+            content: <div className="pt-6"><AssetStats /></div>,
+        },
+    ];
+
+    return (
+        <PageContainer
+            title={t('assets.title', 'Assets')}
+            subtitle={t('assets.subtitle', 'Track and manage your organization\'s assets')}
+        >
+            <UrlTabs
+                tabs={tabs}
+                defaultValue="list"
+                basePath="/assets"
+                tabParam="tab"
+            />
 
             {/* Create dialog */}
             <AssetForm

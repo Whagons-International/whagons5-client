@@ -82,7 +82,7 @@ export default function TaskDialogContent({
   const formState = useTaskFormState();
   const t3 = perfEnabled ? performance.now() : 0;
   markOnce('useTaskFormState', t2, t3);
-  const { categoryId, templateId, priorityId, activeTab, setActiveTab, formInitializedRef, startTime, dueTime } = formState;
+  const { categoryId, templateId, priorityId, activeTab, setActiveTab, formInitializedRef, startTime, dueTime, assetId } = formState;
 
   // Detect if task is being created from scheduler (has start_date/due_date in create mode)
   const isFromScheduler = useMemo(() => {
@@ -254,6 +254,7 @@ export default function TaskDialogContent({
     setCategoryId: formState.setCategoryId,
     setPriorityId: formState.setPriorityId,
     setSpotId: formState.setSpotId,
+    setAssetId: formState.setAssetId,
     setStatusId: formState.setStatusId,
     setTemplateId: formState.setTemplateId,
     setStartDate: formState.setStartDate,
@@ -337,6 +338,8 @@ export default function TaskDialogContent({
               : [],
         };
         if (computed.spotsApplicable) updates.spot_id = formState.spotId;
+        // Include asset_id if set
+        if (assetId) updates.asset_id = assetId;
 
         await dispatch((await import('@/store/reducers/tasksSlice')).updateTaskAsync({ id: Number(task.id), updates })).unwrap();
 
@@ -398,6 +401,8 @@ export default function TaskDialogContent({
           user_ids: formState.selectedUserIds.filter((n) => Number.isFinite(n)),
         };
         if (computed.spotsApplicable) payload.spot_id = formState.spotId;
+        // Include asset_id if set (e.g., creating task from asset detail page)
+        if (assetId) payload.asset_id = assetId;
 
         const result = await dispatch((await import('@/store/reducers/tasksSlice')).addTaskAsync(payload)).unwrap();
         const newTaskId = result?.id;
@@ -673,6 +678,11 @@ export default function TaskDialogContent({
                   tags: data.tags,
                   selectedTagIds: formState.selectedTagIds,
                   setSelectedTagIds: formState.setSelectedTagIds,
+                  // Assets
+                  assetItems: data.assetItems,
+                  assetTypes: data.assetTypes,
+                  assetId,
+                  setAssetId: formState.setAssetId,
                   // Date and recurrence fields for scheduler
                   isFromScheduler,
                   startDate: formState.startDate,

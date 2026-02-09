@@ -3,7 +3,7 @@ import { auth } from '@/firebase/firebaseConfig';
 
 import { Logger } from '@/utils/logger';
 // Current database version - increment when schema changes
-const CURRENT_DB_VERSION = '1.21.0';
+const CURRENT_DB_VERSION = '1.23.0';
 const DB_VERSION_KEY = 'indexeddb_version';
 
 //static class to access the message cache
@@ -167,6 +167,9 @@ export class DB {
           if (!db.objectStoreNames.contains('sla_alerts')) {
             db.createObjectStore('sla_alerts', { keyPath: 'id' });
           }
+          if (!db.objectStoreNames.contains('sla_escalation_levels')) {
+            db.createObjectStore('sla_escalation_levels', { keyPath: 'id' });
+          }
           if (!db.objectStoreNames.contains('category_priorities')) {
             db.createObjectStore('category_priorities', { keyPath: 'id' });
           }
@@ -278,6 +281,17 @@ export class DB {
             store.createIndex('user_id', 'user_id', { unique: false });
             store.createIndex('status', 'status', { unique: false });
             store.createIndex('time_off_type_id', 'time_off_type_id', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('time_off_approval_instances')) {
+            const store = db.createObjectStore('time_off_approval_instances', { keyPath: 'id' });
+            store.createIndex('time_off_request_id', 'time_off_request_id', { unique: false });
+            store.createIndex('approver_user_id', 'approver_user_id', { unique: false });
+            store.createIndex('status', 'status', { unique: false });
+          }
+          if (!db.objectStoreNames.contains('time_off_approval_decisions')) {
+            const store = db.createObjectStore('time_off_approval_decisions', { keyPath: 'id' });
+            store.createIndex('time_off_request_id', 'time_off_request_id', { unique: false });
+            store.createIndex('decision', 'decision', { unique: false });
           }
 
           // Custom Fields & Values
@@ -656,6 +670,8 @@ export class DB {
       | 'status_transition_groups'
       | 'approval_approvers'
       | 'task_approval_instances'
+      | 'time_off_approval_instances'
+      | 'time_off_approval_decisions'
       | 'broadcasts'
       | 'broadcast_acknowledgments'
       | 'plugins'
@@ -728,6 +744,8 @@ export class DB {
       | 'status_transition_groups'
       | 'approval_approvers'
       | 'task_approval_instances'
+      | 'time_off_approval_instances'
+      | 'time_off_approval_decisions'
       | 'broadcasts'
       | 'broadcast_acknowledgments'
       | 'plugins'

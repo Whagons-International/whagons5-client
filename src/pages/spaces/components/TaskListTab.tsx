@@ -37,6 +37,12 @@ function createCategoryMap(categories: any[]) {
   return m;
 }
 
+function createAssetMap(assets: any[]) {
+  const m: Record<number, any> = {};
+  for (const a of assets || []) m[Number(a.id)] = a;
+  return m;
+}
+
 export default function TaskListTab({
   workspaceId,
   searchText = "",
@@ -49,6 +55,7 @@ export default function TaskListTab({
   const priorities = useSelector((s: RootState) => (s as any).priorities.value as any[]);
   const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
   const categories = useSelector((s: RootState) => (s as any).categories.value as any[]);
+  const assetItems = useSelector((s: RootState) => (s as any).assetItems?.value as any[] || []);
   const dispatch = useDispatch<AppDispatch>();
   const [rows, setRows] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +80,7 @@ export default function TaskListTab({
   const priorityMap = useMemo(() => createPriorityMap(priorities || []), [priorities]);
   const spotMap = useMemo(() => createSpotMap(spots || []), [spots]);
   const categoryMap = useMemo(() => createCategoryMap(categories || []), [categories]);
+  const assetMap = useMemo(() => createAssetMap(assetItems || []), [assetItems]);
 
   // Spot-based visibility filtering
   const { isTaskVisible } = useSpotVisibility();
@@ -244,6 +252,7 @@ export default function TaskListTab({
           priorityMap={priorityMap}
           spotMap={spotMap}
           categoryMap={categoryMap}
+          assetMap={assetMap}
           getStatusIcon={getStatusIcon}
           density={density}
           onDelete={() => handleDeleteTask(Number(task?.id))}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { genericInternalActions, genericActions } from '@/store/genericSlices';
@@ -9,12 +9,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Edit, Trash2, MapPin, User, Users, Calendar, DollarSign, Shield, ShieldAlert, ShieldOff, Wrench, FileText } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, MapPin, User, Users, Calendar, DollarSign, Shield, ShieldAlert, ShieldOff, Wrench, FileText, ClipboardList } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { AssetForm } from './components/AssetForm';
 import { MaintenanceTab } from './components/MaintenanceTab';
 import { CustomFieldsTab } from './components/CustomFieldsTab';
-import type { AssetItem, AssetType, AssetMaintenanceSchedule, AssetMaintenanceLog, AssetCustomField, AssetCustomFieldValue } from '@/store/types';
+import type { AssetItem, AssetType, AssetMaintenanceSchedule, AssetMaintenanceLog, AssetCustomField, AssetCustomFieldValue, Task } from '@/store/types';
+
+// Lazy load TaskDialog to avoid circular dependencies
+const TaskDialog = lazy(() => import('@/pages/spaces/components/TaskDialog'));
 
 const statusConfig: Record<string, { label: string; className: string }> = {
     active: { label: 'Active', className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' },
@@ -60,6 +63,16 @@ export const AssetDetail = () => {
     );
 
     const [editDialogOpen, setEditDialogOpen] = useState(false);
+    const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
+
+    // Get tasks related to this asset
+    const { value: tasks } = useSelector(
+        (state: RootState) => state.tasks || { value: [] }
+    );
+    const assetTasks = useMemo(() => 
+        (tasks as Task[]).filter(t => t.asset_id === assetId),
+        [tasks, assetId]
+    );
 
     // Fetch related data
     useEffect(() => {
@@ -140,6 +153,10 @@ export const AssetDetail = () => {
                     <Badge className={`border-0 ${status.className}`}>
                         {t(`assets.status.${asset.status}`, status.label)}
                     </Badge>
+                    <Button variant="outline" size="sm" onClick={() => setCreateTaskDialogOpen(true)}>
+                        <ClipboardList className="h-4 w-4 mr-1" />
+                        {t('assets.detail.createTask', 'Create Task')}
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(true)}>
                         <Edit className="h-4 w-4 mr-1" />
                         {t('common.edit', 'Edit')}
@@ -277,6 +294,15 @@ export const AssetDetail = () => {
                         <FileText className="h-4 w-4 mr-1" />
                         {t('assets.detail.tabs.overview', 'Overview')}
                     </TabsTrigger>
+                    <TabsTrigger value="tasks">
+                        <ClipboardList className="h-4 w-4 mr-1" />
+                        {t('assets.detail.tabs.tasks', 'Tasks')}
+                        {assetTasks.length > 0 && (
+                            <Badge className="ml-1.5 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-0 text-xs h-5 min-w-5 px-1">
+                                {assetTasks.length}
+                            </Badge>
+                        )}
+                    </TabsTrigger>
                     <TabsTrigger value="maintenance">
                         <Wrench className="h-4 w-4 mr-1" />
                         {t('assets.detail.tabs.maintenance', 'Maintenance')}
@@ -308,6 +334,49 @@ export const AssetDetail = () => {
                     <CustomFieldsTab fields={customFields} values={customFieldValues} />
                 </TabsContent>
 
+                <TabsContent value="tasks" className="mt-6">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="text-base">{t('assets.detail.relatedTasks', 'Related Tasks')}</CardTitle>
+                            <Button size="sm" onClick={() => setCreateTaskDialogOpen(true)}>
+                                <ClipboardList className="h-4 w-4 mr-1" />
+                                {t('assets.detail.createTask', 'Create Task')}
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            {assetTasks.length === 0 ? (
+                                <p className="text-sm text-muted-foreground text-center py-8">
+                                    {t('assets.detail.noTasks', 'No tasks linked to this asset yet.')}
+                                </p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {assetTasks.map((task) => (
+                                        <div
+                                            key={task.id}
+                                            className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
+                                            onClick={() => navigate(`/spaces?task=${task.id}`)}
+                                        >
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-medium text-sm truncate">{task.name}</p>
+                                                {task.description && (
+                                                    <p className="text-xs text-muted-foreground truncate mt-0.5">{task.description}</p>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2 ml-4">
+                                                {task.due_date && (
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {new Date(task.due_date).toLocaleDateString()}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
                 <TabsContent value="maintenance" className="mt-6">
                     <MaintenanceTab
                         assetItemId={assetId}
@@ -330,6 +399,20 @@ export const AssetDetail = () => {
                 users={users}
                 teams={teams}
             />
+
+            {/* Create Task dialog */}
+            <Suspense fallback={null}>
+                <TaskDialog
+                    open={createTaskDialogOpen}
+                    onOpenChange={setCreateTaskDialogOpen}
+                    mode="create"
+                    task={{
+                        asset_id: assetId,
+                        name: `${asset.name} - `,
+                        spot_id: asset.spot_id,
+                    }}
+                />
+            </Suspense>
         </PageContainer>
     );
 };

@@ -2,7 +2,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { useState, useEffect } from 'react';
-import { getPluginsConfig, togglePluginEnabled, togglePluginPinned, subscribeToPluginsConfig, type PluginConfig } from '@/components/AppSidebar';
+import { getPluginsConfig, togglePluginPinned, subscribeToPluginsConfig, type PluginConfig } from '@/components/AppSidebar';
 import { Pin, PinOff } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -204,12 +204,6 @@ function PluginSettings() {
 
 	const pluginDetails = pluginId ? getPluginDetails(pluginId) : { features: [], benefits: [] };
 
-	const handleToggleEnabled = () => {
-		if (pluginId) {
-			togglePluginEnabled(pluginId);
-		}
-	};
-
 	const handleTogglePinned = () => {
 		if (pluginId) {
 			togglePluginPinned(pluginId);
@@ -302,19 +296,6 @@ function PluginSettings() {
 					<CardContent className="space-y-6">
 						<div className="flex items-center justify-between">
 							<div className="space-y-0.5">
-								<div className="font-medium">{t('plugins.enabled', 'Enabled')}</div>
-								<div className="text-sm text-muted-foreground">
-									{t('plugins.enabledDescription', 'Show this plugin in the sidebar')}
-								</div>
-							</div>
-							<Switch
-								checked={currentPlugin.enabled}
-								onCheckedChange={handleToggleEnabled}
-							/>
-						</div>
-
-						<div className="flex items-center justify-between">
-							<div className="space-y-0.5">
 								<div className="font-medium flex items-center gap-2">
 									{currentPlugin.pinned ? <Pin className="h-4 w-4" /> : <PinOff className="h-4 w-4" />}
 									{t('plugins.visibleInSidebar', 'Visible in sidebar')}
@@ -326,7 +307,6 @@ function PluginSettings() {
 							<Switch
 								checked={currentPlugin.pinned}
 								onCheckedChange={handleTogglePinned}
-								disabled={!currentPlugin.enabled}
 							/>
 						</div>
 					</CardContent>
@@ -422,8 +402,8 @@ function PluginSettings() {
 								</div>
 								<div className="flex justify-between">
 									<span className="text-muted-foreground">{t('plugins.status', 'Status')}:</span>
-									<span className={`font-medium ${currentPlugin.enabled ? 'text-emerald-500' : 'text-muted-foreground'}`}>
-										{currentPlugin.enabled ? t('plugins.active', 'Active') : t('plugins.inactive', 'Inactive')}
+									<span className={`font-medium ${currentPlugin.pinned ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+										{currentPlugin.pinned ? t('plugins.active', 'Active') : t('plugins.inactive', 'Inactive')}
 									</span>
 								</div>
 							</div>

@@ -41,6 +41,7 @@ export const useGridReduxState = () => {
   const taskNotes = useSelector((s: RootState) => (s as any).taskNotes?.value as any[] || []);
   const taskAttachments = useSelector((s: RootState) => (s as any).taskAttachments?.value as any[] || []);
   const roles = useSelector((s: RootState) => (s as any).roles?.value as any[] || []);
+  const assetItems = useSelector((s: RootState) => (s as any).assetItems?.value as any[] || []);
 
   return {
     statuses,
@@ -67,6 +68,7 @@ export const useGridReduxState = () => {
     taskNotes,
     taskAttachments,
     roles,
+    assetItems,
   };
 };
 
@@ -125,14 +127,15 @@ export const useGridModeDecision = (workspaceId: string, searchText: string) => 
 };
 
 export const useMetadataLoadedFlags = (reduxState: ReturnType<typeof useGridReduxState>) => {
-  const { statuses, priorities, spots, users } = reduxState;
+  const { statuses, priorities, spots, users, assetItems } = reduxState;
 
   return useMemo(() => ({
     statusesLoaded: !!(statuses && statuses.length > 0),
     prioritiesLoaded: !!(priorities && priorities.length > 0),
     spotsLoaded: !!(spots && spots.length > 0),
     usersLoaded: !!(users && users.length > 0),
-  }), [statuses, priorities, spots, users]);
+    assetsLoaded: !!(assetItems && assetItems.length > 0),
+  }), [statuses, priorities, spots, users, assetItems]);
 };
 
 export interface WorkspaceTableModeParams {

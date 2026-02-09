@@ -44,6 +44,7 @@ import {
 import { useLanguage } from '@/providers/LanguageProvider';
 import { genericActions } from '@/store/genericSlices';
 
+import { Logger } from '@/utils/logger';
 export interface AppSidebarBoardsProps {
   boards: any[];
   pathname: string;
@@ -102,7 +103,7 @@ export function AppSidebarBoards({ boards, pathname }: AppSidebarBoardsProps) {
         navigate(`/boards/${result.payload.id}`);
       }
     } catch (error) {
-      console.error('Failed to create board:', error);
+      Logger.error('boards', 'Failed to create board:', error);
     } finally {
       setIsSubmitting(false);
     }

@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
+import { Logger } from '@/utils/logger';
 interface ColorPickerContextValue {
   hue: number;
   saturation: number;
@@ -315,7 +316,7 @@ export const ColorPickerEyeDropper = ({
       setLightness(l);
       setAlpha(100);
     } catch (error) {
-      console.error('EyeDropper failed:', error);
+      Logger.error('ui', 'EyeDropper failed:', error);
     }
   };
 

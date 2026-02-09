@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { OnboardingData } from '@/types/user';
 import { useLanguage } from '@/providers/LanguageProvider';
 
+import { Logger } from '@/utils/logger';
 interface OptionalStepProps {
   data: OnboardingData;
   onUpdate: (data: Partial<OnboardingData>) => void;
@@ -77,7 +78,7 @@ const OptionalStep: React.FC<OptionalStepProps> = ({ data, onUpdate, onNext, loa
       // onUpdate({ url_picture: response.data.url_picture });
       
     } catch (error) {
-      console.error('Photo upload failed:', error);
+      Logger.error('auth', 'Photo upload failed:', error);
       alert(t('onboarding.optionalStep.uploadFailed', 'Failed to upload photo. Please try again.'));
     } finally {
       setUploadingPhoto(false);

@@ -2,6 +2,7 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getMessaging, isSupported, Messaging } from "firebase/messaging";
+import { Logger } from '@/utils/logger';
 import 'firebase/messaging'; // Ensure side effects for registration are loaded
 
 const firebaseConfig = {
@@ -35,7 +36,7 @@ export async function getMessagingInstance(): Promise<Messaging | null> {
     const supported = await isSupported();
     
     if (!supported) {
-      console.warn('⚠️  Firebase Cloud Messaging is not supported:', {
+      Logger.warn('notifications', '⚠️  Firebase Cloud Messaging is not supported:', {
         protocol: window.location.protocol,
         isSecure: window.isSecureContext,
       });
@@ -57,7 +58,7 @@ export async function getMessagingInstance(): Promise<Messaging | null> {
     
     // Wait for service worker to become active/controlling if not already
     if (!navigator.serviceWorker.controller) {
-      console.log('[FCM Config] Service worker not yet controlling, waiting for activation...');
+      Logger.info('notifications', '[FCM Config] Service worker not yet controlling, waiting for activation...');
       
       // Wait for service worker to become active and controlling
       const swActivated = await new Promise<boolean>((resolve) => {
@@ -132,7 +133,7 @@ export async function getMessagingInstance(): Promise<Messaging | null> {
         setTimeout(() => {
           if (!resolved) {
             cleanup();
-            console.warn('[FCM Config] Service worker activation timeout - may need manual refresh');
+            Logger.warn('notifications', '[FCM Config] Service worker activation timeout - may need manual refresh');
             // Show non-blocking prompt to user (only if in browser context)
             if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
               const shouldRefresh = window.confirm(
@@ -148,7 +149,7 @@ export async function getMessagingInstance(): Promise<Messaging | null> {
       });
 
       if (!swActivated) {
-        console.warn('[FCM Config] Service worker not activated, messaging may not work until refresh');
+        Logger.warn('notifications', '[FCM Config] Service worker not activated, messaging may not work until refresh');
         messagingInitialized = true;
         return null;
       }
@@ -156,7 +157,7 @@ export async function getMessagingInstance(): Promise<Messaging | null> {
 
     // Final verification: service worker must be controlling before proceeding
     if (!navigator.serviceWorker.controller) {
-      console.warn('[FCM Config] Service worker is not controlling the page - messaging may not work');
+      Logger.warn('notifications', '[FCM Config] Service worker is not controlling the page - messaging may not work');
       messagingInitialized = true;
       return null;
     }
@@ -171,7 +172,7 @@ export async function getMessagingInstance(): Promise<Messaging | null> {
         messagingInstance = getMessaging();
       }
     } catch (error: any) {
-      console.error('❌ [FCM Config] getMessaging() failed:', {
+      Logger.error('notifications', '❌ [FCM Config] getMessaging() failed:', {
         message: error.message,
         code: error.code,
         name: error.name,
@@ -181,7 +182,7 @@ export async function getMessagingInstance(): Promise<Messaging | null> {
     }
     
   } catch (error) {
-    console.error('❌ [FCM Config] Error initializing Firebase Cloud Messaging:', error);
+    Logger.error('notifications', '❌ [FCM Config] Error initializing Firebase Cloud Messaging:', error);
   }
   
   messagingInitialized = true;

@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Logger } from '@/utils/logger';
 import {
   ShortAnswerField,
   ParagraphField,
@@ -241,7 +242,7 @@ export function DraggableField({
                   onClick={(e) => {
                     e.stopPropagation();
                     // TODO: Implement duplicate functionality
-                    console.log('Duplicate field');
+                    Logger.info('settings', 'Duplicate field');
                   }}
                   title="Duplicate"
                 >

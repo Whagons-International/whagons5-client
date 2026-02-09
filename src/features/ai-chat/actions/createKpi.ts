@@ -9,6 +9,7 @@
 
 import type { FrontendToolResult, SendMessageCallback, NavigateCallback } from './frontend_tools';
 
+import { Logger } from '@/utils/logger';
 // ─── Color mapping (mirrors KpiCardBuilder.tsx COLOR_OPTIONS) ────────────────
 
 const COLOR_MAP: Record<string, { color: string; badgeClass: string; barClass: string }> = {
@@ -226,7 +227,7 @@ export function handleCreateKpi(
 
   // Validate required field
   if (!input.name) {
-    console.error('[Create_Kpi] Missing required field: name');
+    Logger.error('assistant', '[Create_Kpi] Missing required field: name');
     if (sendMessage) {
       sendMessage('Error creating KPI card: "name" is required.');
     }
@@ -235,14 +236,14 @@ export function handleCreateKpi(
 
   const cardData = buildKpiCardPayload(input);
 
-  console.log('[Create_Kpi] Creating KPI card:', cardData);
+  Logger.info('assistant', '[Create_Kpi] Creating KPI card:', cardData);
 
   // Dispatch the creation asynchronously
   store
     .dispatch(genericActions.kpiCards.addAsync(cardData) as any)
     .unwrap()
     .then(() => {
-      console.log('[Create_Kpi] KPI card created successfully');
+      Logger.info('assistant', '[Create_Kpi] KPI card created successfully');
 
       // Navigate to the management page so the user can see the new card
       if (navigate) {
@@ -254,7 +255,7 @@ export function handleCreateKpi(
       }
     })
     .catch((error: any) => {
-      console.error('[Create_Kpi] Failed to create KPI card:', error);
+      Logger.error('assistant', '[Create_Kpi] Failed to create KPI card:', error);
       if (sendMessage) {
         const errMsg = error?.message || error?.response?.data?.message || 'Unknown error';
         sendMessage(`Failed to create KPI card: ${errMsg}`);
@@ -286,12 +287,12 @@ export async function handleCreateKpiPrompt(
 
   const cardData = buildKpiCardPayload(input);
 
-  console.log('[Create_Kpi] Raw input from agent:', JSON.stringify(rawInput));
-  console.log('[Create_Kpi] Resolved payload:', JSON.stringify(cardData));
+  Logger.info('assistant', '[Create_Kpi] Raw input from agent:', JSON.stringify(rawInput));
+  Logger.info('assistant', '[Create_Kpi] Resolved payload:', JSON.stringify(cardData));
 
   try {
     const created = await store.dispatch(genericActions.kpiCards.addAsync(cardData) as any).unwrap();
-    console.log('[Create_Kpi] KPI card created successfully via prompt pathway:', created);
+    Logger.info('assistant', '[Create_Kpi] KPI card created successfully via prompt pathway:', created);
 
     if (navigate) {
       navigate('/settings/kpi-cards/manage');
@@ -316,7 +317,7 @@ export async function handleCreateKpiPrompt(
     });
   } catch (error: any) {
     const errMsg = error?.message || error?.response?.data?.message || 'Unknown error';
-    console.error('[Create_Kpi] Failed:', errMsg);
+    Logger.error('assistant', '[Create_Kpi] Failed:', errMsg);
     send({
       type: 'frontend_tool_response',
       tool: data?.tool,

@@ -27,6 +27,7 @@ import { RootState } from '@/store/store';
 import { MultiSelect } from '@/components/ui/multi-select';
 import toast from 'react-hot-toast';
 
+import { Logger } from '@/utils/logger';
 interface CreateBroadcastDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -58,7 +59,7 @@ function CreateBroadcastDialog({ open, onOpenChange }: CreateBroadcastDialogProp
   const validateRecipients = (): boolean => {
     const { recipient_selection_type, recipient_config } = formData;
     
-    console.log('🔍 [CreateBroadcastDialog] Validating recipients:', {
+    Logger.info('broadcast', '🔍 [CreateBroadcastDialog] Validating recipients:', {
       recipient_selection_type,
       recipient_config,
       manual_user_ids: recipient_config.manual_user_ids,
@@ -107,7 +108,7 @@ function CreateBroadcastDialog({ open, onOpenChange }: CreateBroadcastDialogProp
       onOpenChange(false);
       resetForm();
     } catch (error: any) {
-      console.error('Failed to create broadcast:', error);
+      Logger.error('broadcast', 'Failed to create broadcast:', error);
       
       // Extract validation errors from API response
       const errorMessage = error?.response?.data?.message || 
@@ -141,7 +142,7 @@ function CreateBroadcastDialog({ open, onOpenChange }: CreateBroadcastDialogProp
   };
 
   const updateRecipientConfig = (key: string, value: any) => {
-    console.log('🔍 [CreateBroadcastDialog] updateRecipientConfig called:', { key, value, valueType: typeof value, isArray: Array.isArray(value) });
+    Logger.info('broadcast', '🔍 [CreateBroadcastDialog] updateRecipientConfig called:', { key, value, valueType: typeof value, isArray: Array.isArray(value) });
     setFormData(prev => {
       const updated = {
         ...prev,
@@ -150,7 +151,7 @@ function CreateBroadcastDialog({ open, onOpenChange }: CreateBroadcastDialogProp
           [key]: value,
         },
       };
-      console.log('🔍 [CreateBroadcastDialog] Updated formData:', updated);
+      Logger.info('broadcast', '🔍 [CreateBroadcastDialog] Updated formData:', updated);
       return updated;
     });
   };
@@ -238,11 +239,11 @@ function CreateBroadcastDialog({ open, onOpenChange }: CreateBroadcastDialogProp
                   options={users.map((u: any) => ({ label: u.name, value: String(u.id) }))}
                   defaultValue={(formData.recipient_config.manual_user_ids || []).map(String)}
                   onValueChange={(ids) => {
-                    console.log('🔍 [CreateBroadcastDialog] MultiSelect onValueChange (manual):', ids);
+                    Logger.info('broadcast', '🔍 [CreateBroadcastDialog] MultiSelect onValueChange (manual):', ids);
                     const numericIds = ids.map(id => {
                       const num = Number(id);
                       if (isNaN(num)) {
-                        console.warn('🔍 [CreateBroadcastDialog] Invalid ID:', id);
+                        Logger.warn('broadcast', '🔍 [CreateBroadcastDialog] Invalid ID:', id);
                         return null;
                       }
                       return num;
@@ -268,11 +269,11 @@ function CreateBroadcastDialog({ open, onOpenChange }: CreateBroadcastDialogProp
                   options={teams.map((t: any) => ({ label: t.name, value: String(t.id) }))}
                   defaultValue={(formData.recipient_config.teams || []).map(String)}
                   onValueChange={(teamIds) => {
-                    console.log('🔍 [CreateBroadcastDialog] MultiSelect onValueChange (teams):', teamIds);
+                    Logger.info('broadcast', '🔍 [CreateBroadcastDialog] MultiSelect onValueChange (teams):', teamIds);
                     const numericIds = teamIds.map(id => {
                       const num = Number(id);
                       if (isNaN(num)) {
-                        console.warn('🔍 [CreateBroadcastDialog] Invalid team ID:', id);
+                        Logger.warn('broadcast', '🔍 [CreateBroadcastDialog] Invalid team ID:', id);
                         return null;
                       }
                       return num;

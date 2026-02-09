@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ColumnBuilderOptions } from './types';
 import { createVisibilityChecker } from './shared/utils';
+import { Logger } from '@/utils/logger';
 
 export function createBaseColumns(opts: ColumnBuilderOptions) {
   const {
@@ -81,12 +82,21 @@ export function createBaseColumns(opts: ColumnBuilderOptions) {
           <div 
             className={`wh-task-checkbox flex items-center justify-center cursor-pointer ${isCompact ? 'w-5 h-5' : 'w-6 h-6'}`}
             onClick={(e) => {
+              Logger.info('ui', '[Selection] Checkbox clicked', { taskId, isSelected, hasNode: !!node, hasApi: !!api });
               e.stopPropagation();
-              if (node) {
-                node.setSelected(!isSelected);
+              if (node && api) {
+                const newValue = !isSelected;
+                Logger.info('ui', '[Selection] Calling setNodesSelected via API', { newValue, nodeId: node.id });
+                // Use grid API method for selection in AG Grid v34
+                api.setNodesSelected({ nodes: [node], newValue });
+                const afterSelect = node.isSelected?.();
+                Logger.info('ui', '[Selection] After setNodesSelected', { afterSelect });
                 requestAnimationFrame(() => {
+                  Logger.info('ui', '[Selection] Refreshing cells');
                   api?.refreshCells?.({ rowNodes: [node], force: true });
                 });
+              } else {
+                Logger.warn('ui', '[Selection] No node or api available');
               }
             }}
           >

@@ -27,6 +27,7 @@ import {
   useDoneStatusId,
   useLatestRef,
   useNewTaskAnimation,
+  useWorkspaceSwitchAnimation,
 } from './workspaceTable/hooks';
 import {
   loadAgGridModules,
@@ -57,6 +58,7 @@ import { buildGetRows } from './workspaceTable/grid/dataSource';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 import { useSpotVisibility } from '@/hooks/useSpotVisibility';
 
+import { Logger } from '@/utils/logger';
 // Lazy load AgGridReact component
 const AgGridReact = lazy(() => import('ag-grid-react').then(module => ({ default: module.AgGridReact }))) as any;
 
@@ -107,6 +109,11 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       // ignore
     }
   }, []);
+
+  // Workspace switch animation - staggered fade-in effect
+  const { animationClass } = useWorkspaceSwitchAnimation({
+    workspaceId,
+  });
 
   const handleSelectionChanged = useCallback(
     (e: any, onSelectionChangedCb?: (selectedIds: number[]) => void) => {
@@ -164,7 +171,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   useEffect(() => {
     loadAgGridModules()
       .then(() => setModulesLoaded(true))
-      .catch(console.error);
+      .catch((err) => Logger.error('workspaces', 'Failed to load AG Grid modules:', err));
   }, []);
 
   // Redux state management
@@ -385,7 +392,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           });
         } catch (e) {
           // Ignore errors, grid might not be ready
-          console.debug('Failed to refresh row classes for animation:', e);
+          Logger.debug('workspaces', 'Failed to refresh row classes for animation:', e);
         }
       }, 250); // Wait 250ms to ensure grid refresh has completed and rows are rendered
       
@@ -415,6 +422,13 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
   useEffect(() => {
     setEmptyOverlayVisible(false);
   }, [workspaceId, searchText]);
+
+  // In client-side mode, set empty overlay based on clientRows length
+  useEffect(() => {
+    if (useClientSide) {
+      setEmptyOverlayVisible(clientRows.length === 0);
+    }
+  }, [useClientSide, clientRows]);
 
   // Grid refresh hook
   const refreshGrid = useGridRefresh({
@@ -522,7 +536,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
       return globalRoles.map((r: any) => typeof r === 'object' ? Number(r.id) : Number(r)).filter(Number.isFinite);
     })(),
     onDeleteTask: handleDeleteTask,
-    onLogTask: (id: number) => console.info('Log action selected (placeholder) for task', id),
+    onLogTask: (id: number) => Logger.info('workspaces', 'Log action selected (placeholder) for task', id),
     slaMap,
     taskFormsMap,
     formVersionMap,
@@ -658,6 +672,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           rowSelection={{ 
             mode: 'multiRow', 
             enableClickSelection: false,
+            enableSelectionWithoutKeys: true, // Allow programmatic selection via node.setSelected()
             checkboxes: false, // Disabled - using custom checkbox in ID column
             headerCheckbox: false,
           }}
@@ -665,8 +680,9 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           getRowClass={getRowClass}
           onGridReady={onGridReady}
           onFirstDataRendered={() => {
-            if (!gridRef.current?.api) return;
-            onFiltersChanged?.(!!gridRef.current.api.isAnyFilterPresent?.());
+            const api = gridRef.current?.api;
+            if (!api || api.isDestroyed?.()) return;
+            onFiltersChanged?.(!!api.isAnyFilterPresent?.());
             onRowDataUpdated();
           }}
           onRowDataUpdated={onRowDataUpdated}
@@ -688,7 +704,7 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
           onColumnVisible={(e: any) => {
             handleColumnOrderChanged(e?.columnApi);
           }}
-          animateRows={false}
+          animateRows={true}
           suppressColumnVirtualisation={false}
           suppressNoRowsOverlay={false}
           loading={false}
@@ -714,7 +730,8 @@ const WorkspaceTable = forwardRef<WorkspaceTableHandle, {
         existingTaskFormId={formDialogState.existingTaskFormId}
         existingData={formDialogState.existingData}
       />
-    </Suspense>
+    </Suspense>,
+    animationClass
   );
 });
 

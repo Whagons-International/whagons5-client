@@ -96,6 +96,76 @@ export const Workspace = () => {
   const spots = useSelector((s: RootState) => (s as any).spots.value as any[]);
   const users = useSelector((s: RootState) => (s as any).users.value as any[]);
   const tags = useSelector((s: RootState) => (s as any).tags.value as any[]);
+  const categories = useSelector((s: RootState) => (s as any).categories.value as any[]);
+  const workspaces = useSelector((s: RootState) => (s as any).workspaces.value as any[]);
+  const spotTypes = useSelector((s: RootState) => (s as any).spotTypes.value as any[]);
+
+  // Get current workspace data for filtering
+  const currentWorkspace = useMemo(() => {
+    if (isAllWorkspaces || !id) return null;
+    return workspaces.find((w: any) => String(w.id) === id);
+  }, [workspaces, id, isAllWorkspaces]);
+
+  // Get category IDs for the current workspace
+  const workspaceCategoryIds = useMemo(() => {
+    if (isAllWorkspaces || !currentWorkspace) return null; // null means show all
+    
+    // PROJECT workspaces use allowed_category_ids
+    if (currentWorkspace.type === 'PROJECT') {
+      const allowed = Array.isArray(currentWorkspace.allowed_category_ids) 
+        ? currentWorkspace.allowed_category_ids 
+        : [];
+      return new Set(allowed.map((id: any) => Number(id)));
+    }
+    
+    // DEFAULT workspaces use categories with matching workspace_id
+    const catIds = (categories || [])
+      .filter((c: any) => Number(c.workspace_id) === Number(currentWorkspace.id))
+      .map((c: any) => Number(c.id));
+    return new Set(catIds);
+  }, [isAllWorkspaces, currentWorkspace, categories]);
+
+  // Filter priorities by workspace categories - only include those with category_id in this workspace
+  const workspacePriorities = useMemo(() => {
+    if (!workspaceCategoryIds) return priorities || []; // Show all for "all workspaces"
+    return (priorities || []).filter((p: any) => {
+      const catId = Number(p.category_id);
+      // Only include priorities that belong to this workspace's categories
+      return Number.isFinite(catId) && workspaceCategoryIds.has(catId);
+    });
+  }, [priorities, workspaceCategoryIds]);
+
+  // Filter statuses by workspace categories - only include those with category_id in this workspace
+  const workspaceStatuses = useMemo(() => {
+    if (!workspaceCategoryIds) return statuses || []; // Show all for "all workspaces"
+    return (statuses || []).filter((s: any) => {
+      const catId = Number(s.category_id);
+      // Only include statuses that belong to this workspace's categories
+      return Number.isFinite(catId) && workspaceCategoryIds.has(catId);
+    });
+  }, [statuses, workspaceCategoryIds]);
+
+  // Filter spots by spot_type's workspace_id (spots belong to spot_types which have workspace_id)
+  const workspaceSpots = useMemo(() => {
+    if (isAllWorkspaces || !currentWorkspace) return spots || []; // Show all for "all workspaces"
+    const wsId = Number(currentWorkspace.id);
+    const typeById = new Map((spotTypes || []).map((st: any) => [st.id, st]));
+    return (spots || []).filter((s: any) => {
+      const st: any = typeById.get(s.spot_type_id);
+      // Include spots where spot_type has no workspace_id (global) or matches current workspace
+      return !st?.workspace_id || Number(st.workspace_id) === wsId;
+    });
+  }, [spots, spotTypes, currentWorkspace, isAllWorkspaces]);
+
+  // Filter tags by workspace categories - only include those with category_id in this workspace
+  const workspaceTags = useMemo(() => {
+    if (!workspaceCategoryIds) return tags || []; // Show all for "all workspaces"
+    return (tags || []).filter((t: any) => {
+      const catId = Number(t.category_id);
+      // Only include tags that belong to this workspace's categories
+      return Number.isFinite(catId) && workspaceCategoryIds.has(catId);
+    });
+  }, [tags, workspaceCategoryIds]);
 
   // Derived status groupings for stats
   const doneStatusId = (statuses || []).find((s: any) => String((s as any).action || '').toUpperCase() === 'FINISHED')?.id
@@ -119,7 +189,8 @@ export const Workspace = () => {
     headerKpiCards,
     setHeaderKpiCards,
     headerCards,
-    canReorderHeaderKpis
+    canReorderHeaderKpis,
+    isReorderingRef,
   } = useWorkspaceKpiCards({
     workspaceIdNum,
     currentUserId,
@@ -164,6 +235,7 @@ export const Workspace = () => {
     setCustomTabOrder,
     headerKpiCards,
     setHeaderKpiCards,
+    isReorderingRef,
   });
 
   // DnD sensors
@@ -641,9 +713,9 @@ export const Workspace = () => {
         open={filtersOpen}
         onOpenChange={setFiltersOpen}
         workspaceId={isAllWorkspaces ? 'all' : (id || 'all')}
-        statuses={(statuses || []).map((s: any) => ({ id: Number(s.id), name: s.name }))}
-        priorities={(priorities || []).map((p: any) => ({ id: Number(p.id), name: p.name }))}
-        spots={(spots || []).map((sp: any) => ({ id: Number(sp.id), name: sp.name }))}
+        statuses={(workspaceStatuses || []).map((s: any) => ({ id: Number(s.id), name: s.name }))}
+        priorities={(workspacePriorities || []).map((p: any) => ({ id: Number(p.id), name: p.name }))}
+        spots={(workspaceSpots || []).map((sp: any) => ({ id: Number(sp.id), name: sp.name }))}
         owners={(users || [])
           .map((u: any) => {
             const idNum = Number(u.id);
@@ -651,7 +723,7 @@ export const Workspace = () => {
             return { id: idNum, name: u.name || u.email || `User #${idNum}` };
           })
           .filter((o): o is { id: number; name: string } => Boolean(o))}
-        tags={(tags || [])
+        tags={(workspaceTags || [])
           .filter((t: any) => {
             const idNum = Number(t.id);
             return Number.isFinite(idNum);

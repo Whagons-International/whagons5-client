@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { Logger } from '@/utils/logger';
 interface RadiographyEffectProps {
   onClose?: () => void;
 }
@@ -224,7 +225,7 @@ export default function RadiographyEffect({ onClose }: RadiographyEffectProps) {
 
         animationFrameRef.current = requestAnimationFrame(animate);
       } catch (error) {
-        console.error('Error in depth perspective animation:', error);
+        Logger.error('ui', 'Error in depth perspective animation:', error);
         // Continue animation even if there's an error
         animationFrameRef.current = requestAnimationFrame(animate);
       }

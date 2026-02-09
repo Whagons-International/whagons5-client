@@ -1,3 +1,4 @@
+import { Logger } from '@/utils/logger';
 interface CachedIcon {
   id: string;
   name: string;
@@ -29,7 +30,7 @@ class IconCacheManager {
       const request = indexedDB.open(this.dbName, this.dbVersion);
 
       request.onerror = () => {
-        console.error('Failed to open IndexedDB:', request.error);
+        Logger.error('cache', 'Failed to open IndexedDB:', request.error);
         reject(request.error);
       };
 
@@ -88,12 +89,12 @@ class IconCacheManager {
         };
 
         request.onerror = () => {
-          console.error('Error retrieving cached icon:', request.error);
+          Logger.error('cache', 'Error retrieving cached icon:', request.error);
           reject(request.error);
         };
       });
     } catch (error) {
-      console.error('Error in getCachedIcon:', error);
+      Logger.error('cache', 'Error in getCachedIcon:', error);
       return null;
     }
   }
@@ -117,12 +118,12 @@ class IconCacheManager {
       return new Promise((resolve, reject) => {
         request.onsuccess = () => resolve();
         request.onerror = () => {
-          console.error('Error caching icon:', request.error);
+          Logger.error('cache', 'Error caching icon:', request.error);
           reject(request.error);
         };
       });
     } catch (error) {
-      console.error('Error in setCachedIcon:', error);
+      Logger.error('cache', 'Error in setCachedIcon:', error);
       throw error;
     }
   }
@@ -137,12 +138,12 @@ class IconCacheManager {
       return new Promise((resolve, reject) => {
         request.onsuccess = () => resolve();
         request.onerror = () => {
-          console.error('Error deleting cached icon:', request.error);
+          Logger.error('cache', 'Error deleting cached icon:', request.error);
           reject(request.error);
         };
       });
     } catch (error) {
-      console.error('Error in deleteCachedIcon:', error);
+      Logger.error('cache', 'Error in deleteCachedIcon:', error);
       throw error;
     }
   }
@@ -172,7 +173,7 @@ class IconCacheManager {
           };
 
           request.onerror = () => {
-            console.error('Error retrieving cached icon:', request.error);
+            Logger.error('cache', 'Error retrieving cached icon:', request.error);
             reject(request.error);
           };
         });
@@ -181,7 +182,7 @@ class IconCacheManager {
       await Promise.all(promises);
       return results;
     } catch (error) {
-      console.error('Error in getCachedIcons:', error);
+      Logger.error('cache', 'Error in getCachedIcons:', error);
       return {};
     }
   }
@@ -206,7 +207,7 @@ class IconCacheManager {
           const request = store.put(cachedIcon);
           request.onsuccess = () => resolve();
           request.onerror = () => {
-            console.error('Error caching icon:', request.error);
+            Logger.error('cache', 'Error caching icon:', request.error);
             reject(request.error);
           };
         });
@@ -214,7 +215,7 @@ class IconCacheManager {
 
       await Promise.all(promises);
     } catch (error) {
-      console.error('Error in setCachedIcons:', error);
+      Logger.error('cache', 'Error in setCachedIcons:', error);
       throw error;
     }
   }
@@ -249,12 +250,12 @@ class IconCacheManager {
         };
 
         request.onerror = () => {
-          console.error('Error clearing outdated icons:', request.error);
+          Logger.error('cache', 'Error clearing outdated icons:', request.error);
           reject(request.error);
         };
       });
     } catch (error) {
-      console.error('Error in clearOutdatedIcons:', error);
+      Logger.error('cache', 'Error in clearOutdatedIcons:', error);
       throw error;
     }
   }
@@ -269,12 +270,12 @@ class IconCacheManager {
       return new Promise((resolve, reject) => {
         request.onsuccess = () => resolve();
         request.onerror = () => {
-          console.error('Error clearing all icons:', request.error);
+          Logger.error('cache', 'Error clearing all icons:', request.error);
           reject(request.error);
         };
       });
     } catch (error) {
-      console.error('Error in clearAllIcons:', error);
+      Logger.error('cache', 'Error in clearAllIcons:', error);
       throw error;
     }
   }
@@ -294,12 +295,12 @@ class IconCacheManager {
           });
         };
         request.onerror = () => {
-          console.error('Error getting storage info:', request.error);
+          Logger.error('cache', 'Error getting storage info:', request.error);
           reject(request.error);
         };
       });
     } catch (error) {
-      console.error('Error in getStorageInfo:', error);
+      Logger.error('cache', 'Error in getStorageInfo:', error);
       return { totalIcons: 0, cacheSize: 0 };
     }
   }

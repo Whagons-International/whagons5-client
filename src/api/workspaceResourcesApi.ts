@@ -1,6 +1,7 @@
 import { api } from '@/store/api/internalApi';
 import { getFileUrl } from './assetApi';
 
+import { Logger } from '@/utils/logger';
 export interface WorkspaceResource {
   id: number;
   uuid: string;
@@ -90,7 +91,7 @@ export const deleteWorkspaceResource = async (
   } catch (error: any) {
     // Treat 404 as non-fatal (resource may have already been deleted)
     if (error?.response?.status === 404) {
-      console.warn(`Workspace resource ${resourceId} not found (may have already been deleted)`);
+      Logger.warn('api', `Workspace resource ${resourceId} not found (may have already been deleted)`);
       return;
     }
     // Rethrow any other errors

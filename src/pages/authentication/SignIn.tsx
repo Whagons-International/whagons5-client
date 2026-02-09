@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/providers/LanguageProvider';
 
+import { Logger } from '@/utils/logger';
 const SignIn: React.FC = () => {
   const { t } = useLanguage();
   const [email, setEmail] = useState<string>('');
@@ -53,7 +54,7 @@ const SignIn: React.FC = () => {
 
   async function backendLogin(idToken: string) {
     try {
-      console.log('idToken', idToken);
+      Logger.info('auth', 'idToken', idToken);
 
       const response = await actionsApi.post(`/login`,
         {
@@ -62,7 +63,7 @@ const SignIn: React.FC = () => {
       );
 
       if (response.status === 200) {
-        console.log('Successfully logged in and sent idToken to backend');
+        Logger.info('auth', 'Successfully logged in and sent idToken to backend');
         updateAuthToken(response.data.token);
         
         // Refetch user data after login - the useEffect will handle redirect once user data is loaded
@@ -70,11 +71,11 @@ const SignIn: React.FC = () => {
         
         return true;
       } else {
-        console.error('Login failed with status:', response.status);
+        Logger.error('auth', 'Login failed with status:', response.status);
         return false;
       }
     } catch (error) {
-      console.error('Login error:', error);
+      Logger.error('auth', 'Login error:', error);
       return false;
     }
   }
@@ -102,7 +103,7 @@ const SignIn: React.FC = () => {
           alert(t('auth.googleSignInFailed', 'Google sign-in failed. Please try again.'));
         }
       } else {
-        console.error('Google sign-in error:', error);
+        Logger.error('auth', 'Google sign-in error:', error);
         alert(t('auth.googleSignInFailed', 'Google sign-in failed. Please try again.'));
       }
     } finally {
@@ -120,7 +121,7 @@ const SignIn: React.FC = () => {
           const ok = await backendLogin(idToken);
           if (!ok) alert(t('auth.loginFailed', 'Login failed. Please try again.'));
         } catch (e) {
-          console.error('Reusing Firebase session failed:', e);
+          Logger.error('auth', 'Reusing Firebase session failed:', e);
           alert(t('auth.loginFailed', 'Login failed. Please try again.'));
         }
         return;
@@ -136,7 +137,7 @@ const SignIn: React.FC = () => {
       try {
         userCredential = await signInWithEmail(email, password);
       } catch (error) {
-        console.error('Email sign-in error (Firebase):', error);
+        Logger.error('auth', 'Email sign-in error (Firebase):', error);
         alert(t('auth.emailSignInFailed', 'Email sign-in failed. Please try again.'));
         return; // Do not logout here; let auth state remain untouched
       }
@@ -146,7 +147,7 @@ const SignIn: React.FC = () => {
       try {
         idToken = await userCredential.user.getIdToken();
       } catch (error) {
-        console.error('Failed to get ID token:', error);
+        Logger.error('auth', 'Failed to get ID token:', error);
         alert(t('auth.loginFailed', 'Login failed. Please try again.'));
         return;
       }
@@ -176,7 +177,7 @@ const SignIn: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('Google linking error:', error);
+      Logger.error('auth', 'Google linking error:', error);
       alert(t('auth.failedToLinkGoogle', 'Failed to link Google account. Please try again.'));
     }
   };

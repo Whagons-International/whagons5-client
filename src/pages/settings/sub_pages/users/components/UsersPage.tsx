@@ -22,6 +22,7 @@ import { getUserTeamRoleId } from "../utils/getUserTeamRoleId";
 import { UserStatistics } from "./UserStatistics";
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 
+import { Logger } from '@/utils/logger';
 import {
   SettingsLayout,
   SettingsGrid,
@@ -336,7 +337,7 @@ function Users() {
         pinned: 'left',
         lockPosition: true,
         headerName: '',
-        suppressMenu: true,
+        suppressHeaderMenuButton: true,
         sortable: false,
         filter: false,
         resizable: false
@@ -672,10 +673,10 @@ function Users() {
       // If error is 404 or 500, the invitation might already be deleted
       // Refresh from IndexedDB to sync state
       if (error?.response?.status === 404 || error?.response?.status === 500) {
-        console.warn('Invitation may already be deleted, refreshing from cache');
+        Logger.warn('settings', 'Invitation may already be deleted, refreshing from cache');
         // No manual cache hydration here; state is kept in sync by login hydration + CRUD thunks/RTL.
       }
-      console.error('Failed to delete invitation:', error);
+      Logger.error('settings', 'Failed to delete invitation:', error);
       setIsDeleteInvitationDialogOpen(false);
       setDeletingInvitation(null);
     }
@@ -940,7 +941,7 @@ function Users() {
               role_id: defaultRole?.id || null
             })).unwrap();
           } catch (error) {
-            console.error(`Failed to add user-team relationship:`, error);
+            Logger.error('settings', `Failed to add user-team relationship:`, error);
             setFormError(tu('errors.addTeamFailed', `Failed to add team relationship: ${error instanceof Error ? error.message : 'Unknown error'}`));
           }
         }
@@ -1071,7 +1072,7 @@ function Users() {
             role_id: add.roleIdNum
           })).unwrap();
         } catch (error: any) {
-          console.error(`Failed to add user-team relationship:`, error);
+          Logger.error('settings', `Failed to add user-team relationship:`, error);
           const errorMsg = error?.response?.data?.message || error?.message || 'Unknown error';
           setFormError(tu('errors.addTeamFailed', `Failed to add team relationship: ${errorMsg}`));
           return;
@@ -1089,7 +1090,7 @@ function Users() {
             }
           })).unwrap();
         } catch (error: any) {
-          console.error(`Failed to update user-team relationship:`, error);
+          Logger.error('settings', `Failed to update user-team relationship:`, error);
           const errorMsg = error?.response?.data?.message || error?.message || 'Unknown error';
           setFormError(tu('errors.updateTeamFailed', `Failed to update team relationship: ${errorMsg}`));
           return;
@@ -1101,7 +1102,7 @@ function Users() {
         try {
           await dispatch((genericActions as any).userTeams.removeAsync(del.id)).unwrap();
         } catch (error: any) {
-          console.error(`Failed to remove user-team relationship:`, error);
+          Logger.error('settings', `Failed to remove user-team relationship:`, error);
           const errorMsg = error?.response?.data?.message || error?.message || 'Unknown error';
           setFormError(tu('errors.removeTeamFailed', `Failed to remove team relationship: ${errorMsg}`));
           return;
@@ -1251,7 +1252,7 @@ function Users() {
                         
                         // Update state and save to localStorage
                         if (newOrder.length > 0) {
-                          console.log('Saving new user order:', newOrder);
+                          Logger.info('settings', 'Saving new user order:', newOrder);
                           setUserOrder(newOrder);
                           saveUserOrder(newOrder);
                         }

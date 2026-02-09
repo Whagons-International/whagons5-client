@@ -38,7 +38,7 @@ export function useMetadataSync(opts: {
   // Keep grid cells in sync with hydrated metadata (batched to avoid many small effects)
   useEffect(() => {
     const api = gridRef.current?.api;
-    if (!api) return;
+    if (!api || api.isDestroyed?.()) return;
 
     const cols = new Set<string>();
     cols.add('status_id');
@@ -83,7 +83,9 @@ export function useMetadataSync(opts: {
 
     schedule(() => {
       try {
-        api.refreshCells({ columns: Array.from(cols), force: true, suppressFlash: true });
+        if (!api.isDestroyed?.()) {
+          api.refreshCells({ columns: Array.from(cols), force: true, suppressFlash: true });
+        }
       } catch {
         // ignore
       }

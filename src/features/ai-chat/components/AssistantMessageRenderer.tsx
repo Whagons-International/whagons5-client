@@ -2,6 +2,7 @@ import { useMemo, useEffect, useState, useRef } from "react";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { ContentItem } from "../models";
 import Prism from "prismjs";
+import { LoadingWidget } from "./LoadingWidget";
 
 interface AssistantMessageProps {
   fullContent: string | ContentItem[] | { name: string };
@@ -138,10 +139,13 @@ const AssistantMessageRenderer: React.FC<AssistantMessageProps> = (props) => {
               {bufferedContent || (props.gettingResponse ? "" : String(content || ""))}
             </MarkdownRenderer>
             {props.gettingResponse && props.isLast && (
-              <span className="loading-dots">
-                <span></span>
-                <span></span>
-                <span></span>
+              <span className="inline-block align-middle ml-1">
+                <LoadingWidget
+                  size={20}
+                  strokeWidthRatio={10}
+                  color="currentColor"
+                  cycleDuration={0.9}
+                />
               </span>
             )}
           </div>

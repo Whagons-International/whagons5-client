@@ -9,6 +9,7 @@ import { api as apiClient } from './api/internalApi';
 import { ApiLoadingTracker } from '@/api/apiLoadingTracker';
 import { TasksCache } from './indexedDB/TasksCache';
 
+import { Logger } from '@/utils/logger';
 const coreKeys = [
   'workspaces',
   'teams',
@@ -84,7 +85,7 @@ export class DataManager {
         if (actions?.getFromIndexedDB) {
           return this.dispatch(actions.getFromIndexedDB());
         } else {
-          console.warn('DataManager: missing generic actions for key', key);
+          Logger.warn('cache', 'DataManager: missing generic actions for key', key);
           return Promise.resolve();
         }
       })
@@ -99,7 +100,7 @@ export class DataManager {
     try {
       await apiClient.get('/bootstrap');
     } catch (error) {
-      console.warn('DataManager: bootstrap failed', error);
+      Logger.warn('cache', 'DataManager: bootstrap failed', error);
     }
 
     const cursorKey = this.getCursorKey();
@@ -121,7 +122,7 @@ export class DataManager {
         (categories?.length ?? 0) > 0 ||
         (kpis?.length ?? 0) > 0;
     } catch (error) {
-      console.warn('DataManager: failed to read cache snapshot', error);
+      Logger.warn('cache', 'DataManager: failed to read cache snapshot', error);
     }
 
     if (!hasLocalData && cursorKey && cursor) {
@@ -162,7 +163,7 @@ export class DataManager {
       try {
         await DB.deleteDatabase(uid);
       } catch (error) {
-        console.warn('DataManager: failed to delete IndexedDB for resync', error);
+        Logger.warn('cache', 'DataManager: failed to delete IndexedDB for resync', error);
       }
     }
     const cursorKey = this.getCursorKey();
@@ -258,7 +259,7 @@ export class DataManager {
             await syncReduxForTable(table);
             syncedTables.add(table);
           } catch (error) {
-            console.warn('DataManager: sync redux failed', table, error);
+            Logger.warn('cache', 'DataManager: sync redux failed', table, error);
           }
         }));
       };
@@ -301,7 +302,7 @@ export class DataManager {
         try {
           msg = JSON.parse(trimmed);
         } catch (error) {
-          console.warn('DataManager: failed to parse sync line', error);
+          Logger.warn('cache', 'DataManager: failed to parse sync line', error);
           return;
         }
 
@@ -346,7 +347,7 @@ export class DataManager {
                 }
                 touchedTables.add(msg.entity);
               } catch (error) {
-                console.warn('DataManager: snapshot cleanup failed', msg.entity, error);
+                Logger.warn('cache', 'DataManager: snapshot cleanup failed', msg.entity, error);
               }
             }
           }

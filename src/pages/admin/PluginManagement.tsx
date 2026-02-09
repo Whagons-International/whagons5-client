@@ -52,6 +52,7 @@ import {
 import { arrayMove, SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+import { Logger } from '@/utils/logger';
 interface Plugin {
 	id: number;
 	slug: string;
@@ -357,7 +358,7 @@ export default function PluginManagement() {
 			dispatch(genericInternalActions.plugins.getFromIndexedDB());
 			dispatch(genericInternalActions.plugins.fetchFromAPI());
 		} catch (error) {
-			console.error('Error fetching plugins:', error);
+			Logger.error('ui', 'Error fetching plugins:', error);
 			toast.error(t('plugins.management.fetchError', 'Failed to fetch plugins'));
 		}
 	};
@@ -379,7 +380,7 @@ export default function PluginManagement() {
 					: t('plugins.management.disabledSuccess', '{name} has been disabled').replace('{name}', plugin.name)
 			);
 		} catch (error) {
-			console.error('Error toggling plugin:', error);
+			Logger.error('ui', 'Error toggling plugin:', error);
 			toast.error(
 				plugin.is_enabled
 					? t('plugins.management.disableError', 'Failed to disable {name}').replace('{name}', plugin.name)

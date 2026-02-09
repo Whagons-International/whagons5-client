@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Logger } from '@/utils/logger';
 import {
 	Popover,
 	PopoverContent,
@@ -553,7 +554,7 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 				const action = deduplicateOptions
 					? "automatically removed"
 					: "detected";
-				console.warn(
+				Logger.warn('ui', 
 					`MultiSelect: Duplicate option values ${action}: ${duplicates.join(
 						", "
 					)}. ` +
@@ -571,7 +572,7 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 			(value: string): MultiSelectOption | undefined => {
 				const option = getAllOptions().find((option) => option.value === value);
 				if (!option && process.env.NODE_ENV === "development") {
-					console.warn(
+					Logger.warn('ui', 
 						`MultiSelect: Option with value "${value}" not found in options list`
 					);
 				}

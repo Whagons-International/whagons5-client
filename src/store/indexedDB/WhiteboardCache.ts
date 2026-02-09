@@ -2,6 +2,7 @@ import { DB } from "./DB";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/types/element/types";
 import type { AppState } from "@excalidraw/excalidraw/types/types";
 
+import { Logger } from '@/utils/logger';
 // Legacy types kept for reference / migration
 export interface Page {
   id: string;
@@ -54,7 +55,7 @@ export class WhiteboardCache {
       const data = await DB.get(WhiteboardCache.STORE_NAME, workspaceId);
       return data || null;
     } catch (error) {
-      console.error('[WhiteboardCache] Failed to get whiteboard:', error);
+      Logger.error('cache', '[WhiteboardCache] Failed to get whiteboard:', error);
       return null;
     }
   }
@@ -65,7 +66,7 @@ export class WhiteboardCache {
   static async saveWhiteboard(data: WhiteboardData): Promise<void> {
     if (!DB.inited) await DB.init();
     if (!data.workspaceId) {
-      console.error('[WhiteboardCache] Cannot save whiteboard without workspaceId');
+      Logger.error('cache', '[WhiteboardCache] Cannot save whiteboard without workspaceId');
       return;
     }
 
@@ -77,7 +78,7 @@ export class WhiteboardCache {
         updatedAt: Date.now(),
       });
     } catch (error) {
-      console.error('[WhiteboardCache] Failed to save whiteboard:', error);
+      Logger.error('cache', '[WhiteboardCache] Failed to save whiteboard:', error);
       throw error;
     }
   }
@@ -92,7 +93,7 @@ export class WhiteboardCache {
     try {
       await DB.delete(WhiteboardCache.STORE_NAME, workspaceId);
     } catch (error) {
-      console.error('[WhiteboardCache] Failed to delete whiteboard:', error);
+      Logger.error('cache', '[WhiteboardCache] Failed to delete whiteboard:', error);
     }
   }
 }

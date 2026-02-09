@@ -14,6 +14,7 @@ import { enTranslations } from "@/locales/en";
 import { ptTranslations } from "@/locales/pt";
 import { boardsTranslations, boardsTranslationsES, boardsTranslationsPT } from "@/locales/boards";
 
+import { Logger } from '@/utils/logger';
 type TranslationDictionary = Record<string, string>;
 
 const TRANSLATION_REGISTRY: Record<string, TranslationDictionary> = {
@@ -97,7 +98,7 @@ export const useLanguage = () => {
     // During HMR or concurrent rendering, context might be temporarily unavailable
     // Provide a fallback to prevent crashes
     if (import.meta.env.DEV) {
-      console.warn("useLanguage called outside LanguageProvider, using fallback");
+      Logger.warn('ui', "useLanguage called outside LanguageProvider, using fallback");
       const fallbackLanguage = getInitialLanguage();
       const fallbackTranslate = (key: string, fallback?: string) => {
         const dictionary =

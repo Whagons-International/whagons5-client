@@ -24,6 +24,8 @@ ENV VITE_DOMAIN=$VITE_DOMAIN
 ENV VITE_CACHE_ENCRYPTION=$VITE_CACHE_ENCRYPTION
 ENV VITE_ALLOW_UNVERIFIED_LOGIN=$VITE_ALLOW_UNVERIFIED_LOGIN
 ENV VITE_ALLOW_UNVERIFIED_EMAIL_REGEX=$VITE_ALLOW_UNVERIFIED_EMAIL_REGEX
+# Use placeholder - will be replaced at runtime with SOURCE_COMMIT
+ENV VITE_GIT_COMMIT=__RUNTIME_COMMIT__
 
 # Copy package files
 COPY package.json bun.lock* bun.lockb* package-lock.json* pnpm-lock.yaml* ./
@@ -85,6 +87,15 @@ RUN printf 'server {\n\
     }\n\
 }\n' > /etc/nginx/conf.d/default.conf
 
+# Create startup script to inject SOURCE_COMMIT at runtime
+RUN printf '#!/bin/sh\n\
+COMMIT=${SOURCE_COMMIT:-unknown}\n\
+# Shorten to 7 chars if full hash\n\
+COMMIT=$(echo "$COMMIT" | cut -c1-7)\n\
+# Replace placeholder in all JS files\n\
+find /usr/share/nginx/html/assets -name "*.js" -exec sed -i "s/__RUNTIME_COMMIT__/$COMMIT/g" {} \\;\n\
+exec nginx -g "daemon off;"\n' > /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
+
 EXPOSE 3000
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/docker-entrypoint.sh"]

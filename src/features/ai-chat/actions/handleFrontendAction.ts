@@ -1,5 +1,6 @@
 import type { NavigateFunction } from "react-router-dom";
 
+import { Logger } from '@/utils/logger';
 type WsSend = (conversationId: string, payload: any) => boolean;
 
 /**
@@ -20,15 +21,15 @@ export function handleFrontendAction(
 
   try {
     if (action === "navigate" && actionData.path) {
-      console.log('[FRONTEND_ACTION] Navigating to:', actionData.path);
+      Logger.info('assistant', '[FRONTEND_ACTION] Navigating to:', actionData.path);
       navigate(actionData.path);
       responseMessage = `Navigated to ${actionData.path}`;
     } else if (action === "alert" && actionData.message) {
-      console.log('[FRONTEND_ACTION] Alert:', actionData.message);
+      Logger.info('assistant', '[FRONTEND_ACTION] Alert:', actionData.message);
       alert(actionData.message);
       responseMessage = "Alert shown";
     } else if (action === "create_kpi" && actionData.name) {
-      console.log('[FRONTEND_ACTION] Creating KPI:', actionData.name, 'Full data:', JSON.stringify(actionData));
+      Logger.info('assistant', '[FRONTEND_ACTION] Creating KPI:', actionData.name, 'Full data:', JSON.stringify(actionData));
       import("./createKpi").then(({ handleCreateKpiPrompt }) => {
         handleCreateKpiPrompt(
           { tool: 'Create_Kpi', data: actionData },
@@ -48,7 +49,7 @@ export function handleFrontendAction(
       });
       return; // async — response sent from callback
     } else if (action === "update_kpi" && actionData.id) {
-      console.log('[FRONTEND_ACTION] Updating KPI:', actionData.id, 'Full data:', JSON.stringify(actionData));
+      Logger.info('assistant', '[FRONTEND_ACTION] Updating KPI:', actionData.id, 'Full data:', JSON.stringify(actionData));
       import("./updateKpi").then(({ handleUpdateKpiPrompt }) => {
         handleUpdateKpiPrompt(
           { tool: 'Update_Kpi', data: actionData },
@@ -68,7 +69,7 @@ export function handleFrontendAction(
       });
       return;
     } else if (action === "delete_kpi" && actionData.id) {
-      console.log('[FRONTEND_ACTION] Deleting KPI:', actionData.id);
+      Logger.info('assistant', '[FRONTEND_ACTION] Deleting KPI:', actionData.id);
       import("./deleteKpi").then(({ handleDeleteKpiPrompt }) => {
         handleDeleteKpiPrompt(
           { tool: 'Delete_Kpi', data: actionData },
@@ -88,7 +89,7 @@ export function handleFrontendAction(
       });
       return;
     } else if (action === "list_kpi") {
-      console.log('[FRONTEND_ACTION] Listing KPI cards');
+      Logger.info('assistant', '[FRONTEND_ACTION] Listing KPI cards');
       import("./listKpi").then(({ handleListKpiPrompt }) => {
         handleListKpiPrompt(
           { tool: 'List_Kpi', data: actionData },

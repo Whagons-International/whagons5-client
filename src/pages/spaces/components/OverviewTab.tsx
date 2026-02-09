@@ -11,6 +11,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { AppDispatch, RootState } from "@/store";
 import { genericActions } from '@/store/genericSlices';
+import { Logger } from '@/utils/logger';
 import {
   Dialog,
   DialogContent,
@@ -164,7 +165,7 @@ function OverviewTab({
         setTotalIconsCount(allIcons.length);
         setAllIconsMetadata(allIcons);
       } catch (error) {
-        console.error('Error loading default and popular icons:', error);
+        Logger.error('ui', 'Error loading default and popular icons:', error);
       }
     };
     loadDefaultAndPopularIcons();
@@ -196,7 +197,7 @@ function OverviewTab({
       setDisplayedIcons(prev => [...prev, ...loadedIconsData]);
       setLoadedIconsCount(endIndex);
     } catch (error) {
-      console.error('Error loading more icons:', error);
+      Logger.error('ui', 'Error loading more icons:', error);
     } finally {
       setLoadingMoreIcons(false);
     }
@@ -243,7 +244,7 @@ function OverviewTab({
         setDisplayedIcons(searchResults);
         setLoadedIconsCount(searchResults.length);
       } catch (error) {
-        console.error('Error searching icons:', error);
+        Logger.error('ui', 'Error searching icons:', error);
         setDisplayedIcons([]);
         setLoadedIconsCount(0);
       } finally {
@@ -323,7 +324,7 @@ function OverviewTab({
           const icon = await iconService.getIcon(workspaceInfo.icon);
           setCurrentIcon(icon);
         } catch (error) {
-          console.error('Error loading current icon:', error);
+          Logger.error('ui', 'Error loading current icon:', error);
           setCurrentIcon(defaultIcon);
         }
       }
@@ -342,7 +343,7 @@ function OverviewTab({
           const icon = await iconService.getIcon(tempIcon);
           setCurrentIcon(icon);
         } catch (error) {
-          console.error('Error loading temp icon:', error);
+          Logger.error('ui', 'Error loading temp icon:', error);
           setCurrentIcon(defaultIcon);
         }
       }
@@ -427,7 +428,7 @@ function OverviewTab({
       // Navigate to home or workspace list after successful deletion
       navigate('/tasks'); // or wherever you want to redirect after deletion
     } catch (error) {
-      console.error('Failed to delete workspace:', error);
+      Logger.error('ui', 'Failed to delete workspace:', error);
       // Error is handled by the slice and will show in UI
     } finally {
       setIsDeleting(false);

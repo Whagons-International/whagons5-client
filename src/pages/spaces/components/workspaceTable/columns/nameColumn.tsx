@@ -39,18 +39,18 @@ export function createNameColumn(opts: ColumnBuilderOptions, latestNoteByTaskId:
   return {
     field: 'name',
     headerName: t('workspace.columns.name', 'Name'),
-    flex: 3.8,
+    width: 400,
     filter: false,
     cellRenderer: (p: any) => {
       // Loading placeholder when row data isn't ready (infinite row model)
       if (!p.data) {
         return (
-          <div className="flex flex-col gap-2 py-2 min-w-0">
+          <div className="flex flex-col gap-2 py-2 w-full">
             <div className="flex items-center gap-2.5">
-              <div className="w-6 h-6 rounded-lg bg-muted animate-pulse" />
-              <div className="h-4 w-[40%] bg-muted animate-pulse rounded" />
+              <div className="w-6 h-6 rounded-lg bg-muted animate-pulse flex-shrink-0" />
+              <div className="h-4 flex-1 bg-muted animate-pulse rounded" />
             </div>
-            <div className="h-3 w-[60%] bg-muted/70 animate-pulse rounded ml-8" />
+            <div className="h-3 w-3/4 bg-muted/70 animate-pulse rounded ml-[34px]" />
           </div>
         );
       }

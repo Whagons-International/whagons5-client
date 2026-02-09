@@ -4,6 +4,7 @@ import type { RootState } from "@/store/store";
 import type { SchedulerResource, SchedulerEvent } from "../types/scheduler";
 import { parseLocalDateTime } from "../utils/dateTime";
 
+import { Logger } from '@/utils/logger';
 interface User {
   id: number;
   name: string;
@@ -132,7 +133,7 @@ export function useSchedulerData(workspaceId: string | undefined) {
   // Transform tasks to scheduler events
   const events = useMemo<SchedulerEvent[]>(() => {
     if (!workspaceId) {
-      console.log('[useSchedulerData] No workspaceId provided');
+      Logger.info('scheduler', '[useSchedulerData] No workspaceId provided');
       return [];
     }
 
@@ -144,7 +145,7 @@ export function useSchedulerData(workspaceId: string | undefined) {
     workspaceTasks.forEach((task) => {
       if (!task.start_date || !task.user_ids || task.user_ids.length === 0) {
         skippedTasks++;
-        console.warn('[useSchedulerData] ⚠️ Skipping task (missing start_date or user_ids):', {
+        Logger.warn('scheduler', '[useSchedulerData] ⚠️ Skipping task (missing start_date or user_ids):', {
           id: task.id,
           name: task.name,
           start_date: task.start_date,
@@ -208,7 +209,7 @@ export function useSchedulerData(workspaceId: string | undefined) {
         
         // Debug: Log task being converted to event
         if (workspaceTasks.length <= 5) { // Only log for small task sets
-          console.log('[useSchedulerData] Created event for task:', {
+          Logger.info('scheduler', '[useSchedulerData] Created event for task:', {
             taskId: task.id,
             taskName: task.name,
             userId,

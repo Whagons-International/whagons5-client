@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { normalizeFilterModelForGrid } from '../utils/filterUtils';
 
+import { Logger } from '@/utils/logger';
 /**
  * Hook for persisting and restoring filter state from localStorage
  */
@@ -40,7 +41,7 @@ export const useFilterPersistence = (workspaceId: string) => {
     try {
       const key = `wh_workspace_filters_${workspaceId || 'all'}`;
       if (debugFilters.current) {
-        console.log('[WT] persisted model=', model);
+        Logger.info('workspaces', '[WT] persisted model=', model);
       }
       if (model && Object.keys(model).length > 0) {
         localStorage.setItem(key, JSON.stringify(model));
@@ -98,7 +99,7 @@ export const useFilterPersistence = (workspaceId: string) => {
       const gridModel = normalizeFilterModelForGrid(params.model);
       externalFilterModelRef.current = gridModel;
       try {
-        if (debugFilters.current) console.log('[WT] applyFilterModelToGrid model=', gridModel);
+        if (debugFilters.current) Logger.info('workspaces', '[WT] applyFilterModelToGrid model=', gridModel);
       } catch {
         // ignore
       }
@@ -135,14 +136,14 @@ export const useFilterPersistence = (workspaceId: string) => {
   }) => {
     if (suppressPersistRef.current) return;
     const api = params.api;
-    if (!api) return;
+    if (!api || api.isDestroyed?.()) return;
 
     try {
       const gm = api.getFilterModel?.() || {};
       externalFilterModelRef.current = gm;
       try {
         if (debugFilters.current) {
-          console.log('[WT] handleGridFilterChanged gridModel=', JSON.stringify(gm, null, 2));
+          Logger.info('workspaces', '[WT] handleGridFilterChanged gridModel=', JSON.stringify(gm, null, 2));
         }
       } catch {
         // ignore

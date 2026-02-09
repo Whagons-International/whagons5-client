@@ -28,6 +28,7 @@ import {
   HeartPulse, // Add HeartPulse icon for real-time status
   Package, // Add Package icon for assets
   QrCode, // Add QrCode icon for QR codes
+  Bug, // Add Bug icon for tech support
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { Link, useLocation } from 'react-router-dom';
@@ -48,12 +49,14 @@ import WhagonsCheck from '@/assets/WhagonsCheck';
 
 import { iconService } from '@/database/iconService';
 import { Workspace } from '@/store/types';
+import { getDisplayVersion } from '@/utils/version';
 // Removed Messages feature
 import AppSidebarWorkspaces from './AppSidebarWorkspaces';
 import AppSidebarBoards from './AppSidebarBoards';
 import { genericCaches } from '@/store/genericSlices';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { getRtlConnected, subscribeRtlConnected } from '@/store/realTimeListener/RTL';
+import { useSuperAdmin } from '@/hooks/useSuperAdmin';
 import {
   DndContext,
   closestCenter,
@@ -68,6 +71,7 @@ import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } 
 import { CSS } from '@dnd-kit/utilities';
 import { useBranding } from '@/providers/BrandingProvider';
 
+import { Logger } from '@/utils/logger';
 // Global pinned state management
 let isPinnedGlobal = localStorage.getItem('sidebarPinned') === 'true';
 const pinnedStateCallbacks: ((pinned: boolean) => void)[] = [];
@@ -235,7 +239,7 @@ const loadPluginsConfig = (): PluginConfig[] => {
       });
     }
   } catch (error) {
-    console.error('Error loading plugins config:', error);
+    Logger.error('ui', 'Error loading plugins config:', error);
   }
   return getDefaultPluginsConfig();
 };
@@ -249,7 +253,7 @@ export const setPluginsConfig = (configs: PluginConfig[]) => {
     const toStore = configs.map(({ id, enabled, pinned }) => ({ id, enabled, pinned }));
     localStorage.setItem(PLUGINS_STORAGE_KEY, JSON.stringify(toStore));
   } catch (error) {
-    console.error('Error saving plugins config:', error);
+    Logger.error('ui', 'Error saving plugins config:', error);
   }
   pluginConfigCallbacks.forEach((callback) => callback(configs));
 };
@@ -294,7 +298,7 @@ export const setPinnedPluginsOrder = (order: string[]) => {
   try {
     localStorage.setItem(PINNED_ORDER_STORAGE_KEY, JSON.stringify(order));
   } catch (error) {
-    console.error('Error saving pinned plugins order:', error);
+    Logger.error('ui', 'Error saving pinned plugins order:', error);
   }
 };
 
@@ -536,6 +540,9 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   
   // Subscribe to RTL connection status
   const rtlConnected = useSyncExternalStore(subscribeRtlConnected, getRtlConnected);
+  
+  // Check if user is super admin (for tech support access)
+  const { isSuperAdmin } = useSuperAdmin();
 
   const hoverOpenTimerRef = useRef<number | null>(null);
   const hoverCloseTimerRef = useRef<number | null>(null);
@@ -565,7 +572,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
             await cache.getAll();
           }
         } catch (error) {
-          console.error('Error loading boards:', error);
+          Logger.error('ui', 'Error loading boards:', error);
         }
       };
       loadBoards();
@@ -640,7 +647,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
           setPinnedBoardsOrderState(JSON.parse(storedOrder));
         }
       } catch (error) {
-        console.error('Error loading pinned boards:', error);
+        Logger.error('ui', 'Error loading pinned boards:', error);
       }
     };
     
@@ -675,7 +682,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
         const icon = await iconService.getIcon('building');
         setDefaultIcon(icon);
       } catch (error) {
-        console.error('Error loading default icon:', error);
+        Logger.error('ui', 'Error loading default icon:', error);
         // Set a fallback icon to prevent the component from not rendering
         setDefaultIcon('fa-building');
       }
@@ -700,7 +707,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
         const icons = await iconService.loadIcons(iconNames);
         setWorkspaceIcons(icons);
       } catch (error) {
-        console.error('Error loading workspace icons:', error);
+        Logger.error('ui', 'Error loading workspace icons:', error);
       }
     };
 
@@ -793,7 +800,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
   // Temporarily commented out to debug workspace rendering
   /*
   if (!defaultIcon) {
-    console.log('AppSidebar: Default icon not loaded yet, skipping render');
+    Logger.info('ui', 'AppSidebar: Default icon not loaded yet, skipping render');
     return null;
   }
   */
@@ -1113,6 +1120,38 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
+
+                  {/* Tech Support - Only visible to super admins */}
+                  {isSuperAdmin && (
+                    <>
+                      <SidebarSeparator className="my-1 border-[var(--sidebar-border)]" />
+                      <SidebarMenuItem>
+                        <SidebarMenuButton
+                          asChild
+                          tooltip={isCollapsed && !isMobile ? t('sidebar.techSupport', 'Tech Support') : undefined}
+                          className="rounded-[8px] transition-colors text-[var(--sidebar-text-primary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
+                          style={{
+                            height: '30px',
+                            padding: isCollapsed && !isMobile ? '4px' : '6px 10px',
+                            gap: '8px',
+                            fontWeight: pathname === '/tech-support' ? 600 : 400,
+                            fontSize: '12px',
+                            boxShadow: pathname === '/tech-support' ? 'inset 3px 0 0 var(--sidebar-primary)' : undefined,
+                          }}
+                        >
+                          <Link
+                            to="/tech-support"
+                            className={`${isCollapsed && !isMobile ? 'grid place-items-center w-8 h-8 p-0' : 'flex items-center'} group relative`}
+                          >
+                            <IconBadge color="#ef4444" size={18}>
+                              <Bug size={12} className="w-3 h-3 block" style={{ color: '#ffffff', strokeWidth: 2, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+                            </IconBadge>
+                            {!isCollapsed && !isMobile && <span className="ml-1.5">{t('sidebar.techSupport', 'Tech Support')}</span>}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </>
+                  )}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -1137,7 +1176,7 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
                   {rtlConnected ? 'Real-time connected' : 'Real-time disconnected'}
                 </TooltipContent>
               </Tooltip>
-              <span>Version 5.0.0 <i>(beta)</i></span>
+              <span>Version {getDisplayVersion()}</span>
             </div>
             <AssistantWidget
               floating={false}

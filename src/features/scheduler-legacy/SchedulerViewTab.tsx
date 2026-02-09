@@ -26,6 +26,7 @@ import { Maximize2, Minimize2, Calendar, Clock } from "lucide-react";
 import { TaskEvents } from "@/store/eventEmiters/taskEvents";
 import { getTasksFromIndexedDB, updateTaskLocally } from "@/store/reducers/tasksSlice";
 
+import { Logger } from '@/utils/logger';
 export default function SchedulerViewTab({ workspaceId }: { workspaceId: string | undefined }) {
   const dispatch = useDispatch<AppDispatch>();
   const [viewPreset, setViewPreset] = useState<ViewPreset>(() => {
@@ -75,12 +76,12 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.every((id) => typeof id === 'number')) {
-          console.log('[Scheduler] Restored selected users:', parsed);
+          Logger.info('scheduler', '[Scheduler] Restored selected users:', parsed);
           return parsed;
         }
       }
     } catch (error) {
-      console.error('[Scheduler] Error restoring selected users:', error);
+      Logger.error('scheduler', '[Scheduler] Error restoring selected users:', error);
     }
     return [];
   });
@@ -148,12 +149,12 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       const key = `wh_scheduler_selected_users_${workspaceId || 'all'}`;
       if (selectedUserIds.length > 0) {
         localStorage.setItem(key, JSON.stringify(selectedUserIds));
-        console.log('[Scheduler] Saved selected users:', selectedUserIds);
+        Logger.info('scheduler', '[Scheduler] Saved selected users:', selectedUserIds);
       } else {
         localStorage.removeItem(key);
       }
     } catch (error) {
-      console.error('[Scheduler] Error saving selected users:', error);
+      Logger.error('scheduler', '[Scheduler] Error saving selected users:', error);
     }
   }, [selectedUserIds, workspaceId]);
 
@@ -165,7 +166,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.every((id) => typeof id === 'number')) {
-          console.log('[Scheduler] Workspace changed, restoring users:', parsed);
+          Logger.info('scheduler', '[Scheduler] Workspace changed, restoring users:', parsed);
           setSelectedUserIds(parsed);
         }
       } else {
@@ -173,7 +174,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
         setSelectedUserIds([]);
       }
     } catch (error) {
-      console.error('[Scheduler] Error restoring selected users on workspace change:', error);
+      Logger.error('scheduler', '[Scheduler] Error restoring selected users on workspace change:', error);
     }
   }, [workspaceId]);
 
@@ -184,7 +185,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       // Get unique user IDs from events (tasks with dates and user assignments)
       const usersWithTasks = [...new Set(events.map(event => event.resourceId))];
       if (usersWithTasks.length > 0) {
-        console.log('[Scheduler] Auto-selecting users with tasks:', usersWithTasks);
+        Logger.info('scheduler', '[Scheduler] Auto-selecting users with tasks:', usersWithTasks);
         setSelectedUserIds(usersWithTasks);
       }
     }
@@ -196,7 +197,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       const key = `wh_scheduler_view_preset_${workspaceId || 'all'}`;
       localStorage.setItem(key, viewPreset);
     } catch (error) {
-      console.error('[Scheduler] Error saving view preset:', error);
+      Logger.error('scheduler', '[Scheduler] Error saving view preset:', error);
     }
   }, [viewPreset, workspaceId]);
 
@@ -206,7 +207,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       const key = `wh_scheduler_group_by_${workspaceId || 'all'}`;
       localStorage.setItem(key, groupBy);
     } catch (error) {
-      console.error('[Scheduler] Error saving groupBy:', error);
+      Logger.error('scheduler', '[Scheduler] Error saving groupBy:', error);
     }
   }, [groupBy, workspaceId]);
 
@@ -218,7 +219,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
       const dateStr = `${baseDate.getFullYear()}-${String(baseDate.getMonth() + 1).padStart(2, '0')}-${String(baseDate.getDate()).padStart(2, '0')}`;
       localStorage.setItem(key, dateStr);
     } catch (error) {
-      console.error('[Scheduler] Error saving base date:', error);
+      Logger.error('scheduler', '[Scheduler] Error saving base date:', error);
     }
   }, [baseDate, workspaceId]);
 
@@ -236,7 +237,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
         localStorage.removeItem(key);
       }
     } catch (error) {
-      console.error('[Scheduler] Error saving filters:', error);
+      Logger.error('scheduler', '[Scheduler] Error saving filters:', error);
     }
   }, [filters, workspaceId]);
 
@@ -253,7 +254,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
           // Check if the update is still within the grace period (10 seconds)
           const elapsed = Date.now() - pendingUpdate;
           if (elapsed < 10000) {
-            console.log('[Scheduler] Skipping refresh for task', taskId, '- pending optimistic update');
+            Logger.info('scheduler', '[Scheduler] Skipping refresh for task', taskId, '- pending optimistic update');
             return; // Skip this refresh, our optimistic update takes precedence
           } else {
             // Cleanup stale entry
@@ -293,7 +294,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
         try {
           unsub();
         } catch (error) {
-          console.error('[Scheduler] Error unsubscribing from task event:', error);
+          Logger.error('scheduler', '[Scheduler] Error unsubscribing from task event:', error);
         }
       });
     };
@@ -558,7 +559,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
         });
         toast.success("Undo successful");
       } catch (error) {
-        console.error("Failed to undo action:", error);
+        Logger.error('scheduler', "Failed to undo action:", error);
           // Revert the undo
           if (task) {
             await TasksCache.updateTask(action.taskId.toString(), {
@@ -596,7 +597,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
         });
         toast.success("Redo successful");
       } catch (error) {
-        console.error("Failed to redo action:", error);
+        Logger.error('scheduler', "Failed to redo action:", error);
           // Revert the redo
           if (task) {
             await TasksCache.updateTask(action.taskId.toString(), {
@@ -1008,7 +1009,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
                         if (resourceIndex >= 0 && resourceIndex < resourcesToUse.length) {
                           const resource = resourcesToUse[resourceIndex];
                           
-                          console.log('[Scheduler] Empty space clicked:', {
+                          Logger.info('scheduler', '[Scheduler] Empty space clicked:', {
                             resourceIndex,
                             resource,
                             resourceId: resource.id,
@@ -1020,7 +1021,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
                           // Ensure the clicked user is in selectedUserIds
                           // This is critical so the task will be visible after creation
                           if (!selectedUserIds.includes(resource.id)) {
-                            console.log('[Scheduler] Auto-selecting user', resource.id, 'to show task after creation');
+                            Logger.info('scheduler', '[Scheduler] Auto-selecting user', resource.id, 'to show task after creation');
                             setSelectedUserIds((prev) => [...prev, resource.id]);
                           }
                           
@@ -1050,7 +1051,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
                             workspace_id: workspaceId ? parseInt(workspaceId) : undefined,
                           };
                           
-                          console.log('[Scheduler] ⏰ Creating task at clicked time:', {
+                          Logger.info('scheduler', '[Scheduler] ⏰ Creating task at clicked time:', {
                             clickedDate: date,
                             clickedTime: `${hours}:${String(mins).padStart(2, '0')}`,
                             roundedTime: `${snappedStart.getHours()}:${String(snappedStart.getMinutes()).padStart(2, '0')}`,
@@ -1124,7 +1125,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
                             pendingOptimisticUpdatesRef.current.delete(event.taskId);
                           }, 2000);
                         } catch (error) {
-                          console.error("Failed to update task:", error);
+                          Logger.error('scheduler', "Failed to update task:", error);
                           
                           // Clear pending update immediately on error
                           pendingOptimisticUpdatesRef.current.delete(event.taskId);
@@ -1208,7 +1209,7 @@ export default function SchedulerViewTab({ workspaceId }: { workspaceId: string 
                             pendingOptimisticUpdatesRef.current.delete(event.taskId);
                           }, 2000);
                         } catch (error) {
-                          console.error("Failed to resize task:", error);
+                          Logger.error('scheduler', "Failed to resize task:", error);
                           
                           // Clear pending update immediately on error
                           pendingOptimisticUpdatesRef.current.delete(event.taskId);

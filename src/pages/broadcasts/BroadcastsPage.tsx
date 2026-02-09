@@ -13,6 +13,7 @@ import { Broadcast } from '@/types/broadcast';
 import CreateBroadcastDialog from './CreateBroadcastDialog';
 import BroadcastDetailView from './BroadcastDetailView';
 
+import { Logger } from '@/utils/logger';
 function BroadcastsPage() {
   const { t } = useLanguage();
   const dispatch = useDispatch();
@@ -39,7 +40,7 @@ function BroadcastsPage() {
       case 'my-broadcasts':
         const isMyBroadcast = Number(broadcast.created_by) === Number(currentUser?.id);
         if (isMyBroadcast) {
-          console.log('🔍 [BroadcastsPage] Found my broadcast:', {
+          Logger.info('broadcast', '🔍 [BroadcastsPage] Found my broadcast:', {
             broadcastId: broadcast.id,
             broadcastCreatedBy: broadcast.created_by,
             currentUserId: currentUser?.id,
@@ -65,7 +66,7 @@ function BroadcastsPage() {
 
   // Debug logging
   useEffect(() => {
-    console.log('🔍 [BroadcastsPage] State:', {
+    Logger.info('broadcast', '🔍 [BroadcastsPage] State:', {
       broadcastsCount: broadcasts.length,
       broadcasts: broadcasts.map((b: any) => ({
         id: b.id,

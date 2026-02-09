@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type MutableRefObject } from 'react';
 import { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { reorderKpiCardsAsync } from '@/store/actions/kpiCards';
@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import type { AppDispatch } from '@/store/store';
 import { FIXED_TABS, type WorkspaceTabKey } from '../constants';
 
+import { Logger } from '@/utils/logger';
 type KpiCardEntity = {
   id: number;
   user_id?: number | null;
@@ -25,8 +26,9 @@ export function useWorkspaceDragDrop(params: {
   setCustomTabOrder: (order: WorkspaceTabKey[]) => void;
   headerKpiCards: KpiCardEntity[];
   setHeaderKpiCards: (cards: KpiCardEntity[]) => void;
+  isReorderingRef: MutableRefObject<boolean>;
 }) {
-  const { customTabOrder, setCustomTabOrder, headerKpiCards, setHeaderKpiCards } = params;
+  const { customTabOrder, setCustomTabOrder, headerKpiCards, setHeaderKpiCards, isReorderingRef } = params;
   const dispatch = useDispatch<AppDispatch>();
   const { t } = useLanguage();
   
@@ -81,7 +83,7 @@ export function useWorkspaceDragDrop(params: {
     const newIndex = previous.findIndex((c) => Number(c.id) === overId);
     
     if (oldIndex === -1 || newIndex === -1) {
-      console.warn('[Workspace KPI] Could not find cards to reorder', { activeId, overId });
+      Logger.warn('workspaces', '[Workspace KPI] Could not find cards to reorder', { activeId, overId });
       return;
     }
 
@@ -90,12 +92,16 @@ export function useWorkspaceDragDrop(params: {
       position: index,
     }));
 
+    // Mark that we're in a reorder operation to prevent Redux sync from overwriting local state
+    isReorderingRef.current = true;
+
     // Optimistically update UI
     setHeaderKpiCards(newOrder);
 
     // If either card is a fallback (negative ID), skip API persistence but keep visual reorder
     if (activeId < 0 || overId < 0) {
-      console.log('[Workspace KPI] Fallback cards involved, skipping persistence');
+      Logger.info('workspaces', '[Workspace KPI] Fallback cards involved, skipping persistence');
+      isReorderingRef.current = false;
       return;
     }
 
@@ -108,9 +114,14 @@ export function useWorkspaceDragDrop(params: {
       await dispatch(reorderKpiCardsAsync({ cards: reorderData })).unwrap();
       toast.success(t('kpiCards.reordered', 'Cards reordered successfully'));
     } catch (error) {
-      console.error('[Workspace KPI] Failed to reorder KPI cards:', error);
+      Logger.error('workspaces', '[Workspace KPI] Failed to reorder KPI cards:', error);
       setHeaderKpiCards(previous);
       toast.error(t('errors.reorderFailed', 'Failed to reorder cards'));
+    } finally {
+      // Clear the reordering flag after a short delay to let Redux sync settle
+      setTimeout(() => {
+        isReorderingRef.current = false;
+      }, 100);
     }
   };
 

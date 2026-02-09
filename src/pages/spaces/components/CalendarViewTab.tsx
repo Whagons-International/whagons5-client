@@ -18,6 +18,7 @@ import { api } from "@/store/api/internalApi";
 import { TaskEvents } from "@/store/eventEmiters/taskEvents";
 import { getTasksFromIndexedDB } from "@/store/reducers/tasksSlice";
 
+import { Logger } from '@/utils/logger';
 // Helper to format date as local time without timezone conversion
 const formatAsLocalTime = (d: Date) => {
   const year = d.getFullYear();
@@ -304,7 +305,7 @@ export default function CalendarViewTab({ workspaceId }: { workspaceId: string |
 
       toast.success('Task dates updated');
     } catch (error) {
-      console.error('Failed to update task dates:', error);
+      Logger.error('ui', 'Failed to update task dates:', error);
       toast.error('Failed to update task dates');
       info.revert(); // Revert the calendar change
       
@@ -339,7 +340,7 @@ export default function CalendarViewTab({ workspaceId }: { workspaceId: string |
 
       toast.success('Task duration updated');
     } catch (error) {
-      console.error('Failed to update task duration:', error);
+      Logger.error('ui', 'Failed to update task duration:', error);
       toast.error('Failed to update task duration');
       info.revert(); // Revert the calendar change
       

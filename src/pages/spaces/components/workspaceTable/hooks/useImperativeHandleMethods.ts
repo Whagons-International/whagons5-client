@@ -18,9 +18,10 @@ export function useImperativeHandleMethods(
 
   useImperativeHandle(ref, () => ({
     clearFilters: () => {
-      if (!gridRef.current?.api) return;
+      const api = gridRef.current?.api;
+      if (!api || api.isDestroyed?.()) return;
       applyFilterModelToGrid({
-        api: gridRef.current.api,
+        api,
         model: null,
         onFiltersChanged,
         onAfterApplied: refreshGrid,
@@ -28,13 +29,16 @@ export function useImperativeHandleMethods(
     },
     hasFilters: () => {
       try {
-        return !!gridRef.current?.api?.isAnyFilterPresent();
+        const api = gridRef.current?.api;
+        if (!api || api.isDestroyed?.()) return false;
+        return !!api.isAnyFilterPresent?.();
       } catch { return false; }
     },
     setFilterModel: (model: any) => {
-      if (!gridRef.current?.api) return;
+      const api = gridRef.current?.api;
+      if (!api || api.isDestroyed?.()) return;
       applyFilterModelToGrid({
-        api: gridRef.current.api,
+        api,
         model,
         onFiltersChanged,
         onAfterApplied: refreshGrid,
@@ -42,13 +46,17 @@ export function useImperativeHandleMethods(
     },
     getFilterModel: () => {
       try {
+        const api = gridRef.current?.api;
+        if (!api || api.isDestroyed?.()) return {};
         // AG Grid's filter model is the single source of truth for the UI & modal
-        return gridRef.current?.api?.getFilterModel?.() || {};
+        return api.getFilterModel?.() || {};
       } catch { return {}; }
     },
     clearSelection: () => {
       try {
-        gridRef.current?.api?.deselectAll?.();
+        const api = gridRef.current?.api;
+        if (!api || api.isDestroyed?.()) return;
+        api.deselectAll?.();
       } catch {
         // ignore
       }

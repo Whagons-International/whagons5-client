@@ -22,6 +22,10 @@ import {store } from './store';
 // import * as CryptoAPI from './crypto/crypto';
 // import { genericActions } from './store/genericSlices';
 import { initFontStyle } from './utils/fontStyle';
+import { Logger } from '@/utils/logger';
+
+// Install global error handlers first to catch any initialization errors
+Logger.installGlobalErrorHandlers();
 
 // Initialize font style
 initFontStyle();
@@ -91,7 +95,7 @@ if (import.meta.env.DEV) {
 //   const updateSW = registerSW({
 //     immediate: true,
 //     onRegistered(r) {
-//       console.log('[PWA] Service Worker registered');
+//       Logger.info('ui', '[PWA] Service Worker registered');
 //       // Check for updates every 5 minutes
 //       setInterval(() => {
 //         if (r) {
@@ -107,15 +111,15 @@ if (import.meta.env.DEV) {
 //       });
 //     },
 //     onRegisterError(error) {
-//       console.error('[PWA] Service Worker registration error', error);
+//       Logger.error('ui', '[PWA] Service Worker registration error', error);
 //     },
 //     onNeedRefresh() {
-//       console.log('[PWA] Update available, reloading page...');
+//       Logger.info('ui', '[PWA] Update available, reloading page...');
 //       // Automatically reload when update is ready (skipWaiting + reload)
 //       updateSW(true);
 //     },
 //     onOfflineReady() {
-//       console.log('[PWA] App ready to work offline');
+//       Logger.info('ui', '[PWA] App ready to work offline');
 //     },
 //   });
 // }

@@ -25,6 +25,7 @@ import { RootState } from '@/store/store';
 import { genericActions } from '@/store/genericSlices';
 import AcknowledgeDialog from './AcknowledgeDialog';
 
+import { Logger } from '@/utils/logger';
 interface BroadcastDetailViewProps {
   broadcast: Broadcast;
   onClose: () => void;
@@ -60,7 +61,7 @@ function BroadcastDetailView({ broadcast, onClose }: BroadcastDetailViewProps) {
   // Debug logging
   useEffect(() => {
     if (broadcast.id) {
-      console.log('🔍 [BroadcastDetailView] Debug:', {
+      Logger.info('broadcast', '🔍 [BroadcastDetailView] Debug:', {
         broadcastId: broadcast.id,
         currentUserId: currentUser?.id,
         broadcastAcksCount: broadcastAcks.length,

@@ -54,6 +54,7 @@ import { useLanguage } from "@/providers/LanguageProvider";
 import { genericActions } from "@/store/genericSlices";
 
 
+import { Logger } from '@/utils/logger';
 const STORAGE_KEYS = {
   basic: 'wh-settings-basics-order-v1',
   advanced: 'wh-settings-advanced-order-v1',
@@ -1157,7 +1158,7 @@ function Settings() {
         navigate('/integrations');
         break;
       default:
-        console.log(`Unknown setting: ${settingId}`);
+        Logger.info('settings', `Unknown setting: ${settingId}`);
     }
   };
 

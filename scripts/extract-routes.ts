@@ -11,6 +11,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { glob } from 'glob';
 
+import { Logger } from '@/utils/logger';
 interface RouteDefinition {
   path: string;
   description: string;
@@ -325,7 +326,7 @@ async function main() {
   const projectRoot = path.resolve(__dirname, '..');
   const routerDir = path.join(projectRoot, 'src', 'router');
   
-  console.log('🔍 Extracting routes from React Router files...');
+  Logger.info('ui', '🔍 Extracting routes from React Router files...');
   
   // Extract routes from router files
   const homeRouterPath = path.join(routerDir, 'HomeRouter.tsx');
@@ -334,22 +335,22 @@ async function main() {
   let allRoutes: RouteDefinition[] = [];
   
   if (fs.existsSync(homeRouterPath)) {
-    console.log('  📄 Processing HomeRouter.tsx...');
+    Logger.info('ui', '  📄 Processing HomeRouter.tsx...');
     allRoutes = allRoutes.concat(extractRoutesFromFile(homeRouterPath));
   }
   
   if (fs.existsSync(appRouterPath)) {
-    console.log('  📄 Processing AppRouter.tsx...');
+    Logger.info('ui', '  📄 Processing AppRouter.tsx...');
     allRoutes = allRoutes.concat(extractRoutesFromFile(appRouterPath));
   }
   
   // Discover pages with URL-based tabs
-  console.log('\n🔎 Scanning for pages with URL-based tabs...');
+  Logger.info('ui', '\n🔎 Scanning for pages with URL-based tabs...');
   const pageTabInfo = await discoverTabPages(projectRoot);
-  console.log(`  Found ${pageTabInfo.length} pages with tabs`);
+  Logger.info('ui', `  Found ${pageTabInfo.length} pages with tabs`);
   
   pageTabInfo.forEach(info => {
-    console.log(`  - ${info.route}: ${info.tabs.join(', ')}`);
+    Logger.info('ui', `  - ${info.route}: ${info.tabs.join(', ')}`);
   });
   
   // Map routes to component files
@@ -378,9 +379,9 @@ async function main() {
   const outputPath = path.join(projectRoot, 'routes.json');
   fs.writeFileSync(outputPath, JSON.stringify(config, null, 2), 'utf-8');
   
-  console.log(`\n✅ Extracted ${allRoutes.length} routes`);
-  console.log(`📝 Written to: ${outputPath}`);
-  console.log('\nRoute breakdown:');
+  Logger.info('ui', `\n✅ Extracted ${allRoutes.length} routes`);
+  Logger.info('ui', `📝 Written to: ${outputPath}`);
+  Logger.info('ui', '\nRoute breakdown:');
   
   const categoryCounts = allRoutes.reduce((acc, route) => {
     acc[route.category] = (acc[route.category] || 0) + 1;
@@ -388,14 +389,14 @@ async function main() {
   }, {} as Record<string, number>);
   
   Object.entries(categoryCounts).forEach(([category, count]) => {
-    console.log(`  ${category}: ${count} routes`);
+    Logger.info('ui', `  ${category}: ${count} routes`);
   });
   
   // Count routes with tabs
   const routesWithTabs = allRoutes.filter(r => r.tabs && r.tabs.length > 0);
-  console.log(`\n📑 Routes with tabs: ${routesWithTabs.length}`);
+  Logger.info('ui', `\n📑 Routes with tabs: ${routesWithTabs.length}`);
   routesWithTabs.forEach(route => {
-    console.log(`  ${route.path}: ${route.tabs?.length} tabs (${route.tabs?.join(', ')})`);
+    Logger.info('ui', `  ${route.path}: ${route.tabs?.length} tabs (${route.tabs?.join(', ')})`);
   });
 }
 

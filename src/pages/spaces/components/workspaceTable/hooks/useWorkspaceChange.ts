@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
 
+import { Logger } from '@/utils/logger';
 export interface UseWorkspaceChangeReturn {
   error: string | null;
 }
@@ -27,7 +28,10 @@ export function useWorkspaceChange(opts: {
       setError(null);
       
       // Exit edit mode when workspace changes
-      exitEditMode(gridRef.current?.api);
+      const api = gridRef.current?.api;
+      if (api && !api.isDestroyed?.()) {
+        exitEditMode(api);
+      }
       
       try {
         // Ensure cache is initialized
@@ -47,14 +51,15 @@ export function useWorkspaceChange(opts: {
 
         // Refresh grid after checking
         // Note: Sync stream (DataManager) handles task cache updates automatically
-        if (gridRef.current?.api) {
+        const currentApi = gridRef.current?.api;
+        if (currentApi && !currentApi.isDestroyed?.()) {
           refreshGrid();
         }
       } catch (error: any) {
         const errorMessage = `[useWorkspaceChange] Error during workspace change check for workspace ${workspaceId}`;
         const errorDetails = error?.message || error?.toString() || 'Unknown error';
         
-        console.error(errorMessage, {
+        Logger.error('workspaces', errorMessage, {
           workspaceId,
           error: errorDetails,
           stack: error?.stack,
@@ -64,7 +69,8 @@ export function useWorkspaceChange(opts: {
         setError(errorMessage);
         
         // Still try to refresh grid even if check failed
-        if (gridRef.current?.api) {
+        const currentApi = gridRef.current?.api;
+        if (currentApi && !currentApi.isDestroyed?.()) {
           refreshGrid();
         }
       }

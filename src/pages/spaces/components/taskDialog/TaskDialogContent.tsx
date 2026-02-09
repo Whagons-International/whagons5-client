@@ -38,6 +38,7 @@ import { celebrateTaskCompletion } from '@/utils/confetti';
 import { combineLocalDateAndTime, formatLocalDateTime } from '@/features/scheduler/utils/dateTime';
 import { trackSelection, trackSelections } from '@/utils/taskCreationPreferences';
 
+import { Logger } from '@/utils/logger';
 type Props = TaskDialogProps & {
   clickTime?: number;
   perfEnabled?: boolean;
@@ -68,7 +69,7 @@ export default function TaskDialogContent({
     if (!perfEnabled || clickTime == null) return;
     const mountTime = performance.now();
     // eslint-disable-next-line no-console
-    console.log(`[PERF] TaskDialog: click→content-mount ${(mountTime - clickTime).toFixed(2)}ms`);
+    Logger.info('tasks', `[PERF] TaskDialog: click→content-mount ${(mountTime - clickTime).toFixed(2)}ms`);
   }, [perfEnabled, clickTime]);
 
   // Data and state hooks - must be unconditional (React rules)
@@ -303,7 +304,7 @@ export default function TaskDialogContent({
     const combined = combineLocalDateAndTime(date, time || '00:00');
     // Validate the resulting date is valid before formatting
     if (isNaN(combined.getTime())) {
-      console.warn('[TaskDialog] Invalid date produced from:', { date, time });
+      Logger.warn('tasks', '[TaskDialog] Invalid date produced from:', { date, time });
       return null;
     }
     return formatLocalDateTime(combined);
@@ -562,7 +563,7 @@ export default function TaskDialogContent({
     if (!perfEnabled || clickTime == null) return;
     const now = performance.now();
     // eslint-disable-next-line no-console
-    console.log(`[PERF] TaskDialog: click→content-ready ${(now - clickTime).toFixed(2)}ms`, perfRef.current.marks);
+    Logger.info('tasks', `[PERF] TaskDialog: click→content-ready ${(now - clickTime).toFixed(2)}ms`, perfRef.current.marks);
   }, [perfEnabled, clickTime]);
 
   // Early return MUST be after all hooks

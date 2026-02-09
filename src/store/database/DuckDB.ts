@@ -16,6 +16,7 @@ import mvp_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?ur
 import duckdb_wasm_eh from '@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url';
 import eh_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url';
 
+import { Logger } from '@/utils/logger';
 const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
   mvp: {
     mainModule: duckdb_wasm,
@@ -67,7 +68,7 @@ export class DuckDB {
       try {
         const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
         if (!bundle.mainWorker || !bundle.mainModule) {
-          console.error('[DuckDB] No suitable WASM bundle found');
+          Logger.error('db', '[DuckDB] No suitable WASM bundle found');
           return false;
         }
 
@@ -88,13 +89,13 @@ export class DuckDB {
             path: targetPath,
             accessMode: duckdb.DuckDBAccessMode.READ_WRITE,
           });
-          console.log(
+          Logger.info('db', 
             '[DuckDB] Opened database',
             targetPath,
             opfs ? '(OPFS persistent)' : '(in‑memory)'
           );
         } catch (openErr) {
-          console.warn(
+          Logger.warn('db', 
             '[DuckDB] Failed to open OPFS database, falling back to in‑memory',
             openErr
           );
@@ -105,10 +106,10 @@ export class DuckDB {
         this.db = db;
         this.conn = conn;
 
-        console.log('[DuckDB] Initialized AsyncDuckDB + connection');
+        Logger.info('db', '[DuckDB] Initialized AsyncDuckDB + connection');
         return true;
       } catch (e) {
-        console.error('[DuckDB] init failed', e);
+        Logger.error('db', '[DuckDB] init failed', e);
         this.db = null;
         this.conn = null;
         return false;
@@ -124,7 +125,7 @@ export class DuckDB {
     if (this.conn && this.db) return this.conn;
     const ok = await this.init();
     if (!ok || !this.conn) {
-      console.warn('[DuckDB] ensureConnection: no connection available');
+      Logger.warn('db', '[DuckDB] ensureConnection: no connection available');
       return null;
     }
     return this.conn;
@@ -142,7 +143,7 @@ export class DuckDB {
     try {
       return await conn.query(sql);
     } catch (e) {
-      console.error('[DuckDB] query failed', { sql, error: e });
+      Logger.error('db', '[DuckDB] query failed', { sql, error: e });
       throw e;
     }
   }
@@ -156,7 +157,7 @@ export class DuckDB {
     try {
       await conn.query(sql);
     } catch (e) {
-      console.error('[DuckDB] exec failed', { sql, error: e });
+      Logger.error('db', '[DuckDB] exec failed', { sql, error: e });
       throw e;
     }
   }

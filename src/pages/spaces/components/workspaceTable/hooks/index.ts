@@ -20,3 +20,4 @@ export { useStatusChange } from './useStatusChange';
 export { useDoneStatusId } from './useDoneStatusId';
 export { useLatestRef } from './useLatestRef';
 export { useNewTaskAnimation } from './useNewTaskAnimation';
+export { useWorkspaceSwitchAnimation } from './useWorkspaceSwitchAnimation';

@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react';
 export function useWorkspaceRowDensity() {
   const [rowDensity, setRowDensity] = useState<'compact' | 'comfortable' | 'spacious'>(() => {
     try {
-      return (localStorage.getItem('wh_workspace_density') as any) || 'spacious';
-    } catch { return 'compact'; }
+      return (localStorage.getItem('wh_workspace_density') as any) || 'comfortable';
+    } catch { return 'comfortable'; }
   });
   
   const computedRowHeight = rowDensity === 'compact' ? 40 : rowDensity === 'comfortable' ? 68 : 110;

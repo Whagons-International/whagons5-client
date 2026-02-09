@@ -20,6 +20,7 @@ import { useTemplateStatistics } from "./hooks/useTemplateStatistics";
 import { useTemplateForm } from "./hooks/useTemplateForm";
 import { renderTemplatePreview } from "./utils/renderHelpers";
 
+import { Logger } from '@/utils/logger';
 function Templates() {
   const { t } = useLanguage();
   const tt = (key: string, fallback: string) => t(`settings.templates.${key}`, fallback);
@@ -232,7 +233,7 @@ function Templates() {
       a.click();
       a.remove();
     })
-    .catch(err => console.error('SOP Download failed', err));
+    .catch(err => Logger.error('settings', 'SOP Download failed', err));
   };
 
   // Form handlers
@@ -313,7 +314,7 @@ function Templates() {
       await updateItem(editingTemplate.id, updates);
       (window as any).__settings_error = null;
     } catch (err: any) {
-      console.error('Edit template submit failed:', err);
+      Logger.error('settings', 'Edit template submit failed:', err);
       setEffectiveFormError(err?.message || tt('validation.genericError', 'An error occurred while updating the template'));
     }
   };

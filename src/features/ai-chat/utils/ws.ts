@@ -1,3 +1,4 @@
+import { Logger } from '@/utils/logger';
 export type EventHandler = (data: any) => void;
 
 /**
@@ -68,14 +69,14 @@ class SessionWSManager {
     const wsUrl = this.buildWsUrl(sessionId, modelId, token);
     this.lastUrlBySession.set(sessionId, wsUrl);
     
-    console.log(`[WS] Connecting to: ${wsUrl.replace(/token=[^&]+/, 'token=***')}`); // Hide token in logs
+    Logger.info('assistant', `[WS] Connecting to: ${wsUrl.replace(/token=[^&]+/, 'token=***')}`); // Hide token in logs
     
     const ws = new WebSocket(wsUrl);
     this.connections.set(sessionId, ws);
     this.shouldReconnect.set(sessionId, true);
 
     ws.onopen = () => {
-      console.log(`[WS] Connected to session: ${sessionId}`);
+      Logger.info('assistant', `[WS] Connected to session: ${sessionId}`);
       // Clear previous errors/close info when we successfully connect.
       this.lastErrorBySession.delete(sessionId);
       this.lastCloseBySession.delete(sessionId);
@@ -95,7 +96,7 @@ class SessionWSManager {
           (data && typeof (data as any).event === "string" && (data as any).event) ||
           (data && typeof (data as any).kind === "string" && (data as any).kind) ||
           "unknown";
-        console.log(`[WS] Message received:`, label);
+        Logger.info('assistant', `[WS] Message received:`, label);
         
         const listeners = this.handlers.get(sessionId);
         if (listeners && listeners.size > 0) {
@@ -103,17 +104,17 @@ class SessionWSManager {
             try {
               fn(data);
             } catch (error) {
-              console.error('[WS] Handler error:', error);
+              Logger.error('assistant', '[WS] Handler error:', error);
             }
           }
         }
       } catch (error) {
-        console.error('[WS] Failed to parse message:', error);
+        Logger.error('assistant', '[WS] Failed to parse message:', error);
       }
     };
 
     ws.onclose = (event) => {
-      console.log(`[WS] Disconnected from session ${sessionId}:`, {
+      Logger.info('assistant', `[WS] Disconnected from session ${sessionId}:`, {
         code: event.code,
         reason: event.reason,
         wasClean: event.wasClean,
@@ -143,7 +144,7 @@ class SessionWSManager {
             try {
               fn(payload);
             } catch (error) {
-              console.error("[WS] Handler error (ws_closed):", error);
+              Logger.error('assistant', "[WS] Handler error (ws_closed):", error);
             }
           }
         }
@@ -155,7 +156,7 @@ class SessionWSManager {
       const shouldReconnect = this.shouldReconnect.get(sessionId);
       
       if (hasHandlers && shouldReconnect) {
-        console.log(`[WS] Scheduling reconnect for session ${sessionId}...`);
+        Logger.info('assistant', `[WS] Scheduling reconnect for session ${sessionId}...`);
         const timer = window.setTimeout(() => {
           this.reconnectTimers.delete(sessionId);
           const model = this.sessionModels.get(sessionId);
@@ -167,7 +168,7 @@ class SessionWSManager {
     };
 
     ws.onerror = (event) => {
-      console.error(`[WS] Connection error on session ${sessionId}:`, {
+      Logger.error('assistant', `[WS] Connection error on session ${sessionId}:`, {
         type: event.type,
         target: event.target,
         wsUrl: wsUrl,
@@ -181,7 +182,7 @@ class SessionWSManager {
 
   subscribe(sessionId: string, handler: EventHandler, modelId?: string, token?: string): () => void {
     if (!sessionId) {
-      console.warn('[WS] Cannot subscribe without session ID');
+      Logger.warn('assistant', '[WS] Cannot subscribe without session ID');
       return () => {};
     }
 
@@ -207,7 +208,7 @@ class SessionWSManager {
       listeners.delete(handler);
       
       if (listeners.size === 0) {
-        console.log(`[WS] No more listeners for session ${sessionId}, closing connection`);
+        Logger.info('assistant', `[WS] No more listeners for session ${sessionId}, closing connection`);
         this.handlers.delete(sessionId);
         this.shouldReconnect.set(sessionId, false);
         this.sessionModels.delete(sessionId);
@@ -234,7 +235,7 @@ class SessionWSManager {
   send(sessionId: string, data: any): boolean {
     const ws = this.connections.get(sessionId);
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      console.error(`[WS] Cannot send message - not connected to session ${sessionId}`);
+      Logger.error('assistant', `[WS] Cannot send message - not connected to session ${sessionId}`);
       return false;
     }
 
@@ -242,7 +243,7 @@ class SessionWSManager {
       ws.send(JSON.stringify(data));
       return true;
     } catch (error) {
-      console.error(`[WS] Failed to send message:`, error);
+      Logger.error('assistant', `[WS] Failed to send message:`, error);
       return false;
     }
   }

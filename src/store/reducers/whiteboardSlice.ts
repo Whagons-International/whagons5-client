@@ -3,6 +3,7 @@ import { WhiteboardCache, WhiteboardData } from "../indexedDB/WhiteboardCache";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/types/element/types";
 import type { AppState } from "@excalidraw/excalidraw/types/types";
 
+import { Logger } from '@/utils/logger';
 export interface WhiteboardState {
   data: WhiteboardData | null;
   loading: boolean;
@@ -50,7 +51,7 @@ export const loadWhiteboard = createAsyncThunk(
 
       return data;
     } catch (error: any) {
-      console.error('[whiteboardSlice] Failed to load whiteboard:', error);
+      Logger.error('redux', '[whiteboardSlice] Failed to load whiteboard:', error);
       return rejectWithValue(error?.message || 'Failed to load whiteboard');
     }
   }
@@ -76,7 +77,7 @@ export const saveWhiteboard = createAsyncThunk(
       await WhiteboardCache.saveWhiteboard(data);
       return data;
     } catch (error: any) {
-      console.error('[whiteboardSlice] Failed to save whiteboard:', error);
+      Logger.error('redux', '[whiteboardSlice] Failed to save whiteboard:', error);
       return rejectWithValue(error?.message || 'Failed to save whiteboard');
     }
   }

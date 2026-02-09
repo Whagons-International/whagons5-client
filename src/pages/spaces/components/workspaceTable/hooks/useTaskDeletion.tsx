@@ -21,7 +21,7 @@ export const useTaskDeletion = (gridRef: React.MutableRefObject<any>, refreshGri
     let taskData: { id: number; name?: string } = { id: taskId };
     try {
       const api = gridRef.current?.api;
-      if (api) {
+      if (api && !api.isDestroyed?.()) {
         api.forEachNode((node: any) => {
           if (node.data?.id === taskId) {
             taskData = { id: taskId, name: node.data?.name || taskName };

@@ -8,6 +8,7 @@ import { actionsApi } from '@/api/whagonsActionsApi';
 import { InitializationStage } from '@/types/user';
 import { useAuth } from '@/providers/AuthProvider';
 
+import { Logger } from '@/utils/logger';
 const SignUp: React.FC = () => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
@@ -37,7 +38,7 @@ const SignUp: React.FC = () => {
 
   async function backendLogin(idToken: string) {
     try {
-      console.log('idToken', idToken);
+      Logger.info('auth', 'idToken', idToken);
 
       const response = await actionsApi.post(`/login`,
         {
@@ -46,7 +47,7 @@ const SignUp: React.FC = () => {
       );
 
       if (response.status === 200) {
-        console.log('Successfully logged in and sent idToken to backend');
+        Logger.info('auth', 'Successfully logged in and sent idToken to backend');
         updateAuthToken(response.data.token);
         
         // Refetch user data after login - PublicRoute will handle redirect once user data is loaded
@@ -54,11 +55,11 @@ const SignUp: React.FC = () => {
         
         return true;
       } else {
-        console.error('Login failed');
+        Logger.error('auth', 'Login failed');
         return false;
       }
     } catch (error) {
-      console.error('Login error:', error);
+      Logger.error('auth', 'Login error:', error);
       return false;
     }
   }
@@ -73,7 +74,7 @@ const SignUp: React.FC = () => {
         alert('Signup failed. Please try again.');
       }
     } catch (error) {
-      console.error(error);
+      Logger.error('auth', error);
       alert('Google signup failed. Please try again.');
     }
   };

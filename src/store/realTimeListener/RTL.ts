@@ -5,8 +5,9 @@ import { getEnvVariables } from "@/lib/getEnvVariables";
 import { getCacheForTable } from "@/store/indexedDB/CacheRegistry";
 import { syncReduxForTable } from "@/store/indexedDB/CacheRegistry";
 
+import { Logger } from '@/utils/logger';
 interface RTLMessage {
-  type: 'ping' | 'system' | 'error' | 'echo' | 'database';
+  type: 'ping' | 'system' | 'error' | 'echo' | 'database' | 'telemetry';
   operation?: string;
   message?: string;
   data?: any;
@@ -17,6 +18,7 @@ interface RTLMessage {
   db_timestamp?: number;
   client_timestamp?: string;
   sessionId?: string;
+  error_ids?: string[];  // For telemetry ACK responses
 }
 
 interface ConnectionOptions {
@@ -35,10 +37,6 @@ export class RealTimeListener {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private pingInterval: NodeJS.Timeout | null = null;
   private options: ConnectionOptions;
-  private hasWarnedAboutServer: boolean = false;
-  private lastErrorLogTime: number = 0;
-  private readonly ERROR_LOG_THROTTLE_MS = 10000; // Only log errors every 10 seconds
-  private serverUnavailable: boolean = false; // Track if server is known to be unavailable
   
   // Event listeners
   private listeners: Map<string, ((data: any) => void)[]> = new Map();
@@ -58,7 +56,7 @@ export class RealTimeListener {
    */
   private debugLog(message: string, ...args: any[]): void {
     if (this.options.debug) {
-      console.log(`RTL: ${message}`, ...args);
+      Logger.info('rtl', `RTL: ${message}`, ...args);
     }
   }
 
@@ -158,11 +156,8 @@ export class RealTimeListener {
         return true;
       } catch (error) {
         this.debugLog('Server health check failed:', error);
-        // Only log warning in debug mode to avoid console spam
-        if (this.options.debug) {
-          console.warn('⚠️  WebSocket server appears to be offline (development health-check failed)');
-          console.warn('💡 Make sure your WebSocket server is running before connecting');
-        }
+        Logger.warn('rtl', '⚠️  WebSocket server appears to be offline (development health-check failed)');
+        Logger.warn('rtl', '💡 Make sure your WebSocket server is running before connecting');
         return false;
       }
     }
@@ -175,28 +170,10 @@ export class RealTimeListener {
    * Connect to WebSocket and immediately send a keep-alive message
    */
   async connectAndHold(): Promise<void> {
-   // Prevent multiple simultaneous connection attempts
-   if (this.isConnected || this.isConnecting) {
-     this.debugLog('Already connected or connecting, skipping connectAndHold');
-     return;
-   }
-
-   // If we've determined the server is unavailable, don't attempt connection
-   if (this.serverUnavailable) {
-     this.debugLog('Skipping WebSocket connection - server marked as unavailable');
-     return;
-   }
-
-   // Check if server is available (only in development)
-   const { VITE_DEVELOPMENT } = getEnvVariables();
-   if (VITE_DEVELOPMENT === 'true') {
-     const serverAvailable = await this.checkServerAvailability();
-     if (!serverAvailable) {
-       // In development, mark server as unavailable and skip connection
-       this.serverUnavailable = true;
-       this.debugLog('Skipping WebSocket connection - server not available');
-       return;
-     }
+   //check if server is available
+   const serverAvailable = await this.checkServerAvailability();
+   if(!serverAvailable) {
+    throw new Error('WebSocket server is not available. Please start the server and try again.');
    }
    
    this.connect();
@@ -221,12 +198,6 @@ export class RealTimeListener {
       return;
     }
 
-    // Don't attempt connection if server is marked as unavailable
-    if (this.serverUnavailable) {
-      this.debugLog('Skipping WebSocket connection - server marked as unavailable');
-      return;
-    }
-
     try {
       this.isConnecting = true;
       const wsUrl = this.getWebSocketUrl();
@@ -242,20 +213,11 @@ export class RealTimeListener {
       this.ws.onerror = this.handleError.bind(this);
 
     } catch (error) {
-      // Only log errors if not in silent mode (server unavailable)
-      if (!this.serverUnavailable) {
-        console.error('RTL: Failed to create WebSocket connection:', error);
-      }
+      Logger.error('rtl', 'RTL: Failed to create WebSocket connection:', error);
       this.isConnecting = false;
       this.emit('connection:error', { error: error instanceof Error ? error.message : String(error) });
       
-      // Mark server as unavailable in development if connection fails immediately
-      const { VITE_DEVELOPMENT } = getEnvVariables();
-      if (VITE_DEVELOPMENT === 'true') {
-        this.serverUnavailable = true;
-      }
-      
-      if (this.options.autoReconnect && !this.serverUnavailable) {
+      if (this.options.autoReconnect) {
         this.scheduleReconnect();
       }
     }
@@ -325,7 +287,7 @@ export class RealTimeListener {
    */
   send(message: string | object): void {
     if (!this.isConnected || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn('RTL: Cannot send message - not connected');
+      Logger.warn('rtl', 'RTL: Cannot send message - not connected');
       return;
     }
 
@@ -342,8 +304,6 @@ export class RealTimeListener {
     this.isConnected = true;
     this.isConnecting = false;
     this.reconnectAttempts = 0;
-    this.hasWarnedAboutServer = false; // Reset warning flag on successful connection
-    this.serverUnavailable = false; // Reset server availability flag on successful connection
     setRtlConnected(true);
     
     // Start ping interval to keep connection alive
@@ -366,7 +326,7 @@ export class RealTimeListener {
       
       this.handleRTLMessage(data);
     } catch (error) {
-      console.error('RTL: Failed to parse message:', error);
+      Logger.error('rtl', 'RTL: Failed to parse message:', error);
       this.emit('message:error', { error: 'Failed to parse message', rawData: event.data });
     }
   }
@@ -398,42 +358,20 @@ export class RealTimeListener {
    * Handle WebSocket error event
    */
   private handleError(error: Event): void {
+    Logger.error('rtl', 'RTL: WebSocket error:', error);
     this.isConnecting = false;
     
-    // Mark server as unavailable if we're in development and connecting to localhost
-    const { VITE_DEVELOPMENT } = getEnvVariables();
-    const wsUrl = this.ws?.url || 'unknown';
-    if (VITE_DEVELOPMENT === 'true' && wsUrl.includes('localhost:8082')) {
-      this.serverUnavailable = true;
-    }
-    
     // More specific error message based on the current state
+    const wsUrl = this.ws?.url || 'unknown';
     const errorMessage = this.getConnectionErrorMessage(wsUrl);
     
-    // Throttle error logging to avoid console spam
-    const now = Date.now();
-    const shouldLog = !this.hasWarnedAboutServer || 
-                     (now - this.lastErrorLogTime) > this.ERROR_LOG_THROTTLE_MS;
-    
-    if (shouldLog) {
-      // Only log detailed error on first attempt or after throttle period
-      if (!this.hasWarnedAboutServer) {
-        console.warn('⚠️  WebSocket server unavailable');
-        console.warn('📍 URL:', wsUrl);
-        console.warn('💡 Suggestion:', errorMessage);
-        console.warn('ℹ️  Real-time updates disabled. The app will continue to work normally.');
-        this.hasWarnedAboutServer = true;
-      } else {
-        // Subsequent errors: just a brief debug log
-        this.debugLog('WebSocket connection failed (server still unavailable)');
-      }
-      this.lastErrorLogTime = now;
-    }
+    Logger.error('rtl', '❌ WebSocket Connection Failed');
+    Logger.error('rtl', '📍 URL:', wsUrl);
+    Logger.error('rtl', '💡 Suggestion:', errorMessage);
     
     this.emit('connection:error', { error: errorMessage, url: wsUrl });
 
-    // Only attempt reconnection if server is not marked as unavailable
-    if (this.options.autoReconnect && !this.serverUnavailable) {
+    if (this.options.autoReconnect) {
       this.scheduleReconnect();
     }
   }
@@ -476,10 +414,26 @@ export class RealTimeListener {
         this.handlePublicationMessage(data);
         break;
 
+      case 'telemetry':
+        this.handleTelemetryMessage(data);
+        break;
+
       default:
         // Handle unknown message types
         this.emit('message:unknown', data);
         break;
+    }
+  }
+
+  /**
+   * Handle telemetry messages (ACKs from server)
+   */
+  private handleTelemetryMessage(data: RTLMessage): void {
+    if (data.operation === 'ack' && data.error_ids) {
+      this.debugLog('Telemetry ACK received:', { error_ids: data.error_ids });
+      this.emit('telemetry:ack', { error_ids: data.error_ids });
+    } else {
+      this.emit('telemetry:message', data);
     }
   }
 
@@ -505,7 +459,7 @@ export class RealTimeListener {
    * Handle error messages
    */
   private handleErrorMessage(data: RTLMessage): void {
-    console.error('RTL: Received error message:', data);
+    Logger.error('rtl', 'RTL: Received error message:', data);
     this.emit('message:error', { message: data.message, data: data });
     
     if (data.operation === 'auth_error') {
@@ -531,7 +485,7 @@ export class RealTimeListener {
 
     // Route to appropriate cache by table name
     this.handleTablePublication(data).catch(error => {
-      console.error('Error handling table publication:', error);
+      Logger.error('rtl', 'Error handling table publication:', error);
     });
   }
 
@@ -568,7 +522,7 @@ export class RealTimeListener {
 
             // Check if the data has a valid ID before proceeding
             if (data.new_data.id === undefined || data.new_data.id === null) {
-              console.error(`RTL: Skipping INSERT for ${table} - missing ID`, data.new_data);
+              Logger.error('rtl', `RTL: Skipping INSERT for ${table} - missing ID`, data.new_data);
               return;
             }
 
@@ -580,7 +534,7 @@ export class RealTimeListener {
               const existingRecord = existing.find((record: any) => record.id === data.new_data.id);
 
               if (existingRecord) {
-                console.warn(`RTL: ID ${data.new_data.id} already exists in ${table}, skipping duplicate INSERT`, {
+                Logger.warn('rtl', `RTL: ID ${data.new_data.id} already exists in ${table}, skipping duplicate INSERT`, {
                   existing: existingRecord,
                   incoming: data.new_data
                 });
@@ -590,7 +544,7 @@ export class RealTimeListener {
               await cache.add(data.new_data);
               await syncReduxForTable(table);
             } catch (dbError) {
-              console.error(`RTL: IndexedDB error for ${table} with ID ${data.new_data.id}:`, dbError);
+              Logger.error('rtl', `RTL: IndexedDB error for ${table} with ID ${data.new_data.id}:`, dbError);
               // Don't throw - just log the error to prevent crashes
               return;
             }
@@ -632,7 +586,7 @@ export class RealTimeListener {
           break;
       }
     } catch (error) {
-      console.error('RTL cache handler error', { table, operation, error });
+      Logger.error('rtl', 'RTL cache handler error', { table, operation, error });
     }
   }
 
@@ -640,15 +594,8 @@ export class RealTimeListener {
    * Schedule reconnection attempt
    */
   private scheduleReconnect(): void {
-    // Don't schedule reconnection if server is marked as unavailable
-    if (this.serverUnavailable) {
-      this.debugLog('Skipping reconnection - server marked as unavailable');
-      return;
-    }
-
     if (this.reconnectAttempts >= (this.options.maxReconnectAttempts || 5)) {
       this.debugLog('Max reconnection attempts reached');
-      // Only emit status, don't log to console to avoid spam
       this.emit('connection:status', { 
         status: 'failed', 
         message: 'Max reconnection attempts reached' 
@@ -659,7 +606,6 @@ export class RealTimeListener {
     this.reconnectAttempts++;
     const delay = this.options.reconnectInterval || 5000;
     
-    // Only log reconnection attempts in debug mode
     this.debugLog(`Scheduling reconnection attempt ${this.reconnectAttempts}/${this.options.maxReconnectAttempts} in ${delay}ms`);
     
     this.emit('connection:status', { 

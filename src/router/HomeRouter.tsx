@@ -76,6 +76,9 @@ const AssetTypesManager = lazy(() => import('@/pages/assets/AssetTypesManager').
 // QR Codes (lazy)
 const QrCodesPage = lazy(() => import('@/pages/qr-codes/QrCodesPage').then(m => ({ default: m.QrCodesPage })));
 
+// Tech Support (lazy)
+const TechSupport = lazy(() => import('@/pages/tech-support/TechSupport'));
+
 
 const pages = [
   { path: '/workspace/:id', component: <Workspace /> },
@@ -170,6 +173,9 @@ export const HomeRoutes = () => {
 
             {/* QR Codes Routes */}
             <Route path="/qr-codes" element={<Suspense fallback={null}><PluginGuard pluginSlug="qr-codes"><QrCodesPage /></PluginGuard></Suspense>} />
+
+            {/* Tech Support (Super Admin only) */}
+            <Route path="/tech-support" element={<TechSupport />} />
           </Routes>
         </Suspense>
       </MainLayout>

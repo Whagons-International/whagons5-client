@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Slider } from '@/components/ui/slider';
 
+import { Logger } from '@/utils/logger';
 interface ImageCropperProps {
   image: string;
   open: boolean;
@@ -113,7 +114,7 @@ export function ImageCropper({
       onCropComplete(croppedImage);
       onClose();
     } catch (error) {
-      console.error('Error cropping image:', error);
+      Logger.error('ui', 'Error cropping image:', error);
     }
   };
 

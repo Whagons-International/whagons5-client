@@ -31,6 +31,14 @@ import {
 } from '@/store/reducers/notificationPreferencesSlice';
 import { isFCMReady, isTokenRegistered } from '@/firebase/fcmHelper';
 
+import { Logger } from '@/utils/logger';
+import { getVersionInfo } from '@/utils/version';
+import { Info, Trash2, RefreshCw, Terminal } from 'lucide-react';
+import { DB } from '@/store/indexedDB/DB';
+import { DataManager } from '@/store/DataManager';
+import { auth } from '@/firebase/firebaseConfig';
+import { activateTempAdmin, isTempAdminActive, getTempAdminRemainingMs } from '@/hooks/useSuperAdmin';
+import toast from 'react-hot-toast';
 // Helper functions to get translated arrays
 const getMonths = (t: (key: string, fallback?: string) => string) => [
     { value: 1, label: t('profile.months.january', 'January') },
@@ -186,8 +194,21 @@ function Profile() {
     const [showCropper, setShowCropper] = useState(false);
     const [imageToCrop, setImageToCrop] = useState<string | null>(null);
     const [originalFile, setOriginalFile] = useState<File | null>(null);
+    
+    // Clear cache state
+    const [clearingCache, setClearingCache] = useState(false);
     const [newHobby, setNewHobby] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
+    
+    // Dev mode / Super admin activation state
+    const [hashClickCount, setHashClickCount] = useState(0);
+    const [devModeActive, setDevModeActive] = useState(false);
+    const [devModeExpiry, setDevModeExpiry] = useState<number | null>(null);
+    const [keySequence, setKeySequence] = useState('');
+    const [showSecretInput, setShowSecretInput] = useState(false);
+    const [secretInput, setSecretInput] = useState('');
+    const [secretError, setSecretError] = useState<string | null>(null);
+    const lastClickTime = useRef<number>(0);
 
     // DataManager handles data loading, no need to call internal functions here
 
@@ -207,6 +228,90 @@ function Profile() {
         const isReady = await isFCMReady();
         const isRegistered = isTokenRegistered();
         setFcmEnabled(isReady && isRegistered);
+    };
+
+    // Dev mode activation - Step 1: Click hash 10 times quickly
+    const handleHashClick = () => {
+        const now = Date.now();
+        // Reset if more than 500ms between clicks
+        if (now - lastClickTime.current > 500) {
+            setHashClickCount(1);
+        } else {
+            setHashClickCount(prev => prev + 1);
+        }
+        lastClickTime.current = now;
+        
+        if (hashClickCount + 1 >= 10) {
+            // Activate dev mode for 15 minutes
+            const expiry = Date.now() + 15 * 60 * 1000;
+            setDevModeActive(true);
+            setDevModeExpiry(expiry);
+            setHashClickCount(0);
+            toast.success('Dev mode on for 15 minutes. Ctrl+Alt+T then type "techsupport"', { duration: 5000 });
+            
+            // Auto-deactivate after 15 minutes
+            setTimeout(() => {
+                setDevModeActive(false);
+                setDevModeExpiry(null);
+                toast('Dev mode expired', { icon: 'ℹ️' });
+            }, 15 * 60 * 1000);
+        }
+    };
+    
+    // Dev mode activation - Step 2: Keyboard shortcut Ctrl+Shift+K then type "techsupport"
+    useEffect(() => {
+        if (!devModeActive) {
+            setKeySequence('');
+            return;
+        }
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Check for Ctrl+Alt+T to start the sequence
+            if (e.ctrlKey && e.altKey && e.key === 't') {
+                e.preventDefault();
+                setKeySequence('');
+                toast('Enter sequence...', { duration: 2000, icon: '🔑' });
+                return;
+            }
+            
+            // If we're in typing mode, capture letters
+            if (keySequence !== null && e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+                const newSequence = keySequence + e.key.toLowerCase();
+                setKeySequence(newSequence);
+                
+                // Check if sequence matches
+                if (newSequence === 'techsupport') {
+                    setShowSecretInput(true);
+                    setKeySequence('');
+                    toast.dismiss();
+                } else if (!'techsupport'.startsWith(newSequence)) {
+                    // Wrong sequence, reset
+                    setKeySequence('');
+                }
+            }
+        };
+        
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [devModeActive, keySequence]);
+    
+    // Handle secret submission
+    const handleSecretSubmit = async () => {
+        if (!secretInput.trim()) {
+            setSecretError('Please enter the secret');
+            return;
+        }
+        
+        const success = await activateTempAdmin(secretInput);
+        if (success) {
+            setShowSecretInput(false);
+            setSecretInput('');
+            setSecretError(null);
+            setDevModeActive(false);
+            toast.success('Super admin mode activated for 15 minutes', { duration: 5000 });
+        } else {
+            setSecretError('Invalid secret');
+        }
     };
 
     const handleNotificationToggle = (key: keyof NotificationPreferences) => {
@@ -341,7 +446,7 @@ function Profile() {
                     setPreviewImage(null);
                 }
             } catch (error) {
-                console.error('Error initializing form:', error);
+                Logger.error('profile', 'Error initializing form:', error);
                 setError(t('profile.failedToLoad', 'Failed to load profile data'));
             }
         }
@@ -469,6 +574,43 @@ function Profile() {
         }
     };
 
+    // Handle clear cache and resync
+    const handleClearCache = async () => {
+        setClearingCache(true);
+        try {
+            const uid = auth.currentUser?.uid;
+            
+            // 1. Clear sessionStorage
+            sessionStorage.clear();
+            Logger.info('cache', 'Cleared sessionStorage');
+            
+            // 2. Clear localStorage (except auth-critical keys)
+            const keysToKeep = ['whagons-subdomain', 'firebase:'];
+            const keysToRemove: string[] = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && !keysToKeep.some(keep => key.startsWith(keep))) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+            Logger.info('cache', `Cleared ${keysToRemove.length} localStorage keys`);
+            
+            // 3. Delete IndexedDB
+            if (uid) {
+                await DB.deleteDatabase(uid);
+                Logger.info('cache', 'Deleted IndexedDB');
+            }
+            
+            // 4. Reload page - sync will happen automatically on reload
+            Logger.info('cache', 'Cache cleared, reloading page');
+            window.location.reload();
+        } catch (error) {
+            Logger.error('cache', 'Error clearing cache:', error);
+            setClearingCache(false);
+        }
+    };
+
     // Handle profile update
     const handleSaveProfile = async () => {
         try {
@@ -488,15 +630,15 @@ function Profile() {
             const response = await actionsApi.patch('/users/me', payload);
             
             if (response.status === 200) {
-                console.log('Profile: Saving profile with url_picture:', editForm.url_picture);
+                Logger.info('profile', 'Profile: Saving profile with url_picture:', editForm.url_picture);
                 
                 // Clear avatar cache BEFORE refreshing to ensure fresh image loads
                 const { AvatarCache } = await import('@/store/indexedDB/AvatarCache');
                 const firebaseUser = (window as any).firebase?.auth?.currentUser;
                 if (firebaseUser?.uid && displayUserData?.id) {
-                    console.log('Profile: Clearing cache for', [firebaseUser.uid, displayUserData.google_uuid, displayUserData.id]);
+                    Logger.info('profile', 'Profile: Clearing cache for', [firebaseUser.uid, displayUserData.google_uuid, displayUserData.id]);
                     await AvatarCache.deleteByAny([firebaseUser.uid, displayUserData.google_uuid, displayUserData.id]);
-                    console.log('Profile: Cache cleared');
+                    Logger.info('profile', 'Profile: Cache cleared');
                 }
                 
                 // Notify other components (like header) that profile was updated WITH THE NEW URL
@@ -507,7 +649,7 @@ function Profile() {
                         url_picture: editForm.url_picture 
                     }
                 }));
-                console.log('Profile: Dispatched profileUpdated event with url_picture:', editForm.url_picture);
+                Logger.info('profile', 'Profile: Dispatched profileUpdated event with url_picture:', editForm.url_picture);
                 
                 // Close dialog immediately to prevent blank screen during refetch
                 setIsEditing(false);
@@ -515,16 +657,16 @@ function Profile() {
                 // Refresh user data in the background (non-blocking)
                 // This prevents the blank screen flash since dialog is already closed
                 refetchUser().then(() => {
-                    console.log('Profile: User data refetched');
+                    Logger.info('profile', 'Profile: User data refetched');
                 }).catch((err) => {
-                    console.error('Error refetching user:', err);
+                    Logger.error('profile', 'Error refetching user:', err);
                 });
                 
                 // Also set localStorage for cross-tab communication
                 localStorage.setItem('profile_updated', Date.now().toString());
             }
         } catch (err: any) {
-            console.error('Error updating profile:', err);
+            Logger.error('profile', 'Error updating profile:', err);
             // Extract error message from API response if available
             const errorMessage = err?.response?.data?.message || 
                                 err?.response?.data?.errors?.zodiac_sign?.[0] ||
@@ -1457,6 +1599,90 @@ function Profile() {
                     )}
                 </div>
             )
+        },
+        {
+            value: 'about',
+            label: t('profile.tabs.about', 'About'),
+            content: (
+                <div className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Info className="w-5 h-5" />
+                                {t('profile.about.appInfo', 'Application Info')}
+                            </CardTitle>
+                            <CardDescription>
+                                {t('profile.about.description', 'Version and build information for Whagons')}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-sm text-muted-foreground">
+                                        {t('profile.about.version', 'Version')}
+                                    </Label>
+                                    <p className="text-lg font-semibold">{getVersionInfo().version}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-sm text-muted-foreground">
+                                        {t('profile.about.build', 'Build')}
+                                    </Label>
+                                    <p className="font-mono text-sm">{getVersionInfo().commit}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-sm text-muted-foreground">
+                                        {t('profile.about.buildTime', 'Build Time')}
+                                    </Label>
+                                    <p className="text-sm">{new Date(getVersionInfo().buildTime).toLocaleString()}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-sm text-muted-foreground">
+                                        {t('profile.about.fullVersion', 'Full Version')}
+                                    </Label>
+                                    <p 
+                                        className="font-mono text-sm cursor-default select-none"
+                                        onClick={handleHashClick}
+                                    >
+                                        {getVersionInfo().fullVersion}
+                                    </p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <RefreshCw className="w-5 h-5" />
+                                {t('profile.about.cacheManagement', 'Cache Management')}
+                            </CardTitle>
+                            <CardDescription>
+                                {t('profile.about.cacheDescription', 'Clear local data and resync from server. Use this if you experience data issues.')}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Button
+                                variant="destructive"
+                                onClick={handleClearCache}
+                                disabled={clearingCache}
+                                className="gap-2"
+                            >
+                                {clearingCache ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        {t('profile.about.clearing', 'Clearing...')}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Trash2 className="w-4 h-4" />
+                                        {t('profile.about.clearCache', 'Clear Cache & Resync')}
+                                    </>
+                                )}
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </div>
+            )
         }
     ];
 
@@ -1467,6 +1693,63 @@ function Profile() {
                 defaultValue="profile"
                 basePath="/profile"
             />
+            
+            {/* Secret Admin Activation Dialog */}
+            <Dialog open={showSecretInput} onOpenChange={(open) => {
+                if (!open) {
+                    setShowSecretInput(false);
+                    setSecretInput('');
+                    setSecretError(null);
+                }
+            }}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Terminal className="h-5 w-5" />
+                            Tech Support Access
+                        </DialogTitle>
+                        <DialogDescription>
+                            Enter the tech support secret to activate super admin mode for 15 minutes.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="secret">Secret</Label>
+                            <Input
+                                id="secret"
+                                type="password"
+                                value={secretInput}
+                                onChange={(e) => {
+                                    setSecretInput(e.target.value);
+                                    setSecretError(null);
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        handleSecretSubmit();
+                                    }
+                                }}
+                                placeholder="Enter tech support secret"
+                                autoFocus
+                            />
+                            {secretError && (
+                                <p className="text-sm text-destructive">{secretError}</p>
+                            )}
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => {
+                            setShowSecretInput(false);
+                            setSecretInput('');
+                            setSecretError(null);
+                        }}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSecretSubmit}>
+                            Activate
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

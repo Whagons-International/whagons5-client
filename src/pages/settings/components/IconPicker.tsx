@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { iconService } from '@/database/iconService';
 
+import { Logger } from '@/utils/logger';
 // Lazy-loading icon button component
 function IconButton({ iconName, icon: initialIcon, onClick, title }: { 
   iconName: string; 
@@ -130,7 +131,7 @@ export function IconPicker({
         setTotalIconsCount(allIcons.length);
         setAllIconsMetadata(allIcons);
       } catch (error) {
-        console.error('Error loading icons:', error);
+        Logger.error('settings', 'Error loading icons:', error);
       }
     };
     loadDefaultAndPopularIcons();
@@ -157,7 +158,7 @@ export function IconPicker({
       setDisplayedIcons(prev => [...prev, ...iconsToAdd]);
       setLoadedIconsCount(endIndex);
     } catch (error) {
-      console.error('Error loading more icons:', error);
+      Logger.error('settings', 'Error loading more icons:', error);
     } finally {
       setLoadingMoreIcons(false);
     }
@@ -216,7 +217,7 @@ export function IconPicker({
         setDisplayedIcons(loadedResults);
         setLoadedIconsCount(loadedResults.length);
       } catch (error) {
-        console.error('Error searching icons:', error);
+        Logger.error('settings', 'Error searching icons:', error);
         setDisplayedIcons([]);
         setLoadedIconsCount(0);
       } finally {
@@ -237,7 +238,7 @@ export function IconPicker({
     iconService.getIcon(iconName).then(icon => {
       setCurrentIcon(icon);
     }).catch(error => {
-      console.error('Error loading selected icon:', error);
+      Logger.error('settings', 'Error loading selected icon:', error);
     });
   };
 

@@ -1,0 +1,36 @@
+# Development Logging Configuration
+# All categories enabled by default for debugging
+
+# Set to 'all' to enable all categories, 'none' to disable all
+mode: categories
+
+# Or specify individual categories (only used if mode is not 'all' or 'none')
+categories:
+  - ui
+#   - auth
+#   - api
+#   - cache
+#   - rtl
+#   - redux
+#   - db
+#   - assistant
+#   - scheduler
+#   - forms
+#   - notifications
+#   - integrity
+#   - perf
+#   - navigation
+#   - icons
+#   - boards
+#   - workspaces
+#   - tasks
+#   - branding
+#   - settings
+#   - broadcast
+#   - profile
+#   - activity
+#   - invitations
+#   - speech
+#   - whiteboard
+#   - kpi
+#   - confetti

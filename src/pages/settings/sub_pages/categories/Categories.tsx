@@ -37,6 +37,7 @@ import { CategoryPreview } from './components/CategoryPreview';
 import { StatisticsTab } from './components/StatisticsTab';
 import { GripVertical } from 'lucide-react';
 
+import { Logger } from '@/utils/logger';
 // LocalStorage key for custom category order
 const CATEGORY_ORDER_KEY = 'wh-categories-order';
 
@@ -55,7 +56,7 @@ const saveCategoryOrder = (order: number[]): void => {
   try {
     localStorage.setItem(CATEGORY_ORDER_KEY, JSON.stringify(order));
   } catch (e) {
-    console.error('Failed to save category order:', e);
+    Logger.error('settings', 'Failed to save category order:', e);
   }
 };
 
@@ -97,7 +98,7 @@ const CategoryNameCellRenderer = (props: ICellRendererParams) => {
         const loadedIcon = await iconService.getIcon(iconName);
         setIcon(loadedIcon || faTags);
       } catch (error) {
-        console.error('Error loading category icon:', error);
+        Logger.error('settings', 'Error loading category icon:', error);
         setIcon(faTags);
       }
     };
@@ -355,7 +356,7 @@ function Categories() {
         updates: { reporting_team_ids: safeReportingTeamIds }
       })).unwrap();
     } catch (e: any) {
-      console.error('Error saving reporting teams', e);
+      Logger.error('settings', 'Error saving reporting teams', e);
       setReportingTeamsError(e?.message || 'Failed to save reporting teams');
     } finally {
       setSavingReportingTeams(false);
@@ -464,7 +465,7 @@ function Categories() {
       rowDrag: true,
       width: 50,
       maxWidth: 50,
-      suppressMenu: true,
+      suppressHeaderMenuButton: true,
       sortable: false,
       filter: false,
       cellRenderer: () => (

@@ -4,6 +4,7 @@ import { Template } from "@/store/types";
 import { TemplateFormData } from "../types";
 import { genericActions } from "@/store/genericSlices";
 
+import { Logger } from '@/utils/logger';
 const initialFormData: TemplateFormData = {
   name: '',
   alias: '',
@@ -116,7 +117,7 @@ export function useTemplateForm(
       }) as any);
       setSelectedRequirement('');
     } catch (error) {
-      console.error('Failed to add mapping:', error);
+      Logger.error('settings', 'Failed to add mapping:', error);
     }
   };
 
@@ -124,7 +125,7 @@ export function useTemplateForm(
     try {
       await dispatch(genericActions.complianceMappings.removeAsync(mappingId) as any);
     } catch (error) {
-      console.error('Failed to remove mapping:', error);
+      Logger.error('settings', 'Failed to remove mapping:', error);
     }
   };
 

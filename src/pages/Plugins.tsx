@@ -27,6 +27,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
+import { Logger } from '@/utils/logger';
 const PLUGINS_ORDER_KEY = 'wh-plugins-order-v1';
 const CUSTOM_PLUGINS_KEY = 'wh-custom-plugins-v1';
 
@@ -86,7 +87,7 @@ const saveCustomPlugins = (plugins: CustomPlugin[]) => {
 	try {
 		localStorage.setItem(CUSTOM_PLUGINS_KEY, JSON.stringify(plugins));
 	} catch (error) {
-		console.error('Error saving custom plugins:', error);
+		Logger.error('ui', 'Error saving custom plugins:', error);
 	}
 };
 

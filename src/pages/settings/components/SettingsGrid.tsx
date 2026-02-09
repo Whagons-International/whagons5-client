@@ -1,10 +1,11 @@
-import { useRef, useCallback, useEffect } from "react";
+import { useRef, useCallback, useEffect, useMemo } from "react";
 import { AgGridReact } from 'ag-grid-react';
-import { ColDef, GridReadyEvent } from 'ag-grid-community';
+import { ColDef, GridReadyEvent, RowSelectionOptions } from 'ag-grid-community';
 
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { RowGroupingModule, TreeDataModule, SetFilterModule, LicenseManager } from 'ag-grid-enterprise';
 
+import { Logger } from '@/utils/logger';
 export const AG_GRID_LICENSE = import.meta.env.VITE_AG_GRID_LICENSE_KEY as string | undefined;
 
 // Register AG Grid modules (community + enterprise needed for grouping/tree/set filter)
@@ -14,7 +15,18 @@ ModuleRegistry.registerModules([AllCommunityModule, RowGroupingModule, TreeDataM
 if (AG_GRID_LICENSE) {
   LicenseManager.setLicenseKey(AG_GRID_LICENSE);
 } else {
-  console.warn('AG Grid Enterprise license key (VITE_AG_GRID_LICENSE_KEY) is missing.');
+  Logger.warn('settings', 'AG Grid Enterprise license key (VITE_AG_GRID_LICENSE_KEY) is missing.');
+}
+
+// Helper to normalize deprecated string rowSelection values to new object format
+function normalizeRowSelection(
+  rowSelection: 'single' | 'multiple' | RowSelectionOptions | undefined
+): RowSelectionOptions | undefined {
+  if (!rowSelection) return undefined;
+  if (typeof rowSelection === 'string') {
+    return { mode: rowSelection === 'single' ? 'singleRow' : 'multiRow' };
+  }
+  return rowSelection;
 }
 
 export interface SettingsGridProps<T = any> {
@@ -27,7 +39,7 @@ export interface SettingsGridProps<T = any> {
   className?: string;
   noRowsMessage?: string;
   defaultColDef?: ColDef;
-  rowSelection?: 'single' | 'multiple' | any; // allow object config per example
+  rowSelection?: 'single' | 'multiple' | RowSelectionOptions; // supports both legacy string and new object format
   onSelectionChanged?: (selectedRows: T[]) => void;
   onRowClicked?: (row: T) => void;
   onRowDoubleClicked?: (row: T) => void;
@@ -68,6 +80,12 @@ export function SettingsGrid<T = any>({
 }: SettingsGridProps<T>) {
   const gridRef = useRef<AgGridReact>(null);
 
+  // Normalize rowSelection to new object format
+  const normalizedRowSelection = useMemo(
+    () => normalizeRowSelection(rowSelection),
+    [rowSelection]
+  );
+
   const handleGridReady = useCallback((params: GridReadyEvent) => {
     if (gridRef.current?.api) {
       gridRef.current.api.sizeColumnsToFit();
@@ -98,7 +116,7 @@ export function SettingsGrid<T = any>({
         rowData={rowData}
         columnDefs={columnDefs}
         onGridReady={handleGridReady}
-        rowSelection={rowSelection}
+        rowSelection={normalizedRowSelection}
         suppressColumnVirtualisation={true}
         animateRows={true}
         rowHeight={rowHeight ?? 50}

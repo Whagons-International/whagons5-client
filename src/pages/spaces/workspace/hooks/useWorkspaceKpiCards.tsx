@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, useRef, type ReactNode } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
 import { TasksCache } from '@/store/indexedDB/TasksCache';
@@ -31,6 +31,7 @@ import {
 import { WorkspaceStats } from './useWorkspaceStats';
 import { TaskEvents } from '@/store/eventEmiters/taskEvents';
 
+import { Logger } from '@/utils/logger';
 // Icon mapping from string value to FontAwesome icon
 const FA_ICON_MAP: Record<string, IconDefinition> = {
   faChartBar,
@@ -133,9 +134,13 @@ export function useWorkspaceKpiCards(params: {
   setHeaderKpiCards: (cards: KpiCardEntity[]) => void;
   headerCards: WorkspaceHeaderCard[];
   canReorderHeaderKpis: boolean;
+  isReorderingRef: React.MutableRefObject<boolean>;
 } {
   const { workspaceIdNum, currentUserId, doneStatusId, workingStatusIds, stats } = params;
   const { t } = useLanguage();
+
+  // Ref to track when a reorder operation is in flight to prevent Redux sync from overwriting local state
+  const isReorderingRef = useRef(false);
 
   const allKpiCardsFromRedux = useSelector((s: RootState) => ((s as any).kpiCards?.value ?? []) as KpiCardEntity[]);
 
@@ -167,6 +172,9 @@ export function useWorkspaceKpiCards(params: {
   const [headerKpiCards, setHeaderKpiCards] = useState<KpiCardEntity[]>([]);
 
   useEffect(() => {
+    // Skip syncing from Redux while a reorder operation is in progress
+    // This prevents the flicker where cards briefly jump back to old positions
+    if (isReorderingRef.current) return;
     setHeaderKpiCards(scopedKpiCardsFromStore);
   }, [scopedKpiCardsFromStore]);
 
@@ -507,7 +515,7 @@ export function useWorkspaceKpiCards(params: {
 
         if (!cancelled) setCustomComputed(next);
       } catch (error) {
-        console.error('[Workspace KPI] Error computing KPI cards:', error);
+        Logger.error('workspaces', '[Workspace KPI] Error computing KPI cards:', error);
       }
     };
 
@@ -573,5 +581,6 @@ export function useWorkspaceKpiCards(params: {
     headerCards,
     // Allow dragging when there are cards (fallback cards will snap back since they can't persist)
     canReorderHeaderKpis: headerCards.length > 0,
+    isReorderingRef,
   };
 }

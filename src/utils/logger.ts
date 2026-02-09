@@ -303,38 +303,26 @@ class LoggerClass {
     if (typeof window === 'undefined' || this.globalErrorsInstalled) return;
 
     // Handle uncaught errors
+    // Note: Logger.error() already sends to telemetry, so no need for duplicate captureUncaughtError call
     window.onerror = (message, source, lineno, colno, error) => {
-      this.error('ui', 'Uncaught error:', {
-        message,
+      this.error('ui', '[Uncaught] ' + (error?.message || message), {
         source,
         lineno,
         colno,
-        error: error?.stack || error?.message || error,
+        stack: error?.stack,
       });
-
-      // Also send directly to telemetry for uncaught errors
-      if (this.telemetryEnabled) {
-        getErrorTelemetry().then(telemetry => {
-          telemetry.captureUncaughtError(message, source, lineno, colno, error);
-        }).catch(() => {});
-      }
 
       // Return false to allow default error handling to continue
       return false;
     };
 
     // Handle unhandled promise rejections
+    // Note: Logger.error() already sends to telemetry, so no need for duplicate captureUnhandledRejection call
     window.onunhandledrejection = (event: PromiseRejectionEvent) => {
-      this.error('ui', 'Unhandled promise rejection:', {
-        reason: event.reason?.stack || event.reason?.message || event.reason,
+      const reason = event.reason;
+      this.error('ui', '[Unhandled Rejection] ' + (reason?.message || reason?.toString?.() || 'Unknown'), {
+        stack: reason?.stack,
       });
-
-      // Also send directly to telemetry for unhandled rejections
-      if (this.telemetryEnabled) {
-        getErrorTelemetry().then(telemetry => {
-          telemetry.captureUnhandledRejection(event);
-        }).catch(() => {});
-      }
     };
 
     // Override console.error to also capture through our logging system

@@ -17,6 +17,7 @@ const PluginSettings = lazy(() => import('@/pages/PluginSettings'));
 const PluginManagement = lazy(() => import('@/pages/admin/PluginManagement'));
 const Integrations = lazy(() => import('@/pages/Integrations'));
 const BoardDetail = lazy(() => import('@/pages/boards/BoardDetail'));
+const Boards = lazy(() => import('@/pages/boards/Boards'));
 const TestPage = lazy(() => import('@/pages/Testpage'));
 const SharedWithMe = lazy(() => import('@/pages/shared/SharedWithMe'));
 const BroadcastsPage = lazy(() => import('@/pages/broadcasts/BroadcastsPage'));
@@ -27,6 +28,7 @@ const GamificationHistory = lazy(() => import('@/pages/gamification/PointHistory
 const AnalyticsComingSoon = lazy(() => import('@/pages/analytics/AnalyticsComingSoon'));
 const MotivationComingSoon = lazy(() => import('@/pages/motivation/MotivationComingSoon'));
 const HotelAnalytics = lazy(() => import('@/pages/hotel-analytics/HotelAnalytics'));
+const Cleaning = lazy(() => import('@/pages/cleaning/Cleaning'));
 const ComplianceStandards = lazy(() => import('@/pages/compliance/ComplianceStandards').then(m => ({ default: m.ComplianceStandards })));
 const ComplianceStandardDetail = lazy(() => import('@/pages/compliance/ComplianceStandardDetail').then(m => ({ default: m.ComplianceStandardDetail })));
 
@@ -56,6 +58,7 @@ const GamificationSettings = lazy(() => import('@/pages/settings/sub_pages/gamif
 const AnalyticsSettings = lazy(() => import('@/pages/settings/sub_pages/analytics/AnalyticsSettings'));
 const MotivationSettings = lazy(() => import('@/pages/settings/sub_pages/motivation/MotivationSettings'));
 const HotelAnalyticsSettings = lazy(() => import('@/pages/settings/sub_pages/HotelAnalyticsSettings'));
+const CleaningStatuses = lazy(() => import('@/pages/settings/sub_pages/cleaning-statuses/CleaningStatuses'));
 
 // Working Hours (lazy)
 const WorkingHoursSettings = lazy(() => import('@/pages/settings/sub_pages/WorkingHoursSettings'));
@@ -122,9 +125,11 @@ export const HomeRoutes = () => {
             <Route path="/plugins/:pluginId/settings" element={<PluginSettings />} />
             <Route path="/admin/plugins" element={<PluginManagement />} />
             <Route path="/integrations" element={<Integrations />} />
+            <Route path="/boards" element={<Boards />} />
             <Route path="/boards/:boardId" element={<BoardDetail />} />
             <Route path="/broadcasts" element={<BroadcastsPage />} />
             <Route path="/activity" element={<ActivityMonitor />} />
+            <Route path="/cleaning" element={<Cleaning />} />
             <Route path="/gamification" element={<Suspense fallback={null}><PluginGuard pluginSlug="gamification"><GamificationLeaderboard /></PluginGuard></Suspense>} />
             <Route path="/gamification/history" element={<Suspense fallback={null}><PluginGuard pluginSlug="gamification"><GamificationHistory /></PluginGuard></Suspense>} />
             <Route path="/analytics" element={<AnalyticsComingSoon />} />
@@ -155,6 +160,7 @@ export const HomeRoutes = () => {
             <Route path="/settings/analytics" element={<AnalyticsSettings />} />
             <Route path="/settings/motivation" element={<MotivationSettings />} />
             <Route path="/settings/hotel-analytics" element={<HotelAnalyticsSettings />} />
+            <Route path="/settings/cleaning-statuses" element={<CleaningStatuses />} />
             <Route path="/working-hours" element={<Suspense fallback={null}><WorkingHoursGuard><WorkingHoursDashboard /></WorkingHoursGuard></Suspense>} />
             <Route path="/settings/working-hours" element={<Suspense fallback={null}><WorkingHoursGuard><WorkingHoursSettings /></WorkingHoursGuard></Suspense>} />
             <Route path="/settings/working-schedules" element={<Suspense fallback={null}><WorkingHoursGuard><WorkingSchedules /></WorkingHoursGuard></Suspense>} />

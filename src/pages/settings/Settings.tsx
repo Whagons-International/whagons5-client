@@ -32,7 +32,10 @@ import {
   faChartBar,
   faChartLine,
   faStar as faStarSolid,
+  faBell,
   faFileAlt,
+  faPlug,
+  faBroom,
   faLink,
   faClock
 } from "@fortawesome/free-solid-svg-icons";
@@ -58,7 +61,8 @@ import { Logger } from '@/utils/logger';
 const STORAGE_KEYS = {
   basic: 'wh-settings-basics-order-v1',
   advanced: 'wh-settings-advanced-order-v1',
-  favorites: 'wh-settings-favorites-v1'
+  favorites: 'wh-settings-favorites-v1',
+  plugins: 'wh-settings-plugins-order-v1'
 } as const;
 
 const loadOrder = (key: string): string[] => {
@@ -281,7 +285,7 @@ function Settings() {
   const [activeTab, setActiveTab] = useState<SettingsTabKey>(() => {
     try {
       const saved = localStorage.getItem(SETTINGS_TAB_STORAGE_KEY);
-      if (saved === 'advanced' || saved === 'basics' || saved === 'favorites') {
+      if (saved === 'advanced' || saved === 'basics' || saved === 'favorites' || saved === 'plugins') {
         return saved as SettingsTabKey;
       }
     } catch {}
@@ -346,13 +350,13 @@ function Settings() {
       
       const urlParams = new URLSearchParams(window.location.search);
       const tabFromUrl = urlParams.get('tab');
-      if (tabFromUrl === 'advanced' || tabFromUrl === 'basics' || tabFromUrl === 'favorites') {
+      if (tabFromUrl === 'advanced' || tabFromUrl === 'basics' || tabFromUrl === 'favorites' || tabFromUrl === 'plugins') {
         setActiveTab(tabFromUrl as SettingsTabKey);
         setPrevActiveTab(tabFromUrl as SettingsTabKey);
       } else {
         // No tab in URL - restore from localStorage and update URL
         const saved = localStorage.getItem(SETTINGS_TAB_STORAGE_KEY);
-        if (saved === 'advanced' || saved === 'basics' || saved === 'favorites') {
+        if (saved === 'advanced' || saved === 'basics' || saved === 'favorites' || saved === 'plugins') {
           const savedTab = saved as SettingsTabKey;
           setActiveTab(savedTab);
           setPrevActiveTab(savedTab);
@@ -384,6 +388,7 @@ function Settings() {
   const spots = useSelector((s: RootState) => s.spots?.value ?? []);
   const tags = useSelector((s: RootState) => s.tags?.value ?? []);
   const workflows = useSelector((s: RootState) => (s as any).workflows?.value ?? []);
+  const cleaningStatuses = useSelector((s: RootState) => (s as any).cleaningStatuses?.value ?? []);
 
   const counts = useMemo(() => {
     return {
@@ -400,8 +405,9 @@ function Settings() {
       forms: forms.length,
       workflows: workflows.length,
       approvals: approvals.length,
+      cleaningStatuses: cleaningStatuses.length,
     };
-  }, [categories.length, templates.length, teams.length, workspaces.length, spots.length, statuses.length, tags.length, priorities.length, slas.length, users.length, forms.length, workflows.length, approvals.length]);
+  }, [categories.length, templates.length, teams.length, workspaces.length, spots.length, statuses.length, tags.length, priorities.length, slas.length, users.length, forms.length, workflows.length, approvals.length, cleaningStatuses.length]);
 
   const basicSettings = useMemo(() => [
     {
@@ -526,6 +532,18 @@ function Settings() {
     },
   ], [counts.slas, counts.forms, counts.workflows, t]);
 
+  // Plugin settings configuration
+  const pluginSettings = useMemo(() => [
+    {
+      id: 'cleaning-statuses',
+      title: t('settings.cards.cleaningStatuses.title', 'Estados de Limpieza'),
+      icon: faBroom,
+      count: counts.cleaningStatuses,
+      description: t('settings.cards.cleaningStatuses.description', 'Gestiona los estados para operaciones de limpieza'),
+      color: 'text-teal-500'
+    },
+  ], [counts.cleaningStatuses, t]);
+
   // Order state management
   const [basicOrder, setBasicOrder] = useState<string[]>(() => {
     const currentIds = basicSettings.map(s => s.id);
@@ -536,6 +554,12 @@ function Settings() {
   const [advancedOrder, setAdvancedOrder] = useState<string[]>(() => {
     const currentIds = advancedSettings.map(s => s.id);
     const saved = loadOrder(STORAGE_KEYS.advanced);
+    return [...saved.filter(id => currentIds.includes(id)), ...currentIds.filter(id => !saved.includes(id))];
+  });
+
+  const [pluginOrder, setPluginOrder] = useState<string[]>(() => {
+    const currentIds = pluginSettings.map(s => s.id);
+    const saved = loadOrder(STORAGE_KEYS.plugins);
     return [...saved.filter(id => currentIds.includes(id)), ...currentIds.filter(id => !saved.includes(id))];
   });
 
@@ -565,15 +589,20 @@ function Settings() {
     return advancedOrder.map(id => settingMap.get(id)).filter(Boolean) as SettingCard[];
   }, [advancedSettings, advancedOrder]);
 
+  const orderedPluginSettings = useMemo(() => {
+    const settingMap = new Map(pluginSettings.map(s => [s.id, s]));
+    return pluginOrder.map(id => settingMap.get(id)).filter(Boolean) as SettingCard[];
+  }, [pluginSettings, pluginOrder]);
+
   const [favoriteIds, setFavoriteIds] = useState<string[]>(() => loadOrder(STORAGE_KEYS.favorites));
 
   const allSettingsById = useMemo<Record<string, SettingCard>>(() => {
     const map: Record<string, SettingCard> = {};
-    [...basicSettings, ...advancedSettings].forEach((setting) => {
+    [...basicSettings, ...advancedSettings, ...pluginSettings].forEach((setting) => {
       map[setting.id] = setting;
     });
     return map;
-  }, [basicSettings, advancedSettings]);
+  }, [basicSettings, advancedSettings, pluginSettings]);
 
   useEffect(() => {
     setFavoriteIds((prev) => {
@@ -791,9 +820,26 @@ function Settings() {
     });
   };
 
+  const handlePluginDragEnd = (event: DragEndEvent) => {
+    handleDragEnd(event, () => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+
+      const oldIndex = pluginOrder.indexOf(String(active.id));
+      const newIndex = pluginOrder.indexOf(String(over.id));
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newOrder = arrayMove(pluginOrder, oldIndex, newIndex);
+        setPluginOrder(newOrder);
+        saveOrder(STORAGE_KEYS.plugins, newOrder);
+      }
+    });
+  };
+
   // IDs for SortableContext
   const basicIds = useMemo(() => orderedBasicSettings.map(s => s.id), [orderedBasicSettings]);
   const advancedIds = useMemo(() => orderedAdvancedSettings.map(s => s.id), [orderedAdvancedSettings]);
+  const pluginIds = useMemo(() => orderedPluginSettings.map(s => s.id), [orderedPluginSettings]);
 
 
 
@@ -818,6 +864,7 @@ function Settings() {
   const filteredBasicSettings = orderedBasicSettings;
   const filteredAdvancedSettings = orderedAdvancedSettings;
   const filteredFavoriteSettings = favoriteSettings;
+  const filteredPluginSettings = orderedPluginSettings;
 
   // Search across all models
   interface ModelSearchResult {
@@ -1157,6 +1204,9 @@ function Settings() {
       case 'integrations':
         navigate('/integrations');
         break;
+      case 'cleaning-statuses':
+        navigate('/settings/cleaning-statuses');
+        break;
       default:
         Logger.info('settings', `Unknown setting: ${settingId}`);
     }
@@ -1304,6 +1354,56 @@ function Settings() {
                 <SortableContext items={advancedIds} strategy={rectSortingStrategy}>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {filteredAdvancedSettings.map((setting) => (
+                      <SortableSettingCard
+                        key={setting.id}
+                        setting={setting}
+                        onSettingClick={handleSettingClick}
+                        dragHandleLabel={dragHandleLabel}
+                        isFavorite={favoriteSet.has(setting.id)}
+                        onToggleFavorite={handleToggleFavorite}
+                        favoriteLabel={favoriteAddLabel}
+                        unfavoriteLabel={favoriteRemoveLabel}
+                        favoriteBadgeLabel={favoriteBadgeLabel}
+                        showFavoriteBadge={false}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            )}
+          </div>
+        </motion.div>
+      )
+    },
+    {
+      value: 'plugins',
+      label: t('settings.tabs.plugins', 'Plugins'),
+      content: (
+        <motion.div
+          className="space-y-4 flex-1 h-full"
+          key="plugins"
+          initial={{ x: getSettingsTabInitialX(prevActiveTab, 'plugins') }}
+          animate={{ x: 0 }}
+          transition={SETTINGS_TAB_ANIMATION.transition}
+        >
+          <div className="space-y-4">
+            {!searchQuery && <div className="text-sm text-muted-foreground">{dragHint}</div>}
+            {filteredPluginSettings.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-muted/50 bg-muted/20 p-10 text-center text-muted-foreground">
+                <FontAwesomeIcon icon={faPlug} className="mb-3 text-4xl text-muted-foreground" />
+                <p className="font-medium">No plugin settings available</p>
+                <p className="text-sm">Plugin settings will appear here</p>
+              </div>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handlePluginDragEnd}
+              >
+                <SortableContext items={pluginIds} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {filteredPluginSettings.map((setting) => (
                       <SortableSettingCard
                         key={setting.id}
                         setting={setting}

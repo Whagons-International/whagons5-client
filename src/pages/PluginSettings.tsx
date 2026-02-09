@@ -1,12 +1,21 @@
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { getPluginsConfig, togglePluginPinned, subscribeToPluginsConfig, type PluginConfig } from '@/components/AppSidebar';
-import { Pin, PinOff } from 'lucide-react';
+import { Pin, PinOff, Save, Plus, Trash2 } from 'lucide-react';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faStar } from '@fortawesome/free-solid-svg-icons';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState } from '@/store/store';
+import { genericActions, genericInternalActions } from '@/store/genericSlices';
+import { actionsApi } from '@/api/whagonsActionsApi';
+import { MultiSelect } from '@/components/ui/multi-select';
+import { SelectField } from '@/pages/settings/components';
+import type { Status, CleaningStatus } from '@/store/types';
+import toast from 'react-hot-toast';
 
 interface PluginDetails {
 	features: string[];
@@ -16,18 +25,407 @@ interface PluginDetails {
 function PluginSettings() {
 	const { pluginId } = useParams<{ pluginId: string }>();
 	const { t } = useLanguage();
+	const dispatch = useDispatch();
 	const [searchParams, setSearchParams] = useSearchParams();
 	const [pluginsConfig, setPluginsConfigState] = useState<PluginConfig[]>(getPluginsConfig());
+	const [selectedSpotTypeIds, setSelectedSpotTypeIds] = useState<string[]>([]);
+	const [savedSpotTypeIds, setSavedSpotTypeIds] = useState<string[]>([]);
+	const [saving, setSaving] = useState(false);
+	// Template states
+	const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
+	const [savedTemplateIds, setSavedTemplateIds] = useState<string[]>([]);
+	const [savingTemplates, setSavingTemplates] = useState(false);
+	// Change to array of objects: [{status_id: number, cleaning_status_id: number}, ...]
+	const [statusToCleaningStatusMap, setStatusToCleaningStatusMap] = useState<Array<{status_id: number, cleaning_status_id: number}>>([]);
+	const [savedStatusToCleaningStatusMap, setSavedStatusToCleaningStatusMap] = useState<Array<{status_id: number, cleaning_status_id: number}>>([]);
+	const [savingStatusMapping, setSavingStatusMapping] = useState(false);
+	const [isAddingMapping, setIsAddingMapping] = useState(false);
+	const [newMappingStatusId, setNewMappingStatusId] = useState<string>('');
+	const [newMappingCleaningStatusId, setNewMappingCleaningStatusId] = useState<string>('');
 	
 	// Default to 'settings' tab
 	const activeTab = searchParams.get('tab') || 'settings';
+
+	// Get plugin from Redux store
+	const plugins = useSelector((state: RootState) => {
+		try {
+			return (state as any).plugins?.value || [];
+		} catch (error) {
+			console.error('Error accessing plugins from Redux:', error);
+			return [];
+		}
+	});
+	const backendPlugin = pluginId ? plugins.find((p: any) => {
+		// First try to match by slug, then by id
+		if (p.slug === pluginId) return true;
+		if (String(p.id) === String(pluginId)) return true;
+		return false;
+	}) : undefined;
+	
+	// Ensure we have a valid slug for API calls
+	// If pluginId is numeric, it's likely an ID, so use the plugin's slug
+	// Otherwise, use pluginId as slug (it should be 'cleaning', 'broadcasts', etc.)
+	const effectivePluginSlug = backendPlugin?.slug || (isNaN(Number(pluginId)) ? pluginId : 'cleaning') || 'cleaning';
+
+	// Get spotTypes from Redux
+	const spotTypes = useSelector((state: RootState) => {
+		try {
+			return (state as any).spotTypes?.value || [];
+		} catch (error) {
+			console.error('Error accessing spotTypes from Redux:', error);
+			return [];
+		}
+	});
+
+	// Get statuses and cleaningStatuses from Redux
+	const statuses = useSelector((state: RootState) => {
+		try {
+			return (state as any).statuses?.value || [];
+		} catch (error) {
+			console.error('Error accessing statuses from Redux:', error);
+			return [];
+		}
+	}) as Status[];
+
+	const cleaningStatuses = useSelector((state: RootState) => {
+		try {
+			// Access the cleaningStatuses slice from the state
+			const slice = (state as any).cleaningStatuses;
+			if (!slice) {
+				console.warn('cleaningStatuses slice not found in Redux state');
+				return [];
+			}
+			const value = Array.isArray(slice.value) ? slice.value : [];
+			return value;
+		} catch (error) {
+			console.error('Error accessing cleaningStatuses from Redux:', error);
+			return [];
+		}
+	}) as CleaningStatus[];
+
+	// Get templates and categories from Redux
+	const templates = useSelector((state: RootState) => {
+		try {
+			return (state as any).templates?.value || [];
+		} catch (error) {
+			console.error('Error accessing templates from Redux:', error);
+			return [];
+		}
+	});
+
+	const categories = useSelector((state: RootState) => {
+		try {
+			return (state as any).categories?.value || [];
+		} catch (error) {
+			console.error('Error accessing categories from Redux:', error);
+			return [];
+		}
+	});
+
+	// Filter cleaning templates (templates that belong to Cleaning category)
+	const cleaningCategory = categories.find((cat: any) => 
+		cat.name?.toLowerCase() === 'cleaning'
+	);
+	const cleaningTemplates = cleaningCategory 
+		? templates.filter((t: any) => t.category_id === cleaningCategory.id)
+		: [];
 
 	useEffect(() => {
 		const unsubscribe = subscribeToPluginsConfig(setPluginsConfigState);
 		return unsubscribe;
 	}, []);
 
-	const currentPlugin = pluginsConfig.find(p => p.id === pluginId);
+	// Load spotTypes, statuses and cleaningStatuses on mount
+	useEffect(() => {
+		if (pluginId === 'cleaning') {
+			try {
+				// Load spotTypes
+				if (genericInternalActions?.spotTypes?.getFromIndexedDB) {
+					dispatch(genericInternalActions.spotTypes.getFromIndexedDB() as any);
+				}
+				if (genericInternalActions?.spotTypes?.fetchFromAPI) {
+					dispatch(genericInternalActions.spotTypes.fetchFromAPI() as any);
+				}
+				// Load statuses
+				if (genericInternalActions?.statuses?.getFromIndexedDB) {
+					dispatch(genericInternalActions.statuses.getFromIndexedDB() as any);
+				}
+				if (genericInternalActions?.statuses?.fetchFromAPI) {
+					dispatch(genericInternalActions.statuses.fetchFromAPI() as any);
+				}
+				// Load cleaningStatuses
+				if (genericInternalActions?.cleaningStatuses?.getFromIndexedDB) {
+					dispatch(genericInternalActions.cleaningStatuses.getFromIndexedDB() as any);
+				}
+				if (genericInternalActions?.cleaningStatuses?.fetchFromAPI) {
+					dispatch(genericInternalActions.cleaningStatuses.fetchFromAPI() as any);
+				}
+				// Load templates
+				if (genericInternalActions?.templates?.getFromIndexedDB) {
+					dispatch(genericInternalActions.templates.getFromIndexedDB() as any);
+				}
+				if (genericInternalActions?.templates?.fetchFromAPI) {
+					dispatch(genericInternalActions.templates.fetchFromAPI() as any);
+				}
+				// Load categories
+				if (genericInternalActions?.categories?.getFromIndexedDB) {
+					dispatch(genericInternalActions.categories.getFromIndexedDB() as any);
+				}
+				if (genericInternalActions?.categories?.fetchFromAPI) {
+					dispatch(genericInternalActions.categories.fetchFromAPI() as any);
+				}
+			} catch (error) {
+				console.error('Error loading data:', error);
+			}
+		}
+	}, [pluginId, dispatch]);
+
+	// Parse existing settings from plugin
+	useEffect(() => {
+		if (backendPlugin && pluginId === 'cleaning') {
+			try {
+				let settings = {};
+				if (backendPlugin.settings) {
+					if (typeof backendPlugin.settings === 'string') {
+						try {
+							settings = JSON.parse(backendPlugin.settings);
+						} catch (e) {
+							console.error('Error parsing settings JSON:', e);
+							settings = {};
+						}
+					} else if (typeof backendPlugin.settings === 'object') {
+						settings = backendPlugin.settings;
+					}
+				}
+				
+				const spotTypeIds = (settings as any).spot_type_ids || [];
+				const spotTypeIdsString = spotTypeIds.map((id: number) => String(id));
+				setSelectedSpotTypeIds(spotTypeIdsString);
+				setSavedSpotTypeIds(spotTypeIdsString);
+
+				// Parse template_ids
+				const templateIds = (settings as any).template_ids || [];
+				const templateIdsString = templateIds.map((id: number) => String(id));
+				setSelectedTemplateIds(templateIdsString);
+				setSavedTemplateIds(templateIdsString);
+
+				// Parse status to cleaning status mapping - now expects array of objects
+				const statusMapping = (settings as any).status_to_cleaning_status || [];
+				
+				// Handle migration from old format (object) to new format (array of objects)
+				let mappingsArray: Array<{status_id: number, cleaning_status_id: number}> = [];
+				
+				if (Array.isArray(statusMapping)) {
+					// New format: array of objects
+					mappingsArray = statusMapping.map((item: any) => ({
+						status_id: typeof item.status_id === 'string' ? parseInt(item.status_id, 10) : item.status_id,
+						cleaning_status_id: typeof item.cleaning_status_id === 'string' ? parseInt(item.cleaning_status_id, 10) : item.cleaning_status_id
+					})).filter((item: any) => !isNaN(item.status_id) && !isNaN(item.cleaning_status_id));
+				} else if (statusMapping && typeof statusMapping === 'object' && !Array.isArray(statusMapping)) {
+					// Old format: object like {"2": 2, "4": 3} - migrate to new format
+					mappingsArray = Object.entries(statusMapping).map(([statusId, cleaningStatusId]) => ({
+						status_id: parseInt(String(statusId), 10),
+						cleaning_status_id: typeof cleaningStatusId === 'string' ? parseInt(cleaningStatusId, 10) : cleaningStatusId
+					})).filter(item => !isNaN(item.status_id) && !isNaN(item.cleaning_status_id));
+				}
+				
+				setStatusToCleaningStatusMap(mappingsArray);
+				setSavedStatusToCleaningStatusMap(mappingsArray);
+			} catch (error) {
+				console.error('Error parsing plugin settings:', error);
+				setSelectedSpotTypeIds([]);
+				setSelectedTemplateIds([]);
+				setStatusToCleaningStatusMap([]);
+				setSavedStatusToCleaningStatusMap([]);
+			}
+		} else if (pluginId === 'cleaning' && !backendPlugin) {
+			// Reset if plugin not found
+			setSelectedSpotTypeIds([]);
+			setSelectedTemplateIds([]);
+			setStatusToCleaningStatusMap([]);
+		}
+	}, [backendPlugin, pluginId]);
+
+	const currentPlugin = pluginId ? pluginsConfig.find(p => p.id === pluginId) : undefined;
+
+	// Helper function to get current settings from backendPlugin
+	const getCurrentSettings = (): Record<string, any> => {
+		if (!backendPlugin?.settings) {
+			return {};
+		}
+		
+		if (typeof backendPlugin.settings === 'string') {
+			try {
+				return JSON.parse(backendPlugin.settings);
+			} catch (e) {
+				console.error('Error parsing settings JSON:', e);
+				return {};
+			}
+		}
+		
+		if (typeof backendPlugin.settings === 'object') {
+			return { ...backendPlugin.settings };
+		}
+		
+		return {};
+	};
+
+	// Generic helper function to update plugin settings
+	const updatePluginSettings = async (updates: Record<string, any>): Promise<any> => {
+		if (!backendPlugin) {
+			throw new Error('Backend plugin not found');
+		}
+
+		const currentSettings = getCurrentSettings();
+		const updatedSettings = {
+			...currentSettings,
+			...updates
+		};
+
+		const pluginSlug = effectivePluginSlug;
+		const response = await actionsApi.patch(`/plugins/${pluginSlug}/settings`, {
+			settings: updatedSettings
+		});
+
+		const savedPlugin = response?.data?.data;
+		if (savedPlugin) {
+			dispatch(genericActions.plugins.updateItem(savedPlugin));
+		}
+
+		return savedPlugin;
+	};
+
+	// Handle spot types selection change (only updates local state)
+	const handleSpotTypesChange = (values: string[]) => {
+		setSelectedSpotTypeIds(values);
+	};
+
+	// Handle templates selection change (only updates local state)
+	const handleTemplatesChange = (values: string[]) => {
+		setSelectedTemplateIds(values);
+	};
+
+	// Handle saving spot_type_ids
+	const handleSaveSpotTypes = async () => {
+		setSaving(true);
+		
+		try {
+			const spotTypeIds = selectedSpotTypeIds.map(v => parseInt(v));
+			await updatePluginSettings({ spot_type_ids: spotTypeIds });
+			
+			setSavedSpotTypeIds([...selectedSpotTypeIds]);
+			toast.success(t('plugins.cleaning.spotTypesSaved', 'Spot types saved successfully'));
+		} catch (error: any) {
+			console.error('Error saving spot types:', error);
+			const errorMessage = error?.response?.data?.message || error?.message || t('plugins.cleaning.saveError', 'Failed to save settings');
+			toast.error(errorMessage);
+			// Revert to saved selection
+			setSelectedSpotTypeIds([...savedSpotTypeIds]);
+		} finally {
+			setSaving(false);
+		}
+	};
+
+	// Handle saving template_ids
+	const handleSaveTemplates = async () => {
+		setSavingTemplates(true);
+		
+		try {
+			const templateIds = selectedTemplateIds.map(v => parseInt(v));
+			await updatePluginSettings({ template_ids: templateIds });
+			
+			setSavedTemplateIds([...selectedTemplateIds]);
+			toast.success(t('plugins.cleaning.templatesSaved', 'Templates saved successfully'));
+		} catch (error: any) {
+			console.error('Error saving templates:', error);
+			const errorMessage = error?.response?.data?.message || error?.message || t('plugins.cleaning.saveError', 'Failed to save settings');
+			toast.error(errorMessage);
+			// Revert to saved selection
+			setSelectedTemplateIds([...savedTemplateIds]);
+		} finally {
+			setSavingTemplates(false);
+		}
+	};
+
+	// Handle saving status to cleaning status mapping
+	const handleSaveStatusMapping = async () => {
+		setSavingStatusMapping(true);
+		
+		try {
+			// Convert to array of objects format
+			const currentMapping = Array.isArray(statusToCleaningStatusMap) ? statusToCleaningStatusMap : [];
+			const statusMappingArray = currentMapping.map(item => ({
+				status_id: typeof item.status_id === 'string' ? parseInt(item.status_id, 10) : item.status_id,
+				cleaning_status_id: typeof item.cleaning_status_id === 'string' ? parseInt(item.cleaning_status_id, 10) : item.cleaning_status_id
+			})).filter(item => !isNaN(item.status_id) && !isNaN(item.cleaning_status_id));
+
+			const savedPlugin = await updatePluginSettings({ 
+				status_to_cleaning_status: statusMappingArray 
+			});
+
+			// Parse the saved settings to update local state
+			const savedSettings = savedPlugin?.settings || getCurrentSettings();
+			const savedStatusMapping = savedSettings?.status_to_cleaning_status || [];
+			const savedMappingsArray = Array.isArray(savedStatusMapping) 
+				? savedStatusMapping.map((item: any) => ({
+					status_id: typeof item.status_id === 'string' ? parseInt(item.status_id, 10) : item.status_id,
+					cleaning_status_id: typeof item.cleaning_status_id === 'string' ? parseInt(item.cleaning_status_id, 10) : item.cleaning_status_id
+				})).filter((item: any) => !isNaN(item.status_id) && !isNaN(item.cleaning_status_id))
+				: [];
+			
+			// Update saved mapping state
+			setStatusToCleaningStatusMap(savedMappingsArray);
+			setSavedStatusToCleaningStatusMap(savedMappingsArray);
+
+			toast.success(t('plugins.cleaning.statusMappingSaved', 'Status mapping saved successfully'));
+		} catch (error: any) {
+			console.error('Error saving status mapping:', error);
+			const errorMessage = error?.response?.data?.message || error?.message || t('plugins.cleaning.saveError', 'Failed to save settings');
+			toast.error(errorMessage);
+			// Revert to saved mapping
+			setStatusToCleaningStatusMap([...savedStatusToCleaningStatusMap]);
+		} finally {
+			setSavingStatusMapping(false);
+		}
+	};
+
+	// Handle adding new mapping
+	const handleAddMapping = () => {
+		if (newMappingStatusId && newMappingCleaningStatusId) {
+			const newMapping = {
+				status_id: parseInt(newMappingStatusId, 10),
+				cleaning_status_id: parseInt(newMappingCleaningStatusId, 10)
+			};
+			setStatusToCleaningStatusMap(prev => {
+				const current = Array.isArray(prev) ? prev : [];
+				return [...current, newMapping];
+			});
+			setNewMappingStatusId('');
+			setNewMappingCleaningStatusId('');
+			setIsAddingMapping(false);
+		}
+	};
+
+	// Handle removing mapping
+	const handleRemoveMapping = (statusId: number) => {
+		setStatusToCleaningStatusMap(prev => {
+			const current = Array.isArray(prev) ? prev : [];
+			return current.filter(mapping => mapping.status_id !== statusId);
+		});
+	};
+
+	// Get available statuses (not already mapped)
+	// Ensure statusToCleaningStatusMap is always an array
+	const statusMappingArray = Array.isArray(statusToCleaningStatusMap) ? statusToCleaningStatusMap : [];
+	const availableStatuses = statuses.filter(status => 
+		!statusMappingArray.some(mapping => mapping.status_id === status.id)
+	);
+
+	// Check if there are unsaved changes
+	const hasUnsavedChanges = JSON.stringify(selectedSpotTypeIds.sort()) !== JSON.stringify(savedSpotTypeIds.sort());
+	const hasUnsavedTemplateChanges = JSON.stringify(selectedTemplateIds.sort()) !== JSON.stringify(savedTemplateIds.sort());
+	const savedMappingArray = Array.isArray(savedStatusToCleaningStatusMap) ? savedStatusToCleaningStatusMap : [];
+	const hasUnsavedStatusMappingChanges = JSON.stringify(statusMappingArray.sort((a, b) => a.status_id - b.status_id)) !== JSON.stringify(savedMappingArray.sort((a, b) => a.status_id - b.status_id));
 
 	// Plugin details for summary tab
 	const getPluginDetails = (pluginId: string): PluginDetails => {
@@ -232,7 +630,8 @@ function PluginSettings() {
 	const Icon = currentPlugin.icon;
 
 	// Get translated plugin name
-	const getPluginName = (pluginId: string) => {
+	const getPluginName = (pluginId: string | undefined) => {
+		if (!pluginId || !currentPlugin) return 'Plugin';
 		return t(`plugins.${pluginId}.title`, currentPlugin.name);
 	};
 
@@ -242,7 +641,7 @@ function PluginSettings() {
 				<div 
 					className="grid place-items-center rounded-lg flex-shrink-0"
 					style={{
-						backgroundColor: currentPlugin.iconColor,
+						backgroundColor: currentPlugin.iconColor || '#6b7280',
 						width: '48px',
 						height: '48px',
 					}}
@@ -311,6 +710,295 @@ function PluginSettings() {
 						</div>
 					</CardContent>
 				</Card>
+
+				{/* Spot Types Selection for Cleaning Plugin */}
+				{pluginId === 'cleaning' && Array.isArray(spotTypes) && (
+					<Card>
+						<CardHeader>
+							<CardTitle className="flex items-center justify-between">
+								<span>{t('plugins.cleaning.spotTypes', 'Applicable Spot Types')}</span>
+								{hasUnsavedChanges && (
+									<span className="text-xs text-amber-500 font-normal">
+										{t('plugins.cleaning.unsavedChanges', 'Unsaved changes')}
+									</span>
+								)}
+							</CardTitle>
+							<CardDescription>
+								{t('plugins.cleaning.spotTypesDescription', 'Select which spot types are applicable for cleaning operations')}
+							</CardDescription>
+						</CardHeader>
+						<CardContent className="space-y-4">
+							<div className="space-y-2">
+								<label className="text-sm font-medium">
+									{t('plugins.cleaning.selectSpotTypes', 'Select Spot Types')}
+								</label>
+								<MultiSelect
+									options={Array.isArray(spotTypes) ? spotTypes.map((st: any) => ({
+										value: String(st.id),
+										label: st.name || `Spot Type ${st.id}`
+									})) : []}
+									onValueChange={handleSpotTypesChange}
+									defaultValue={Array.isArray(spotTypes) && spotTypes.length > 0 
+										? selectedSpotTypeIds.filter(id => spotTypes.some((st: any) => String(st.id) === id))
+										: []}
+									placeholder={
+										!Array.isArray(spotTypes) || spotTypes.length === 0
+											? t('plugins.cleaning.loadingSpotTypes', 'Loading spot types...')
+											: t('plugins.cleaning.selectSpotTypesPlaceholder', 'Select spot types...')
+									}
+									maxCount={10}
+									disabled={saving}
+									className="w-full"
+								/>
+								<p className="text-xs text-muted-foreground">
+									{t('plugins.cleaning.spotTypesHint', 'Only spots with selected types will be available for cleaning operations')}
+								</p>
+							</div>
+							<div className="flex justify-end pt-2">
+								<Button
+									onClick={handleSaveSpotTypes}
+									disabled={saving || !hasUnsavedChanges || !backendPlugin}
+									className="gap-2"
+								>
+									<Save className="h-4 w-4" />
+									{saving 
+										? t('plugins.cleaning.saving', 'Saving...')
+										: t('plugins.cleaning.save', 'Save')
+									}
+								</Button>
+							</div>
+						</CardContent>
+					</Card>
+				)}
+
+				{/* Templates Selection for Cleaning Plugin */}
+				{pluginId === 'cleaning' && Array.isArray(cleaningTemplates) && (
+					<Card>
+						<CardHeader>
+							<CardTitle className="flex items-center justify-between">
+								<span>{t('plugins.cleaning.templates', 'Cleaning Templates')}</span>
+								{hasUnsavedTemplateChanges && (
+									<span className="text-xs text-amber-500 font-normal">
+										{t('plugins.cleaning.unsavedChanges', 'Unsaved changes')}
+									</span>
+								)}
+							</CardTitle>
+							<CardDescription>
+								{t('plugins.cleaning.templatesDescription', 'Select which cleaning templates are available for use')}
+							</CardDescription>
+						</CardHeader>
+						<CardContent className="space-y-4">
+							<div className="space-y-2">
+								<label className="text-sm font-medium">
+									{t('plugins.cleaning.selectTemplates', 'Select Templates')}
+								</label>
+								<MultiSelect
+									options={Array.isArray(cleaningTemplates) ? cleaningTemplates.map((t: any) => ({
+										value: String(t.id),
+										label: t.name || `Template ${t.id}`
+									})) : []}
+									onValueChange={handleTemplatesChange}
+									defaultValue={Array.isArray(cleaningTemplates) && cleaningTemplates.length > 0 
+										? selectedTemplateIds.filter(id => cleaningTemplates.some((t: any) => String(t.id) === id))
+										: []}
+									placeholder={
+										!Array.isArray(cleaningTemplates) || cleaningTemplates.length === 0
+											? t('plugins.cleaning.loadingTemplates', 'Loading templates...')
+											: t('plugins.cleaning.selectTemplatesPlaceholder', 'Select templates...')
+									}
+									maxCount={10}
+									disabled={savingTemplates}
+									className="w-full"
+								/>
+								<p className="text-xs text-muted-foreground">
+									{t('plugins.cleaning.templatesHint', 'Only selected templates will be available for cleaning operations')}
+								</p>
+							</div>
+							<div className="flex justify-end pt-2">
+								<Button
+									onClick={handleSaveTemplates}
+									disabled={savingTemplates || !hasUnsavedTemplateChanges || !backendPlugin}
+									className="gap-2"
+								>
+									<Save className="h-4 w-4" />
+									{savingTemplates 
+										? t('plugins.cleaning.saving', 'Saving...')
+										: t('plugins.cleaning.save', 'Save')
+									}
+								</Button>
+							</div>
+						</CardContent>
+					</Card>
+				)}
+
+				{/* Status to Cleaning Status Mapping for Cleaning Plugin */}
+				{pluginId === 'cleaning' && Array.isArray(statuses) && (
+					<Card>
+						<CardHeader>
+							<CardTitle className="flex items-center justify-between">
+								<span>{t('plugins.cleaning.statusMapping', 'Task Status to Cleaning Status Mapping')}</span>
+								{hasUnsavedStatusMappingChanges && (
+									<span className="text-xs text-amber-500 font-normal">
+										{t('plugins.cleaning.unsavedChanges', 'Unsaved changes')}
+									</span>
+								)}
+							</CardTitle>
+							<CardDescription>
+								{t('plugins.cleaning.statusMappingDescription', 'Configure which cleaning status to assign to spots when a task changes to a specific status. For example: "En Progreso" → "Cleaning", "Finalizado" → "Limpia"')}
+							</CardDescription>
+						</CardHeader>
+						<CardContent className="space-y-4">
+							{!Array.isArray(cleaningStatuses) || cleaningStatuses.length === 0 ? (
+								<div className="text-center py-8 text-muted-foreground">
+									<p>{t('plugins.cleaning.loadingCleaningStatuses', 'Loading cleaning statuses...')}</p>
+									<p className="text-xs mt-2">
+										{cleaningStatuses.length === 0 
+											? t('plugins.cleaning.noCleaningStatusesFound', 'No cleaning statuses found. Please create cleaning statuses first.')
+											: ''
+										}
+									</p>
+								</div>
+							) : (
+								<>
+									{/* Existing mappings */}
+									<div className="space-y-3">
+										{statusToCleaningStatusMap.length === 0 ? (
+											<div className="text-center py-6 text-muted-foreground text-sm">
+												{t('plugins.cleaning.noMappingsConfigured', 'No mappings configured. Click "Add Mapping" to create one.')}
+											</div>
+										) : (
+											(Array.isArray(statusToCleaningStatusMap) ? statusToCleaningStatusMap : []).map((mapping) => {
+												const status = statuses.find(s => s.id === mapping.status_id);
+												const cleaningStatus = cleaningStatuses.find(cs => cs.id === mapping.cleaning_status_id);
+												
+												if (!status || !cleaningStatus) {
+													return null;
+												}
+
+												return (
+													<div key={`${mapping.status_id}-${mapping.cleaning_status_id}`} className="flex items-center gap-4 p-3 border rounded-lg bg-muted/30">
+														<div className="flex-1">
+															<div className="flex items-center gap-2">
+																{status.color && (
+																	<div className="w-3 h-3 rounded-full" style={{ backgroundColor: status.color }} />
+																)}
+																<span className="font-medium">{status.name}</span>
+															</div>
+															<p className="text-xs text-muted-foreground mt-1">
+																{t('plugins.cleaning.whenTaskStatus', 'When task status is')} "{status.name}"
+															</p>
+														</div>
+														<div className="flex items-center gap-3 flex-1">
+															<span className="text-muted-foreground">→</span>
+															<div className="flex items-center gap-2 flex-1">
+																{cleaningStatus.color && (
+																	<div className="w-3 h-3 rounded-full" style={{ backgroundColor: cleaningStatus.color }} />
+																)}
+																<span className="font-medium">{cleaningStatus.name}</span>
+															</div>
+															<Button
+																variant="ghost"
+																size="icon"
+																onClick={() => handleRemoveMapping(mapping.status_id)}
+																className="h-8 w-8 text-destructive hover:text-destructive"
+																title={t('plugins.cleaning.removeMapping', 'Remove mapping')}
+															>
+																<Trash2 className="h-4 w-4" />
+															</Button>
+														</div>
+													</div>
+												);
+											})
+										)}
+									</div>
+
+									{/* Add new mapping form */}
+									{isAddingMapping ? (
+										<div className="p-4 border-2 border-dashed rounded-lg space-y-4">
+											<div className="grid grid-cols-2 gap-4">
+												<div>
+													<SelectField
+														id="new-status"
+														label={t('plugins.cleaning.selectTaskStatus', 'Task Status')}
+														value={newMappingStatusId}
+														onChange={(v) => setNewMappingStatusId(v)}
+														options={availableStatuses.map(s => ({
+															value: String(s.id),
+															label: s.name,
+															color: s.color
+														}))}
+														placeholder={t('plugins.cleaning.selectTaskStatusPlaceholder', 'Select task status...')}
+													/>
+												</div>
+												<div>
+													<SelectField
+														id="new-cleaning-status"
+														label={t('plugins.cleaning.selectCleaningStatusLabel', 'Cleaning Status')}
+														value={newMappingCleaningStatusId}
+														onChange={(v) => setNewMappingCleaningStatusId(v)}
+														options={cleaningStatuses.map(cs => ({
+															value: String(cs.id),
+															label: cs.name,
+															color: cs.color
+														}))}
+														placeholder={t('plugins.cleaning.selectCleaningStatus', 'Select cleaning status...')}
+													/>
+												</div>
+											</div>
+											<div className="flex justify-end gap-2">
+												<Button
+													variant="outline"
+													onClick={() => {
+														setIsAddingMapping(false);
+														setNewMappingStatusId('');
+														setNewMappingCleaningStatusId('');
+													}}
+												>
+													{t('plugins.cleaning.cancel', 'Cancel')}
+												</Button>
+												<Button
+													onClick={handleAddMapping}
+													disabled={!newMappingStatusId || !newMappingCleaningStatusId}
+													className="gap-2"
+												>
+													<Plus className="h-4 w-4" />
+													{t('plugins.cleaning.addMapping', 'Add Mapping')}
+												</Button>
+											</div>
+										</div>
+									) : (
+										<Button
+											variant="outline"
+											onClick={() => setIsAddingMapping(true)}
+											disabled={availableStatuses.length === 0 || cleaningStatuses.length === 0}
+											className="w-full gap-2"
+										>
+											<Plus className="h-4 w-4" />
+											{t('plugins.cleaning.addNewMapping', 'Add New Mapping')}
+										</Button>
+									)}
+
+									<p className="text-xs text-muted-foreground">
+										{t('plugins.cleaning.statusMappingHint', 'When a task changes to a status, the associated spot will automatically update its cleaning status.')}
+									</p>
+									<div className="flex justify-end pt-2">
+										<Button
+											onClick={handleSaveStatusMapping}
+											disabled={savingStatusMapping || !hasUnsavedStatusMappingChanges || !backendPlugin}
+											className="gap-2"
+										>
+											<Save className="h-4 w-4" />
+											{savingStatusMapping 
+												? t('plugins.cleaning.saving', 'Saving...')
+												: t('plugins.cleaning.save', 'Save')
+											}
+										</Button>
+									</div>
+								</>
+							)}
+						</CardContent>
+					</Card>
+				)}
 
 				<Card>
 					<CardHeader>

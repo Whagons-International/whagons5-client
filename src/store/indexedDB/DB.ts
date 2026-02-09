@@ -99,6 +99,9 @@ export class DB {
           if (!db.objectStoreNames.contains('statuses')) {
             db.createObjectStore('statuses', { keyPath: 'id' });
           }
+          if (!db.objectStoreNames.contains('cleaning_statuses')) {
+            db.createObjectStore('cleaning_statuses', { keyPath: 'id' });
+          }
           if (!db.objectStoreNames.contains('priorities')) {
             db.createObjectStore('priorities', { keyPath: 'id' });
           }

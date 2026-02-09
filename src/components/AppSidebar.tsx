@@ -24,6 +24,7 @@ import {
   BarChart3, // Add BarChart3 icon for KPI Cards
   Trophy, // Add Trophy icon for gamification
   LineChart, // Add LineChart icon for analytics
+  Droplet, // Add Droplet icon for cleaning
   Hotel, // Add Hotel icon for hotel analytics
   HeartPulse, // Add HeartPulse icon for real-time status
   Package, // Add Package icon for assets
@@ -125,6 +126,15 @@ const getDefaultPluginsConfig = (): PluginConfig[] => [
     icon: Bell,
     iconColor: '#ef4444', // red-500 to match plugin card
     route: '/broadcasts',
+  },
+  {
+    id: 'cleaning',
+    enabled: true,
+    pinned: false,
+    name: 'Cleaning',
+    icon: Droplet,
+    iconColor: '#10b981', // emerald-500 to match plugin card
+    route: '/cleaning',
   },
   {
     id: 'boards',

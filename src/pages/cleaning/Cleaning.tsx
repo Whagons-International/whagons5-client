@@ -22,6 +22,16 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 
 dayjs.extend(relativeTime);
 
+const cleanCardShimmerStyles = `
+  @keyframes cleaning-shimmer {
+    0% { transform: translateX(-100%) skewX(-15deg); }
+    100% { transform: translateX(200%) skewX(-15deg); }
+  }
+  .cleaning-shimmer-band {
+    animation: cleaning-shimmer 2.5s ease-in-out infinite;
+  }
+`;
+
 function Cleaning() {
   const { t } = useLanguage();
   const dispatch = useDispatch<AppDispatch>();
@@ -209,6 +219,7 @@ function Cleaning() {
 
   return (
     <div className="p-4 space-y-4 bg-background text-foreground min-h-screen">
+      <style>{cleanCardShimmerStyles}</style>
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="text-emerald-500 text-3xl">
@@ -348,17 +359,26 @@ function Cleaning() {
             const statusColor = cleaningStatus?.color || '#6b7280';
             const statusName = cleaningStatus?.name || t('cleaning.status.none', 'No Status');
             const statusCode = cleaningStatus?.code || null;
+            const isCleanState = cleaningStatus?.is_clean_state === true;
             const backgroundColor = getBackgroundColor(statusColor);
 
             return (
               <div key={spot.id} className="min-w-0">
               <Card
-                className="hover:shadow-lg transition-shadow relative min-w-0"
+                className={`hover:shadow-lg transition-all relative min-w-0 overflow-hidden ${isCleanState ? 'shadow-[0_0_28px_rgba(16,185,129,0.25)]' : ''}`}
                 style={{
                   backgroundColor: backgroundColor,
                 }}
               >
-                <CardHeader className={viewMode === 'compact' ? 'pb-2 pt-2' : 'pb-1 pt-2'}>
+                {isCleanState && (
+                  <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-[var(--card-radius)]">
+                    <div
+                      className="cleaning-shimmer-band absolute top-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                      aria-hidden
+                    />
+                  </div>
+                )}
+                <CardHeader className={`relative z-10 ${viewMode === 'compact' ? 'pb-2 pt-2' : 'pb-1 pt-2'}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0 overflow-hidden">
                       <CardTitle className="text-base font-bold mb-0 truncate block" title={spot.name}>

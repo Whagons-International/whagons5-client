@@ -1,3 +1,4 @@
+import { generateUUID } from "@/utils/uuid";
 import { useState, useRef } from 'react';
 import { Image, X } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -148,7 +149,7 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
             
             // Create board attachment record
             attachment = {
-              uuid: crypto.randomUUID(),
+              uuid: generateUUID(),
               board_message_id: messageId,
               type: 'IMAGE' as const,
               file_path: fileUrl,

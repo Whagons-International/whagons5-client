@@ -1,3 +1,4 @@
+import { generateUUID } from "@/utils/uuid";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import Prism from "prismjs";
 import { Message } from "../models";
@@ -60,7 +61,7 @@ export function useChatMessages(
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationId, setConversationId] = useState<string>(() => {
     const conversations = getConversations();
-    return conversations.length > 0 ? conversations[0].id : crypto.randomUUID().toString();
+    return conversations.length > 0 ? conversations[0].id : generateUUID().toString();
   });
   const [conversations, setConversations] = useState<Conversation[]>(() => getConversations());
   const abortControllerRef = useRef(false);
@@ -150,7 +151,7 @@ export function useChatMessages(
     if (messages.length > 0) {
       saveMessages(conversationId, messages);
     }
-    const newId = crypto.randomUUID().toString();
+    const newId = generateUUID().toString();
     createConversation(newId, "New conversation");
     setConversationId(newId);
     setMessages([]);

@@ -340,7 +340,7 @@ function Cleaning() {
         </div>
       )}
 
-      {/* Spots Grid */}
+      {/* Spots Grid - min-w-0 on wrapper so long spot names truncate and don't push the status button out */}
       {!loading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredSpots.map((spot: Spot) => {
@@ -351,17 +351,19 @@ function Cleaning() {
             const backgroundColor = getBackgroundColor(statusColor);
 
             return (
+              <div key={spot.id} className="min-w-0">
               <Card
-                key={spot.id}
-                className="hover:shadow-lg transition-shadow relative"
+                className="hover:shadow-lg transition-shadow relative min-w-0"
                 style={{
                   backgroundColor: backgroundColor,
                 }}
               >
                 <CardHeader className={viewMode === 'compact' ? 'pb-2 pt-2' : 'pb-1 pt-2'}>
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base font-bold mb-0 truncate">{spot.name}</CardTitle>
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <CardTitle className="text-base font-bold mb-0 truncate block" title={spot.name}>
+                        {spot.name?.length > 25 ? `${spot.name.slice(0, 25)}...` : (spot.name ?? '')}
+                      </CardTitle>
                       <p className="text-xs text-gray-600">Suite VIP</p>
                     </div>
                     <div className="shrink-0">
@@ -454,6 +456,7 @@ function Cleaning() {
                   </CardContent>
                 )}
               </Card>
+              </div>
             );
           })}
         </div>

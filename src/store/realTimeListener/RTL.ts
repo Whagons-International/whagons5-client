@@ -91,7 +91,7 @@ export class RealTimeListener {
       : '';
 
     const host =
-      VITE_DEVELOPMENT === 'true'
+      VITE_DEVELOPMENT === 'true' && !normalizedRteHost
         ? 'localhost:8082'
         : (normalizedRteHost || domain);
     
@@ -148,7 +148,8 @@ export class RealTimeListener {
           : '';
         const healthHost = normalizedRteHost || 'localhost:8082';
 
-        const response = await fetch(`http://${healthHost}/api/health`, { 
+        const healthProtocol = healthHost === 'localhost:8082' ? 'http' : 'https';
+        const response = await fetch(`${healthProtocol}://${healthHost}/api/health`, { 
           method: 'GET',
           mode: 'no-cors' // Allow connection even if CORS isn't configured
         });

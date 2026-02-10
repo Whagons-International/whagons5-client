@@ -549,7 +549,7 @@ export function BasicTab(props: any) {
               if (e.target.value.trim() && !showDescription) setShowDescription(true);
             }}
             placeholder={t('workspace.taskDialog.addDescription', 'Add a description for this task...')} 
-            className="min-h-[120px] px-4 py-4 rounded-[12px] text-sm resize-y focus:border-primary focus:ring-[3px] focus:ring-ring transition-all duration-150" 
+            className="min-h-[120px] px-4 py-4 rounded-[12px] text-sm resize-y focus:border-primary focus:ring-[3px] focus:ring-ring transition-all duration-150"
           />
         </div>
       )}

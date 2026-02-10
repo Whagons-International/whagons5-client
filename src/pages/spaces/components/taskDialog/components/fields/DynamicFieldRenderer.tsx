@@ -268,7 +268,7 @@ function DescriptionField(props: FieldRendererProps) {
                 value={description || ''} 
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder={t('workspace.taskDialog.addDescription', 'Add a description for this task...')} 
-                className="min-h-[120px] px-4 py-4 rounded-[12px] text-sm resize-y" 
+                className="min-h-[120px] px-4 py-4 rounded-[12px] text-sm resize-y"
             />
         </div>
     );

@@ -288,7 +288,14 @@ function Teams() {
       await dispatch((genericActions as any).userTeams.removeAsync(del.id)).unwrap();
     }
 
-    dispatch((genericActions as any).userTeams.getFromIndexedDB?.());
+    // Refresh userTeams cache to reflect changes
+    try {
+      if ((genericActions as any).userTeams?.getFromIndexedDB) {
+        dispatch((genericActions as any).userTeams.getFromIndexedDB());
+      }
+    } catch (error) {
+      console.warn('Failed to refresh userTeams cache:', error);
+    }
   };
 
   // Open edit with immediate form population to avoid flicker

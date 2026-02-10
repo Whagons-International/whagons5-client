@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -263,7 +263,11 @@ export function IconPicker({
             )}
             <span className="text-sm">{iconName || 'none'}</span>
           </div>
-          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          {showDropdown ? (
+            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          )}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-3" align="start">

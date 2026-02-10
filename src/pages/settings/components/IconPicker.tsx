@@ -270,7 +270,7 @@ export function IconPicker({
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-3" align="start">
+      <PopoverContent className="w-80 p-3" align="start" side="top" avoidCollisions={false}>
         {/* Search input at the top */}
         <Input
           placeholder="Search icons... (e.g., heart, user, star)"

@@ -49,12 +49,16 @@ function Cleaning() {
   const { value: plugins } = useSelector(
     (state: RootState) => (state as any).plugins || { value: [] }
   );
+  const { value: spotTypes } = useSelector(
+    (state: RootState) => (state as any).spotTypes || { value: [] }
+  );
 
   // Local state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
   const [showActiveTaskFilter, setShowActiveTaskFilter] = useState(false);
   const [viewMode, setViewMode] = useState<'full' | 'compact'>('full');
+  const [groupBy, setGroupBy] = useState<'none' | 'cleaning_status' | 'spot_type'>('none');
 
   // Load data on mount
   useEffect(() => {
@@ -63,18 +67,27 @@ function Cleaning() {
     dispatch(genericInternalActions.cleaningStatuses.getFromIndexedDB() as any);
     dispatch(genericInternalActions.users.getFromIndexedDB() as any);
     dispatch(genericInternalActions.plugins.getFromIndexedDB() as any);
+    dispatch(genericInternalActions.spotTypes.getFromIndexedDB() as any);
     
     // Then fetch from API to ensure we have the latest data
     dispatch(genericInternalActions.spots.fetchFromAPI() as any);
     dispatch(genericInternalActions.cleaningStatuses.fetchFromAPI() as any);
     dispatch(genericInternalActions.users.fetchFromAPI() as any);
     dispatch(genericInternalActions.plugins.fetchFromAPI() as any);
+    dispatch(genericInternalActions.spotTypes.fetchFromAPI() as any);
   }, [dispatch]);
 
   // Get cleaning status by ID
   const getCleaningStatus = (statusId: number | null | undefined): CleaningStatus | null => {
     if (!statusId) return null;
     return cleaningStatuses.find((status: CleaningStatus) => status.id === statusId) || null;
+  };
+
+  // Get spot type name by ID
+  const getSpotTypeName = (typeId: number | null | undefined): string => {
+    if (typeId == null) return t('cleaning.groupBy.noType', 'No type');
+    const st = (spotTypes as any[]).find((t: any) => t.id === typeId);
+    return st?.name ?? `#${typeId}`;
   };
 
   // Get user name by ID
@@ -197,6 +210,54 @@ function Cleaning() {
     return counts;
   }, [filteredSpots, sortedCleaningStatuses]);
 
+  // Group filtered spots by selected criterion (for display)
+  const groupedSpots = useMemo((): { key: string; label: string; color?: string; spots: Spot[] }[] => {
+    if (groupBy === 'none') {
+      return [{ key: '_', label: '', spots: filteredSpots }];
+    }
+    if (groupBy === 'cleaning_status') {
+      const map = new Map<string, Spot[]>();
+      map.set('none', []);
+      sortedCleaningStatuses.forEach((s: CleaningStatus) => map.set(String(s.id), []));
+      filteredSpots.forEach((spot: Spot) => {
+        const k = spot.cleaning_status_id != null ? String(spot.cleaning_status_id) : 'none';
+        const arr = map.get(k) ?? [];
+        arr.push(spot);
+        map.set(k, arr);
+      });
+      const result: { key: string; label: string; color?: string; spots: Spot[] }[] = [];
+      sortedCleaningStatuses.forEach((s: CleaningStatus) => {
+        const spots = map.get(String(s.id)) ?? [];
+        if (spots.length > 0) result.push({ key: String(s.id), label: s.name, color: s.color ?? undefined, spots });
+      });
+      const noStatus = map.get('none') ?? [];
+      if (noStatus.length > 0) result.push({ key: 'none', label: t('cleaning.status.none', 'No Status'), spots: noStatus });
+      return result;
+    }
+    // groupBy === 'spot_type'
+    const map = new Map<string, Spot[]>();
+    filteredSpots.forEach((spot: Spot) => {
+      const k = spot.spot_type_id != null ? String(spot.spot_type_id) : 'none';
+      const arr = map.get(k) ?? [];
+      arr.push(spot);
+      map.set(k, arr);
+    });
+    const result: { key: string; label: string; color?: string; spots: Spot[] }[] = [];
+    const keys = Array.from(map.keys()).sort((a, b) => {
+      if (a === 'none') return 1;
+      if (b === 'none') return -1;
+      return getSpotTypeName(a === 'none' ? null : parseInt(a, 10)).localeCompare(getSpotTypeName(b === 'none' ? null : parseInt(b, 10)));
+    });
+    keys.forEach((k) => {
+      const spots = map.get(k) ?? [];
+      if (spots.length === 0) return;
+      const label = k === 'none' ? t('cleaning.groupBy.noType', 'No type') : getSpotTypeName(parseInt(k, 10));
+      const spotType = (spotTypes as any[]).find((t: any) => t.id === parseInt(k, 10));
+      result.push({ key: k, label, color: spotType?.color, spots });
+    });
+    return result;
+  }, [filteredSpots, groupBy, sortedCleaningStatuses, spotTypes, t]);
+
   // Handle status change
   const handleStatusChange = async (spot: Spot, newStatusId: number | null) => {
     if (newStatusId === spot.cleaning_status_id) {
@@ -279,6 +340,20 @@ function Cleaning() {
               {t('cleaning.filters.active-tasks', 'Active Tasks')}
             </Button>
 
+            {/* Group by */}
+            <div className="w-full sm:w-48">
+              <Select value={groupBy} onValueChange={(v: 'none' | 'cleaning_status' | 'spot_type') => setGroupBy(v)}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder={t('cleaning.groupBy.placeholder', 'Group by')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t('cleaning.groupBy.none', 'No grouping')}</SelectItem>
+                  <SelectItem value="cleaning_status">{t('cleaning.groupBy.cleaningStatus', 'Cleaning status')}</SelectItem>
+                  <SelectItem value="spot_type">{t('cleaning.groupBy.spotType', 'Spot type')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* View Mode Toggle */}
             <div className="flex gap-1 border rounded-md p-1 shrink-0">
               <Button
@@ -351,10 +426,22 @@ function Cleaning() {
         </div>
       )}
 
-      {/* Spots Grid - min-w-0 on wrapper so long spot names truncate and don't push the status button out */}
+      {/* Spots Grid - optionally grouped by status or spot type */}
       {!loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredSpots.map((spot: Spot) => {
+        <div className="space-y-6">
+          {groupedSpots.map((group) => (
+            <div key={group.key} className="space-y-3">
+              {group.label && (
+                <div className="flex items-center gap-2">
+                  {group.color && (
+                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: group.color }} />
+                  )}
+                  <h2 className="text-lg font-semibold text-foreground">{group.label}</h2>
+                  <span className="text-sm text-muted-foreground">({group.spots.length})</span>
+                </div>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {group.spots.map((spot: Spot) => {
             const cleaningStatus = getCleaningStatus(spot.cleaning_status_id);
             const statusColor = cleaningStatus?.color || '#6b7280';
             const statusName = cleaningStatus?.name || t('cleaning.status.none', 'No Status');
@@ -384,7 +471,7 @@ function Cleaning() {
                       <CardTitle className="text-base font-bold mb-0 truncate block" title={spot.name}>
                         {spot.name?.length > 25 ? `${spot.name.slice(0, 25)}...` : (spot.name ?? '')}
                       </CardTitle>
-                      <p className="text-xs text-gray-600">Suite VIP</p>
+                      <p className="text-xs text-gray-600">{getSpotTypeName(spot.spot_type_id)}</p>
                     </div>
                     <div className="shrink-0">
                       <Select
@@ -479,6 +566,9 @@ function Cleaning() {
               </div>
             );
           })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

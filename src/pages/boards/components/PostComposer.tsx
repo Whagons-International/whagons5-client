@@ -3,6 +3,7 @@ import { useState, useRef } from 'react';
 import { Image, X } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { useDispatch } from 'react-redux';
 import { genericActions } from '@/store/genericSlices';
@@ -234,13 +235,13 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
 
       {/* Input Area */}
       <div className="flex-1 min-w-0">
-        <textarea
+        <Textarea
           ref={textareaRef}
           value={content}
           onChange={handleTextareaChange}
           onKeyDown={handleKeyDown}
           placeholder={placeholder || t('boards.composer.placeholder', "What's happening?")}
-          className="w-full bg-transparent text-foreground placeholder:text-muted-foreground resize-none outline-none text-base min-h-[24px] max-h-[300px]"
+          className="w-full bg-transparent text-foreground placeholder:text-muted-foreground resize-none outline-none text-base min-h-[24px] max-h-[300px] border-0 shadow-none ring-0 focus-visible:ring-0 focus-visible:outline-none p-0 rounded-none"
           rows={1}
         />
 

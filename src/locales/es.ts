@@ -2005,7 +2005,6 @@ export const esTranslations: Record<string, string> = {
   "qrCodes.format": "Formato",
   "qrCodes.totalScans": "Total de Escaneos",
   "qrCodes.lastScanned": "Último Escaneado",
-  "qrCodes.created": "Creado",
   "qrCodes.expires": "Expira",
   "qrCodes.uuid": "UUID",
   "qrCodes.public": "Público",

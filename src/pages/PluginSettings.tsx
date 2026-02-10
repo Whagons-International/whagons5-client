@@ -122,13 +122,8 @@ function PluginSettings() {
 		}
 	});
 
-	// Filter cleaning templates (templates that belong to Cleaning category)
-	const cleaningCategory = categories.find((cat: any) => 
-		cat.name?.toLowerCase() === 'cleaning'
-	);
-	const cleaningTemplates = cleaningCategory 
-		? templates.filter((t: any) => t.category_id === cleaningCategory.id)
-		: [];
+	// Use full flat list of templates for cleaning plugin (no category filter)
+	const cleaningTemplates = Array.isArray(templates) ? templates : [];
 
 	useEffect(() => {
 		const unsubscribe = subscribeToPluginsConfig(setPluginsConfigState);
@@ -651,7 +646,7 @@ function PluginSettings() {
 				<div>
 					<h1 className="text-3xl font-bold">{getPluginName(currentPlugin.id)}</h1>
 					<p className="text-muted-foreground">
-						{activeTab === 'summary' ? t('plugins.summary', 'Overview') : t('plugins.settings', 'Settings')}
+						{activeTab === 'summary' ? t('plugins.summary', 'Overview') : activeTab === 'advanced' ? t('plugins.advanced', 'Advanced') : t('plugins.settings', 'Settings')}
 					</p>
 				</div>
 			</div>
@@ -679,6 +674,18 @@ function PluginSettings() {
 					>
 						{t('plugins.summary', 'Summary')}
 					</button>
+					{pluginId === 'cleaning' && (
+						<button
+							onClick={() => setTab('advanced')}
+							className={`pb-3 px-1 border-b-2 transition-colors ${
+								activeTab === 'advanced'
+									? 'border-primary text-primary font-medium'
+									: 'border-transparent text-muted-foreground hover:text-foreground'
+							}`}
+						>
+							{t('plugins.advanced', 'Advanced')}
+						</button>
+					)}
 				</div>
 			</div>
 
@@ -711,295 +718,6 @@ function PluginSettings() {
 					</CardContent>
 				</Card>
 
-				{/* Spot Types Selection for Cleaning Plugin */}
-				{pluginId === 'cleaning' && Array.isArray(spotTypes) && (
-					<Card>
-						<CardHeader>
-							<CardTitle className="flex items-center justify-between">
-								<span>{t('plugins.cleaning.spotTypes', 'Applicable Spot Types')}</span>
-								{hasUnsavedChanges && (
-									<span className="text-xs text-amber-500 font-normal">
-										{t('plugins.cleaning.unsavedChanges', 'Unsaved changes')}
-									</span>
-								)}
-							</CardTitle>
-							<CardDescription>
-								{t('plugins.cleaning.spotTypesDescription', 'Select which spot types are applicable for cleaning operations')}
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="space-y-4">
-							<div className="space-y-2">
-								<label className="text-sm font-medium">
-									{t('plugins.cleaning.selectSpotTypes', 'Select Spot Types')}
-								</label>
-								<MultiSelect
-									options={Array.isArray(spotTypes) ? spotTypes.map((st: any) => ({
-										value: String(st.id),
-										label: st.name || `Spot Type ${st.id}`
-									})) : []}
-									onValueChange={handleSpotTypesChange}
-									defaultValue={Array.isArray(spotTypes) && spotTypes.length > 0 
-										? selectedSpotTypeIds.filter(id => spotTypes.some((st: any) => String(st.id) === id))
-										: []}
-									placeholder={
-										!Array.isArray(spotTypes) || spotTypes.length === 0
-											? t('plugins.cleaning.loadingSpotTypes', 'Loading spot types...')
-											: t('plugins.cleaning.selectSpotTypesPlaceholder', 'Select spot types...')
-									}
-									maxCount={10}
-									disabled={saving}
-									className="w-full"
-								/>
-								<p className="text-xs text-muted-foreground">
-									{t('plugins.cleaning.spotTypesHint', 'Only spots with selected types will be available for cleaning operations')}
-								</p>
-							</div>
-							<div className="flex justify-end pt-2">
-								<Button
-									onClick={handleSaveSpotTypes}
-									disabled={saving || !hasUnsavedChanges || !backendPlugin}
-									className="gap-2"
-								>
-									<Save className="h-4 w-4" />
-									{saving 
-										? t('plugins.cleaning.saving', 'Saving...')
-										: t('plugins.cleaning.save', 'Save')
-									}
-								</Button>
-							</div>
-						</CardContent>
-					</Card>
-				)}
-
-				{/* Templates Selection for Cleaning Plugin */}
-				{pluginId === 'cleaning' && Array.isArray(cleaningTemplates) && (
-					<Card>
-						<CardHeader>
-							<CardTitle className="flex items-center justify-between">
-								<span>{t('plugins.cleaning.templates', 'Cleaning Templates')}</span>
-								{hasUnsavedTemplateChanges && (
-									<span className="text-xs text-amber-500 font-normal">
-										{t('plugins.cleaning.unsavedChanges', 'Unsaved changes')}
-									</span>
-								)}
-							</CardTitle>
-							<CardDescription>
-								{t('plugins.cleaning.templatesDescription', 'Select which cleaning templates are available for use')}
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="space-y-4">
-							<div className="space-y-2">
-								<label className="text-sm font-medium">
-									{t('plugins.cleaning.selectTemplates', 'Select Templates')}
-								</label>
-								<MultiSelect
-									options={Array.isArray(cleaningTemplates) ? cleaningTemplates.map((t: any) => ({
-										value: String(t.id),
-										label: t.name || `Template ${t.id}`
-									})) : []}
-									onValueChange={handleTemplatesChange}
-									defaultValue={Array.isArray(cleaningTemplates) && cleaningTemplates.length > 0 
-										? selectedTemplateIds.filter(id => cleaningTemplates.some((t: any) => String(t.id) === id))
-										: []}
-									placeholder={
-										!Array.isArray(cleaningTemplates) || cleaningTemplates.length === 0
-											? t('plugins.cleaning.loadingTemplates', 'Loading templates...')
-											: t('plugins.cleaning.selectTemplatesPlaceholder', 'Select templates...')
-									}
-									maxCount={10}
-									disabled={savingTemplates}
-									className="w-full"
-								/>
-								<p className="text-xs text-muted-foreground">
-									{t('plugins.cleaning.templatesHint', 'Only selected templates will be available for cleaning operations')}
-								</p>
-							</div>
-							<div className="flex justify-end pt-2">
-								<Button
-									onClick={handleSaveTemplates}
-									disabled={savingTemplates || !hasUnsavedTemplateChanges || !backendPlugin}
-									className="gap-2"
-								>
-									<Save className="h-4 w-4" />
-									{savingTemplates 
-										? t('plugins.cleaning.saving', 'Saving...')
-										: t('plugins.cleaning.save', 'Save')
-									}
-								</Button>
-							</div>
-						</CardContent>
-					</Card>
-				)}
-
-				{/* Status to Cleaning Status Mapping for Cleaning Plugin */}
-				{pluginId === 'cleaning' && Array.isArray(statuses) && (
-					<Card>
-						<CardHeader>
-							<CardTitle className="flex items-center justify-between">
-								<span>{t('plugins.cleaning.statusMapping', 'Task Status to Cleaning Status Mapping')}</span>
-								{hasUnsavedStatusMappingChanges && (
-									<span className="text-xs text-amber-500 font-normal">
-										{t('plugins.cleaning.unsavedChanges', 'Unsaved changes')}
-									</span>
-								)}
-							</CardTitle>
-							<CardDescription>
-								{t('plugins.cleaning.statusMappingDescription', 'Configure which cleaning status to assign to spots when a task changes to a specific status. For example: "En Progreso" → "Cleaning", "Finalizado" → "Limpia"')}
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="space-y-4">
-							{!Array.isArray(cleaningStatuses) || cleaningStatuses.length === 0 ? (
-								<div className="text-center py-8 text-muted-foreground">
-									<p>{t('plugins.cleaning.loadingCleaningStatuses', 'Loading cleaning statuses...')}</p>
-									<p className="text-xs mt-2">
-										{cleaningStatuses.length === 0 
-											? t('plugins.cleaning.noCleaningStatusesFound', 'No cleaning statuses found. Please create cleaning statuses first.')
-											: ''
-										}
-									</p>
-								</div>
-							) : (
-								<>
-									{/* Existing mappings */}
-									<div className="space-y-3">
-										{statusToCleaningStatusMap.length === 0 ? (
-											<div className="text-center py-6 text-muted-foreground text-sm">
-												{t('plugins.cleaning.noMappingsConfigured', 'No mappings configured. Click "Add Mapping" to create one.')}
-											</div>
-										) : (
-											(Array.isArray(statusToCleaningStatusMap) ? statusToCleaningStatusMap : []).map((mapping) => {
-												const status = statuses.find(s => s.id === mapping.status_id);
-												const cleaningStatus = cleaningStatuses.find(cs => cs.id === mapping.cleaning_status_id);
-												
-												if (!status || !cleaningStatus) {
-													return null;
-												}
-
-												return (
-													<div key={`${mapping.status_id}-${mapping.cleaning_status_id}`} className="flex items-center gap-4 p-3 border rounded-lg bg-muted/30">
-														<div className="flex-1">
-															<div className="flex items-center gap-2">
-																{status.color && (
-																	<div className="w-3 h-3 rounded-full" style={{ backgroundColor: status.color }} />
-																)}
-																<span className="font-medium">{status.name}</span>
-															</div>
-															<p className="text-xs text-muted-foreground mt-1">
-																{t('plugins.cleaning.whenTaskStatus', 'When task status is')} "{status.name}"
-															</p>
-														</div>
-														<div className="flex items-center gap-3 flex-1">
-															<span className="text-muted-foreground">→</span>
-															<div className="flex items-center gap-2 flex-1">
-																{cleaningStatus.color && (
-																	<div className="w-3 h-3 rounded-full" style={{ backgroundColor: cleaningStatus.color }} />
-																)}
-																<span className="font-medium">{cleaningStatus.name}</span>
-															</div>
-															<Button
-																variant="ghost"
-																size="icon"
-																onClick={() => handleRemoveMapping(mapping.status_id)}
-																className="h-8 w-8 text-destructive hover:text-destructive"
-																title={t('plugins.cleaning.removeMapping', 'Remove mapping')}
-															>
-																<Trash2 className="h-4 w-4" />
-															</Button>
-														</div>
-													</div>
-												);
-											})
-										)}
-									</div>
-
-									{/* Add new mapping form */}
-									{isAddingMapping ? (
-										<div className="p-4 border-2 border-dashed rounded-lg space-y-4">
-											<div className="grid grid-cols-2 gap-4">
-												<div>
-													<SelectField
-														id="new-status"
-														label={t('plugins.cleaning.selectTaskStatus', 'Task Status')}
-														value={newMappingStatusId}
-														onChange={(v) => setNewMappingStatusId(v)}
-														options={availableStatuses.map(s => ({
-															value: String(s.id),
-															label: s.name,
-															color: s.color
-														}))}
-														placeholder={t('plugins.cleaning.selectTaskStatusPlaceholder', 'Select task status...')}
-													/>
-												</div>
-												<div>
-													<SelectField
-														id="new-cleaning-status"
-														label={t('plugins.cleaning.selectCleaningStatusLabel', 'Cleaning Status')}
-														value={newMappingCleaningStatusId}
-														onChange={(v) => setNewMappingCleaningStatusId(v)}
-														options={cleaningStatuses.map(cs => ({
-															value: String(cs.id),
-															label: cs.name,
-															color: cs.color
-														}))}
-														placeholder={t('plugins.cleaning.selectCleaningStatus', 'Select cleaning status...')}
-													/>
-												</div>
-											</div>
-											<div className="flex justify-end gap-2">
-												<Button
-													variant="outline"
-													onClick={() => {
-														setIsAddingMapping(false);
-														setNewMappingStatusId('');
-														setNewMappingCleaningStatusId('');
-													}}
-												>
-													{t('plugins.cleaning.cancel', 'Cancel')}
-												</Button>
-												<Button
-													onClick={handleAddMapping}
-													disabled={!newMappingStatusId || !newMappingCleaningStatusId}
-													className="gap-2"
-												>
-													<Plus className="h-4 w-4" />
-													{t('plugins.cleaning.addMapping', 'Add Mapping')}
-												</Button>
-											</div>
-										</div>
-									) : (
-										<Button
-											variant="outline"
-											onClick={() => setIsAddingMapping(true)}
-											disabled={availableStatuses.length === 0 || cleaningStatuses.length === 0}
-											className="w-full gap-2"
-										>
-											<Plus className="h-4 w-4" />
-											{t('plugins.cleaning.addNewMapping', 'Add New Mapping')}
-										</Button>
-									)}
-
-									<p className="text-xs text-muted-foreground">
-										{t('plugins.cleaning.statusMappingHint', 'When a task changes to a status, the associated spot will automatically update its cleaning status.')}
-									</p>
-									<div className="flex justify-end pt-2">
-										<Button
-											onClick={handleSaveStatusMapping}
-											disabled={savingStatusMapping || !hasUnsavedStatusMappingChanges || !backendPlugin}
-											className="gap-2"
-										>
-											<Save className="h-4 w-4" />
-											{savingStatusMapping 
-												? t('plugins.cleaning.saving', 'Saving...')
-												: t('plugins.cleaning.save', 'Save')
-											}
-										</Button>
-									</div>
-								</>
-							)}
-						</CardContent>
-					</Card>
-				)}
-
 				<Card>
 					<CardHeader>
 						<CardTitle>{t('plugins.about', 'About')}</CardTitle>
@@ -1017,6 +735,265 @@ function PluginSettings() {
 						</div>
 					</CardContent>
 				</Card>
+				</div>
+			)}
+
+			{activeTab === 'advanced' && pluginId === 'cleaning' && (
+				<div className="grid gap-6 max-w-2xl">
+					{/* Applicable Spot Types */}
+					{Array.isArray(spotTypes) && (
+						<Card>
+							<CardHeader>
+								<CardTitle className="flex items-center justify-between">
+									<span>{t('plugins.cleaning.spotTypes', 'Applicable Spot Types')}</span>
+									{hasUnsavedChanges && (
+										<span className="text-xs text-amber-500 font-normal">
+											{t('plugins.cleaning.unsavedChanges', 'Unsaved changes')}
+										</span>
+									)}
+								</CardTitle>
+								<CardDescription>
+									{t('plugins.cleaning.spotTypesDescription', 'Select which spot types are applicable for cleaning operations')}
+								</CardDescription>
+							</CardHeader>
+							<CardContent className="space-y-4">
+								<div className="space-y-2">
+									<label className="text-sm font-medium">
+										{t('plugins.cleaning.selectSpotTypes', 'Select Spot Types')}
+									</label>
+									<MultiSelect
+										options={Array.isArray(spotTypes) ? spotTypes.map((st: any) => ({
+											value: String(st.id),
+											label: st.name || `Spot Type ${st.id}`
+										})) : []}
+										onValueChange={handleSpotTypesChange}
+										defaultValue={Array.isArray(spotTypes) && spotTypes.length > 0 
+											? selectedSpotTypeIds.filter(id => spotTypes.some((st: any) => String(st.id) === id))
+											: []}
+										placeholder={
+											!Array.isArray(spotTypes) || spotTypes.length === 0
+												? t('plugins.cleaning.loadingSpotTypes', 'Loading spot types...')
+												: t('plugins.cleaning.selectSpotTypesPlaceholder', 'Select spot types...')
+										}
+										maxCount={10}
+										disabled={saving}
+										className="w-full"
+									/>
+									<p className="text-xs text-muted-foreground">
+										{t('plugins.cleaning.spotTypesHint', 'Only spots with selected types will be available for cleaning operations')}
+									</p>
+								</div>
+								<div className="flex justify-end pt-2">
+									<Button
+										onClick={handleSaveSpotTypes}
+										disabled={saving || !hasUnsavedChanges || !backendPlugin}
+										className="gap-2"
+									>
+										<Save className="h-4 w-4" />
+										{saving 
+											? t('plugins.cleaning.saving', 'Saving...')
+											: t('plugins.cleaning.save', 'Save')
+										}
+									</Button>
+								</div>
+							</CardContent>
+						</Card>
+					)}
+
+					{/* Cleaning Templates */}
+					{Array.isArray(cleaningTemplates) && (
+						<Card>
+							<CardHeader>
+								<CardTitle className="flex items-center justify-between">
+									<span>{t('plugins.cleaning.templates', 'Cleaning Templates')}</span>
+									{hasUnsavedTemplateChanges && (
+										<span className="text-xs text-amber-500 font-normal">
+											{t('plugins.cleaning.unsavedChanges', 'Unsaved changes')}
+										</span>
+									)}
+								</CardTitle>
+								<CardDescription>
+									{t('plugins.cleaning.templatesDescription', 'Select which cleaning templates are available for use')}
+								</CardDescription>
+							</CardHeader>
+							<CardContent className="space-y-4">
+								<div className="space-y-2">
+									<label className="text-sm font-medium">
+										{t('plugins.cleaning.selectTemplates', 'Select Templates')}
+									</label>
+									<MultiSelect
+										options={Array.isArray(cleaningTemplates) ? cleaningTemplates.map((t: any) => ({
+											value: String(t.id),
+											label: t.name || `Template ${t.id}`
+										})) : []}
+										onValueChange={handleTemplatesChange}
+										defaultValue={Array.isArray(cleaningTemplates) && cleaningTemplates.length > 0 
+											? selectedTemplateIds.filter(id => cleaningTemplates.some((t: any) => String(t.id) === id))
+											: []}
+										placeholder={
+											!Array.isArray(cleaningTemplates) || cleaningTemplates.length === 0
+												? t('plugins.cleaning.loadingTemplates', 'Loading templates...')
+												: t('plugins.cleaning.selectTemplatesPlaceholder', 'Select templates...')
+										}
+										maxCount={10}
+										disabled={savingTemplates}
+										className="w-full"
+									/>
+									<p className="text-xs text-muted-foreground">
+										{t('plugins.cleaning.templatesHint', 'Only selected templates will be available for cleaning operations')}
+									</p>
+								</div>
+								<div className="flex justify-end pt-2">
+									<Button
+										onClick={handleSaveTemplates}
+										disabled={savingTemplates || !hasUnsavedTemplateChanges || !backendPlugin}
+										className="gap-2"
+									>
+										<Save className="h-4 w-4" />
+										{savingTemplates 
+											? t('plugins.cleaning.saving', 'Saving...')
+											: t('plugins.cleaning.save', 'Save')
+										}
+									</Button>
+								</div>
+							</CardContent>
+						</Card>
+					)}
+
+					{/* Task Status to Cleaning Status Mapping */}
+					{Array.isArray(statuses) && (
+						<Card>
+							<CardHeader>
+								<CardTitle className="flex items-center justify-between">
+									<span>{t('plugins.cleaning.statusMapping', 'Task Status to Cleaning Status Mapping')}</span>
+									{hasUnsavedStatusMappingChanges && (
+										<span className="text-xs text-amber-500 font-normal">
+											{t('plugins.cleaning.unsavedChanges', 'Unsaved changes')}
+										</span>
+									)}
+								</CardTitle>
+								<CardDescription>
+									{t('plugins.cleaning.statusMappingDescription', 'Configure which cleaning status to assign to spots when a task changes to a specific status. For example: "En Progreso" → "Cleaning", "Finalizado" → "Limpia"')}
+								</CardDescription>
+							</CardHeader>
+							<CardContent className="space-y-4">
+								{!Array.isArray(cleaningStatuses) || cleaningStatuses.length === 0 ? (
+									<div className="text-center py-8 text-muted-foreground">
+										<p>{t('plugins.cleaning.loadingCleaningStatuses', 'Loading cleaning statuses...')}</p>
+										<p className="text-xs mt-2">
+											{cleaningStatuses.length === 0 
+												? t('plugins.cleaning.noCleaningStatusesFound', 'No cleaning statuses found. Please create cleaning statuses first.')
+												: ''
+											}
+										</p>
+									</div>
+								) : (
+									<>
+										<div className="space-y-3">
+											{statusToCleaningStatusMap.length === 0 ? (
+												<div className="text-center py-6 text-muted-foreground text-sm">
+													{t('plugins.cleaning.noMappingsConfigured', 'No mappings configured. Click "Add Mapping" to create one.')}
+												</div>
+											) : (
+												(Array.isArray(statusToCleaningStatusMap) ? statusToCleaningStatusMap : []).map((mapping) => {
+													const status = statuses.find(s => s.id === mapping.status_id);
+													const cleaningStatus = cleaningStatuses.find(cs => cs.id === mapping.cleaning_status_id);
+													if (!status || !cleaningStatus) return null;
+													return (
+														<div key={`${mapping.status_id}-${mapping.cleaning_status_id}`} className="flex items-center gap-4 p-3 border rounded-lg bg-muted/30">
+															<div className="flex-1">
+																<div className="flex items-center gap-2">
+																	{status.color && <div className="w-3 h-3 rounded-full" style={{ backgroundColor: status.color }} />}
+																	<span className="font-medium">{status.name}</span>
+																</div>
+																<p className="text-xs text-muted-foreground mt-1">
+																	{t('plugins.cleaning.whenTaskStatus', 'When task status is')} "{status.name}"
+																</p>
+															</div>
+															<div className="flex items-center gap-3 flex-1">
+																<span className="text-muted-foreground">→</span>
+																<div className="flex items-center gap-2 flex-1">
+																	{cleaningStatus.color && <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cleaningStatus.color }} />}
+																	<span className="font-medium">{cleaningStatus.name}</span>
+																</div>
+																<Button
+																	variant="ghost"
+																	size="icon"
+																	onClick={() => handleRemoveMapping(mapping.status_id)}
+																	className="h-8 w-8 text-destructive hover:text-destructive"
+																	title={t('plugins.cleaning.removeMapping', 'Remove mapping')}
+																>
+																	<Trash2 className="h-4 w-4" />
+																</Button>
+															</div>
+														</div>
+													);
+												})
+											)}
+										</div>
+										{isAddingMapping ? (
+											<div className="p-4 border-2 border-dashed rounded-lg space-y-4">
+												<div className="grid grid-cols-2 gap-4">
+													<div>
+														<SelectField
+															id="new-status"
+															label={t('plugins.cleaning.selectTaskStatus', 'Task Status')}
+															value={newMappingStatusId}
+															onChange={(v) => setNewMappingStatusId(v)}
+															options={availableStatuses.map(s => ({ value: String(s.id), label: s.name, color: s.color ?? undefined }))}
+															placeholder={t('plugins.cleaning.selectTaskStatusPlaceholder', 'Select task status...')}
+														/>
+													</div>
+													<div>
+														<SelectField
+															id="new-cleaning-status"
+															label={t('plugins.cleaning.selectCleaningStatusLabel', 'Cleaning Status')}
+															value={newMappingCleaningStatusId}
+															onChange={(v) => setNewMappingCleaningStatusId(v)}
+															options={cleaningStatuses.map(cs => ({ value: String(cs.id), label: cs.name, color: cs.color ?? undefined }))}
+															placeholder={t('plugins.cleaning.selectCleaningStatus', 'Select cleaning status...')}
+														/>
+													</div>
+												</div>
+												<div className="flex justify-end gap-2">
+													<Button variant="outline" onClick={() => { setIsAddingMapping(false); setNewMappingStatusId(''); setNewMappingCleaningStatusId(''); }}>
+														{t('plugins.cleaning.cancel', 'Cancel')}
+													</Button>
+													<Button onClick={handleAddMapping} disabled={!newMappingStatusId || !newMappingCleaningStatusId} className="gap-2">
+														<Plus className="h-4 w-4" />
+														{t('plugins.cleaning.addMapping', 'Add Mapping')}
+													</Button>
+												</div>
+											</div>
+										) : (
+											<Button
+												variant="outline"
+												onClick={() => setIsAddingMapping(true)}
+												disabled={availableStatuses.length === 0 || cleaningStatuses.length === 0}
+												className="w-full gap-2"
+											>
+												<Plus className="h-4 w-4" />
+												{t('plugins.cleaning.addNewMapping', 'Add New Mapping')}
+											</Button>
+										)}
+										<p className="text-xs text-muted-foreground">
+											{t('plugins.cleaning.statusMappingHint', 'When a task changes to a status, the associated spot will automatically update its cleaning status.')}
+										</p>
+										<div className="flex justify-end pt-2">
+											<Button
+												onClick={handleSaveStatusMapping}
+												disabled={savingStatusMapping || !hasUnsavedStatusMappingChanges || !backendPlugin}
+												className="gap-2"
+											>
+												<Save className="h-4 w-4" />
+												{savingStatusMapping ? t('plugins.cleaning.saving', 'Saving...') : t('plugins.cleaning.save', 'Save')}
+											</Button>
+										</div>
+									</>
+								)}
+							</CardContent>
+						</Card>
+					)}
 				</div>
 			)}
 

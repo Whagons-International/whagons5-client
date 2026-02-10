@@ -305,6 +305,7 @@ export const enTranslations: Record<string, string> = {
   "plugins.title": "Plugins",
   "plugins.dragHint": "Drag cards to reorder. Click disabled plugins to learn more.",
   "plugins.settings": "Settings",
+  "plugins.advanced": "Advanced",
   "plugins.configureDescription": "Configure plugin visibility and pinning options",
   "plugins.enabled": "Enabled",
   "plugins.enabledDescription": "Show this plugin in the sidebar",

@@ -3,12 +3,13 @@
  *
  * Handles the Create_Kpi tool call from the AI agent.
  * Parses a flat JSON input, maps it to the internal KpiCard shape,
- * dispatches the creation via Redux genericActions, and navigates
+ * dispatches via genericActions (API + cache + Redux), and navigates
  * to the KPI management page so the user can see the result.
  */
 
 import type { FrontendToolResult, SendMessageCallback, NavigateCallback } from './frontend_tools';
-
+import { store } from '@/store/store';
+import { genericActions } from '@/store/genericSlices';
 import { Logger } from '@/utils/logger';
 // ─── Color mapping (mirrors KpiCardBuilder.tsx COLOR_OPTIONS) ────────────────
 
@@ -238,14 +239,13 @@ export function handleCreateKpi(
 
   Logger.info('assistant', '[Create_Kpi] Creating KPI card:', cardData);
 
-  // Dispatch the creation asynchronously
+  // Dispatch via genericActions (handles API + IndexedDB cache + Redux state)
   store
     .dispatch(genericActions.kpiCards.addAsync(cardData) as any)
     .unwrap()
     .then(() => {
       Logger.info('assistant', '[Create_Kpi] KPI card created successfully');
 
-      // Navigate to the management page so the user can see the new card
       if (navigate) {
         navigate('/settings/kpi-cards/manage');
       }
@@ -257,7 +257,7 @@ export function handleCreateKpi(
     .catch((error: any) => {
       Logger.error('assistant', '[Create_Kpi] Failed to create KPI card:', error);
       if (sendMessage) {
-        const errMsg = error?.message || error?.response?.data?.message || 'Unknown error';
+        const errMsg = error?.response?.data?.message || error?.message || 'Unknown error';
         sendMessage(`Failed to create KPI card: ${errMsg}`);
       }
     });
@@ -298,7 +298,6 @@ export async function handleCreateKpiPrompt(
       navigate('/settings/kpi-cards/manage');
     }
 
-    // Return the full created card so the model can verify what was actually created
     send({
       type: 'frontend_tool_response',
       tool: data?.tool,
@@ -316,7 +315,7 @@ export async function handleCreateKpiPrompt(
       }),
     });
   } catch (error: any) {
-    const errMsg = error?.message || error?.response?.data?.message || 'Unknown error';
+    const errMsg = error?.response?.data?.message || error?.message || 'Unknown error';
     Logger.error('assistant', '[Create_Kpi] Failed:', errMsg);
     send({
       type: 'frontend_tool_response',

@@ -10,6 +10,16 @@ import { handleCreateKpi } from './createKpi';
 import { handleUpdateKpi } from './updateKpi';
 import { handleDeleteKpi } from './deleteKpi';
 import { handleListKpi } from './listKpi';
+import {
+  handleCreateTask,
+  handleUpdateTask,
+  handleDeleteTask,
+  handleChangeTaskStatus,
+  handleAddTaskTag,
+  handleRemoveTaskTag,
+  handleAddTaskNote,
+} from './taskActions';
+import { GENERIC_ACTION_MAP } from './genericCrudActions';
 
 import { Logger } from '@/utils/logger';
 export interface FrontendToolResult {
@@ -33,7 +43,7 @@ export type NavigateCallback = (path: string) => void;
 function handleBrowserAlert(result: FrontendToolResult, sendMessage?: SendMessageCallback): boolean {
   if (result.action === "browser_alert" && result.message) {
     Logger.info('assistant', '[BROWSER_ALERT]', result.message);
-    alert(result.message);
+    import('react-hot-toast').then(({ default: toast }) => toast(result.message, { duration: 6000 }));
     return true;
   }
   return false;
@@ -188,6 +198,13 @@ const FRONTEND_TOOL_HANDLERS: Record<string, (result: FrontendToolResult, sendMe
   'Update_Kpi': handleUpdateKpi,
   'Delete_Kpi': handleDeleteKpi,
   'List_Kpi': handleListKpi,
+  'Create_Task': handleCreateTask,
+  'Update_Task': handleUpdateTask,
+  'Delete_Task': handleDeleteTask,
+  'Change_Task_Status': handleChangeTaskStatus,
+  'Add_Task_Tag': handleAddTaskTag,
+  'Remove_Task_Tag': handleRemoveTaskTag,
+  'Add_Task_Note': handleAddTaskNote,
 };
 
 /**
@@ -202,9 +219,6 @@ const FRONTEND_TOOL_HANDLERS: Record<string, (result: FrontendToolResult, sendMe
 export function processFrontendTool(toolName: string, result: any, sendMessage?: SendMessageCallback, navigate?: NavigateCallback): boolean {
   // Check if this is a registered frontend tool
   const handler = FRONTEND_TOOL_HANDLERS[toolName];
-  if (!handler) {
-    return false; // Not a frontend tool
-  }
 
   try {
     // Parse result if it's a string
@@ -218,8 +232,30 @@ export function processFrontendTool(toolName: string, result: any, sendMessage?:
       }
     }
 
-    // Execute the handler with optional callbacks
-    return handler(resultData, sendMessage, navigate);
+    // Try registered handler first
+    if (handler) {
+      return handler(resultData, sendMessage, navigate);
+    }
+
+    // Try generic CRUD handler — match tool names like Create_Categories, Update_Statuses, etc.
+    const crudMatch = toolName.match(/^(Create|Update|Delete|List)_(.+)$/);
+    if (crudMatch) {
+      const [, operation, rawEntity] = crudMatch;
+      // Convert PascalCase entity to snake_case (e.g., "Spot_Types" -> "spot_types", "Categories" -> "categories")
+      const entityName = rawEntity.replace(/([A-Z])/g, '_$1').replace(/^_/, '').toLowerCase().replace(/__/g, '_');
+      const handlers = GENERIC_ACTION_MAP[entityName];
+      if (handlers) {
+        const op = operation.toLowerCase();
+        const toolHandler =
+          op === 'create' ? handlers.handleCreate :
+          op === 'update' ? handlers.handleUpdate :
+          op === 'delete' ? handlers.handleDelete :
+          handlers.handleList;
+        return toolHandler(resultData, sendMessage, navigate);
+      }
+    }
+
+    return false; // Not a frontend tool
   } catch (error) {
     Logger.error('assistant', `[FrontendTools] Error processing ${toolName}:`, error);
     return false;
@@ -230,7 +266,14 @@ export function processFrontendTool(toolName: string, result: any, sendMessage?:
  * Check if a tool name is a frontend tool
  */
 export function isFrontendTool(toolName: string): boolean {
-  return toolName in FRONTEND_TOOL_HANDLERS;
+  if (toolName in FRONTEND_TOOL_HANDLERS) return true;
+  // Check for generic CRUD tools (e.g., Create_Categories, Update_Statuses)
+  const crudMatch = toolName.match(/^(Create|Update|Delete|List)_(.+)$/);
+  if (crudMatch) {
+    const entityName = crudMatch[2].replace(/([A-Z])/g, '_$1').replace(/^_/, '').toLowerCase().replace(/__/g, '_');
+    return entityName in GENERIC_ACTION_MAP;
+  }
+  return false;
 }
 
 /**

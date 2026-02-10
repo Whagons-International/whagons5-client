@@ -2,6 +2,16 @@ import { handleCreateKpiPrompt } from './createKpi';
 import { handleUpdateKpiPrompt } from './updateKpi';
 import { handleDeleteKpiPrompt } from './deleteKpi';
 import { handleListKpiPrompt } from './listKpi';
+import {
+  handleCreateTaskPrompt,
+  handleUpdateTaskPrompt,
+  handleDeleteTaskPrompt,
+  handleChangeTaskStatusPrompt,
+  handleAddTaskTagPrompt,
+  handleRemoveTaskTagPrompt,
+  handleAddTaskNotePrompt,
+} from './taskActions';
+import { GENERIC_ACTION_MAP } from './genericCrudActions';
 
 export type FrontendToolPromptMessage = {
   type: "frontend_tool_prompt";
@@ -123,7 +133,7 @@ export function handleFrontendToolPromptMessage(
   }
 
   if (action === "browser_alert" && msg) {
-    alert(msg);
+    import('react-hot-toast').then(({ default: toast }) => toast(msg, { duration: 6000 }));
     send({ type: "frontend_tool_response", tool: data?.tool, response: "ok" });
     return true;
   }
@@ -237,6 +247,57 @@ export function handleFrontendToolPromptMessage(
   if (action === "list_kpi") {
     handleListKpiPrompt(data, send, navigate);
     return true;
+  }
+
+  if (action === "create_task") {
+    handleCreateTaskPrompt(data, send, navigate);
+    return true;
+  }
+
+  if (action === "update_task") {
+    handleUpdateTaskPrompt(data, send, navigate);
+    return true;
+  }
+
+  if (action === "delete_task") {
+    handleDeleteTaskPrompt(data, send, navigate);
+    return true;
+  }
+
+  if (action === "change_task_status") {
+    handleChangeTaskStatusPrompt(data, send, navigate);
+    return true;
+  }
+
+  if (action === "add_task_tag") {
+    handleAddTaskTagPrompt(data, send, navigate);
+    return true;
+  }
+
+  if (action === "remove_task_tag") {
+    handleRemoveTaskTagPrompt(data, send, navigate);
+    return true;
+  }
+
+  if (action === "add_task_note") {
+    handleAddTaskNotePrompt(data, send, navigate);
+    return true;
+  }
+
+  // ─── Generic CRUD catch-all ──────────────────────────────────────────
+  const crudMatch = action?.match(/^(create|update|delete|list)_(.+)$/);
+  if (crudMatch) {
+    const [, operation, entityName] = crudMatch;
+    const handlers = GENERIC_ACTION_MAP[entityName];
+    if (handlers) {
+      const promptHandler =
+        operation === 'create' ? handlers.handleCreatePrompt :
+        operation === 'update' ? handlers.handleUpdatePrompt :
+        operation === 'delete' ? handlers.handleDeletePrompt :
+        handlers.handleListPrompt;
+      promptHandler(data, send, navigate);
+      return true;
+    }
   }
 
   return false;

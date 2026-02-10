@@ -6,8 +6,10 @@
  */
 
 import type { FrontendToolResult, SendMessageCallback, NavigateCallback } from './frontend_tools';
-
+import { store } from '@/store/store';
+import { genericActions } from '@/store/genericSlices';
 import { Logger } from '@/utils/logger';
+
 // ─── Input normalization ─────────────────────────────────────────────────────
 
 function normalizeId(raw: Record<string, any>): number | null {
@@ -37,7 +39,7 @@ export function handleDeleteKpi(
 
   // Verify card exists
   const state = store.getState() as any;
-  const kpiCards = state.kpiCards?.value ?? [];
+  const kpiCards = state.generic?.kpiCards?.value ?? state.kpiCards?.value ?? [];
   const existingCard = kpiCards.find((c: any) => c.id === id);
 
   if (!existingCard) {
@@ -98,7 +100,7 @@ export async function handleDeleteKpiPrompt(
 
   // Verify card exists
   const state = store.getState() as any;
-  const kpiCards = state.kpiCards?.value ?? [];
+  const kpiCards = state.generic?.kpiCards?.value ?? state.kpiCards?.value ?? [];
   const existingCard = kpiCards.find((c: any) => c.id === id);
 
   if (!existingCard) {

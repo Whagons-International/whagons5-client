@@ -631,7 +631,9 @@ export function useWebSocketChat(deps: UseWebSocketChatDeps): UseWebSocketChatRe
       });
 
       if (!(error instanceof DOMException && error.name === 'AbortError') && !abortControllerRef.current) {
-        alert(`Error sending message: ${error instanceof Error ? error.message : String(error)}`);
+        import('react-hot-toast').then(({ default: toast }) => 
+          toast.error(`Error sending message: ${error instanceof Error ? error.message : String(error)}`)
+        );
       }
     }
   };

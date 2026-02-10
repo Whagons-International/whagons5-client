@@ -247,6 +247,13 @@ export const AssistantWidget: React.FC<AssistantWidgetProps> = ({ floating = tru
     tts.primeTtsAudio();
   }, [chat.open, chat.handleNewConversation, tts.primeTtsAudio]);
 
+  // ── Global event listener so external buttons (e.g. sidebar) can open the chat ──
+  useEffect(() => {
+    const handler = () => handleOpenSheet();
+    window.addEventListener('assistant:open', handler);
+    return () => window.removeEventListener('assistant:open', handler);
+  }, [handleOpenSheet]);
+
   // ── Conversation change handler ──
   const handleConversationChange = useCallback((newConversationId: string) => {
     chat.handleConversationChange(newConversationId, () => {

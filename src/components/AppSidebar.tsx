@@ -44,7 +44,8 @@ import {
   CollapsibleTrigger,
   useCollapsible,
 } from '@/components/animate-ui/primitives/radix/collapsible';
-import AssistantWidget from '@/features/ai-chat/AssistantWidget';
+// AssistantWidget now lives in MainLayout. The sidebar just dispatches a global
+// event to open it, avoiding lifecycle coupling with sidebar collapse/expand.
 import WhagonsCheck from '@/assets/WhagonsCheck';
 
 import { iconService } from '@/database/iconService';
@@ -1178,35 +1179,25 @@ export function AppSidebar({ overlayOnExpand = true }: { overlayOnExpand?: boole
               </Tooltip>
               <span>Version {getDisplayVersion()}</span>
             </div>
-            <AssistantWidget
-              floating={false}
-              renderTrigger={(open) => (
-                <button
-                  type="button"
-                  onClick={open}
-                  title={t('sidebar.copilot', 'Copilot')}
-                  className="h-5 w-5 inline-flex items-center justify-center rounded-full text-[var(--sidebar-text-secondary)] hover:text-[var(--sidebar-primary)] transition-colors"
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                </button>
-              )}
-            />
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event('assistant:open'))}
+              title={t('sidebar.copilot', 'Copilot')}
+              className="h-5 w-5 inline-flex items-center justify-center rounded-full text-[var(--sidebar-text-secondary)] hover:text-[var(--sidebar-primary)] transition-colors"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+            </button>
           </div>
         ) : (
           <div className="flex justify-center py-2">
-            <AssistantWidget
-              floating={false}
-              renderTrigger={(open) => (
-                <button
-                  type="button"
-                  onClick={open}
-                  title={t('sidebar.copilot', 'Copilot')}
-                  className="h-6 w-6 inline-flex items-center justify-center rounded-full text-[var(--sidebar-text-secondary)] hover:text-[var(--sidebar-primary)] transition-colors"
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                </button>
-              )}
-            />
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event('assistant:open'))}
+              title={t('sidebar.copilot', 'Copilot')}
+              className="h-6 w-6 inline-flex items-center justify-center rounded-full text-[var(--sidebar-text-secondary)] hover:text-[var(--sidebar-primary)] transition-colors"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+            </button>
           </div>
         )}
       </SidebarFooter>

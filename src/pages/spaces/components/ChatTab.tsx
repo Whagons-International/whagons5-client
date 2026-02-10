@@ -1,3 +1,4 @@
+import { generateUUID } from "@/utils/uuid";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -135,7 +136,7 @@ export default function ChatTab({ workspaceId }: { workspaceId: string | undefin
 
     try {
       const chatMessage = {
-        uuid: crypto.randomUUID(),
+        uuid: generateUUID(),
         workspace_id: Number(workspaceId),
         message: messageText,
         user_id: Number(user.id)
@@ -170,7 +171,7 @@ export default function ChatTab({ workspaceId }: { workspaceId: string | undefin
 
       // Send as a message with markdown link pattern: [filename](url)
       const chatMessage = {
-        uuid: crypto.randomUUID(),
+        uuid: generateUUID(),
         workspace_id: Number(workspaceId),
         message: `[${file.name}](${fileUrl})`,
         user_id: Number(user.id)

@@ -1,3 +1,4 @@
+import { generateUUID } from "@/utils/uuid";
 import { useEffect, useState, useRef } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -86,7 +87,7 @@ export default function TaskNotesModal() {
     
     try {
       const note: TaskNote = {
-        uuid: crypto.randomUUID(),
+        uuid: generateUUID(),
         task_id: taskId,
         note: noteText,
         user_id: Number(user.id)
@@ -152,7 +153,7 @@ export default function TaskNotesModal() {
         const fileUrl = uploadedFile.url || getFileUrl(uploadedFile.id);
         
         const attachment = {
-            uuid: crypto.randomUUID(),
+            uuid: generateUUID(),
             task_id: taskId,
             type: fileType,
             file_path: fileUrl, // Store the asset URL instead of base64

@@ -1,3 +1,4 @@
+import { generateUUID } from "@/utils/uuid";
 import { getToken, onMessage, Unsubscribe } from "firebase/messaging";
 import { getMessagingInstance } from "./firebaseConfig";
 import { api } from "@/api/whagonsApi";
@@ -283,7 +284,7 @@ function handleNotificationClick(data: any) {
 function getOrCreateDeviceId(): string {
   let deviceId = localStorage.getItem('wh-device-id');
   if (!deviceId) {
-    deviceId = crypto.randomUUID();
+    deviceId = generateUUID();
     localStorage.setItem('wh-device-id', deviceId);
   }
   return deviceId;

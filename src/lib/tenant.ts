@@ -14,6 +14,11 @@ export const generateTenantSuffix = (): string => {
 
 // Create final tenant name based on subscription status
 export const createTenantName = (baseName: string, hasActiveSubscription: boolean): string => {
+  // In dev mode, skip random suffix so tenant names are predictable
+  if (import.meta.env.VITE_DISABLE_TENANT_SUFFIX === 'true') {
+    return baseName;
+  }
+
   if (hasActiveSubscription) {
     return baseName;
   }

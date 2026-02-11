@@ -1938,6 +1938,7 @@ export const esTranslations: Record<string, string> = {
   "plugins.title": "Complementos",
   "plugins.dragHint": "Arrastra las tarjetas para reordenarlas.",
   "plugins.settings": "Configuración",
+  "plugins.advanced": "Avanzados",
   "plugins.configureDescription": "Configura la visibilidad del plugin y opciones de anclaje",
   "plugins.enabled": "Habilitado",
   "plugins.enabledDescription": "Mostrar este plugin en la barra lateral",

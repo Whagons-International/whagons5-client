@@ -22,6 +22,16 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 
 dayjs.extend(relativeTime);
 
+const cleanCardShimmerStyles = `
+  @keyframes cleaning-shimmer {
+    0% { transform: translateX(-100%) skewX(-15deg); }
+    100% { transform: translateX(200%) skewX(-15deg); }
+  }
+  .cleaning-shimmer-band {
+    animation: cleaning-shimmer 2.5s ease-in-out infinite;
+  }
+`;
+
 function Cleaning() {
   const { t } = useLanguage();
   const dispatch = useDispatch<AppDispatch>();
@@ -39,12 +49,16 @@ function Cleaning() {
   const { value: plugins } = useSelector(
     (state: RootState) => (state as any).plugins || { value: [] }
   );
+  const { value: spotTypes } = useSelector(
+    (state: RootState) => (state as any).spotTypes || { value: [] }
+  );
 
   // Local state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
   const [showActiveTaskFilter, setShowActiveTaskFilter] = useState(false);
   const [viewMode, setViewMode] = useState<'full' | 'compact'>('full');
+  const [groupBy, setGroupBy] = useState<'none' | 'cleaning_status' | 'spot_type'>('none');
 
   // Load data on mount
   useEffect(() => {
@@ -53,18 +67,27 @@ function Cleaning() {
     dispatch(genericInternalActions.cleaningStatuses.getFromIndexedDB() as any);
     dispatch(genericInternalActions.users.getFromIndexedDB() as any);
     dispatch(genericInternalActions.plugins.getFromIndexedDB() as any);
+    dispatch(genericInternalActions.spotTypes.getFromIndexedDB() as any);
     
     // Then fetch from API to ensure we have the latest data
     dispatch(genericInternalActions.spots.fetchFromAPI() as any);
     dispatch(genericInternalActions.cleaningStatuses.fetchFromAPI() as any);
     dispatch(genericInternalActions.users.fetchFromAPI() as any);
     dispatch(genericInternalActions.plugins.fetchFromAPI() as any);
+    dispatch(genericInternalActions.spotTypes.fetchFromAPI() as any);
   }, [dispatch]);
 
   // Get cleaning status by ID
   const getCleaningStatus = (statusId: number | null | undefined): CleaningStatus | null => {
     if (!statusId) return null;
     return cleaningStatuses.find((status: CleaningStatus) => status.id === statusId) || null;
+  };
+
+  // Get spot type name by ID
+  const getSpotTypeName = (typeId: number | null | undefined): string => {
+    if (typeId == null) return t('cleaning.groupBy.noType', 'No type');
+    const st = (spotTypes as any[]).find((t: any) => t.id === typeId);
+    return st?.name ?? `#${typeId}`;
   };
 
   // Get user name by ID
@@ -187,6 +210,54 @@ function Cleaning() {
     return counts;
   }, [filteredSpots, sortedCleaningStatuses]);
 
+  // Group filtered spots by selected criterion (for display)
+  const groupedSpots = useMemo((): { key: string; label: string; color?: string; spots: Spot[] }[] => {
+    if (groupBy === 'none') {
+      return [{ key: '_', label: '', spots: filteredSpots }];
+    }
+    if (groupBy === 'cleaning_status') {
+      const map = new Map<string, Spot[]>();
+      map.set('none', []);
+      sortedCleaningStatuses.forEach((s: CleaningStatus) => map.set(String(s.id), []));
+      filteredSpots.forEach((spot: Spot) => {
+        const k = spot.cleaning_status_id != null ? String(spot.cleaning_status_id) : 'none';
+        const arr = map.get(k) ?? [];
+        arr.push(spot);
+        map.set(k, arr);
+      });
+      const result: { key: string; label: string; color?: string; spots: Spot[] }[] = [];
+      sortedCleaningStatuses.forEach((s: CleaningStatus) => {
+        const spots = map.get(String(s.id)) ?? [];
+        if (spots.length > 0) result.push({ key: String(s.id), label: s.name, color: s.color ?? undefined, spots });
+      });
+      const noStatus = map.get('none') ?? [];
+      if (noStatus.length > 0) result.push({ key: 'none', label: t('cleaning.status.none', 'No Status'), spots: noStatus });
+      return result;
+    }
+    // groupBy === 'spot_type'
+    const map = new Map<string, Spot[]>();
+    filteredSpots.forEach((spot: Spot) => {
+      const k = spot.spot_type_id != null ? String(spot.spot_type_id) : 'none';
+      const arr = map.get(k) ?? [];
+      arr.push(spot);
+      map.set(k, arr);
+    });
+    const result: { key: string; label: string; color?: string; spots: Spot[] }[] = [];
+    const keys = Array.from(map.keys()).sort((a, b) => {
+      if (a === 'none') return 1;
+      if (b === 'none') return -1;
+      return getSpotTypeName(a === 'none' ? null : parseInt(a, 10)).localeCompare(getSpotTypeName(b === 'none' ? null : parseInt(b, 10)));
+    });
+    keys.forEach((k) => {
+      const spots = map.get(k) ?? [];
+      if (spots.length === 0) return;
+      const label = k === 'none' ? t('cleaning.groupBy.noType', 'No type') : getSpotTypeName(parseInt(k, 10));
+      const spotType = (spotTypes as any[]).find((t: any) => t.id === parseInt(k, 10));
+      result.push({ key: k, label, color: spotType?.color, spots });
+    });
+    return result;
+  }, [filteredSpots, groupBy, sortedCleaningStatuses, spotTypes, t]);
+
   // Handle status change
   const handleStatusChange = async (spot: Spot, newStatusId: number | null) => {
     if (newStatusId === spot.cleaning_status_id) {
@@ -209,6 +280,7 @@ function Cleaning() {
 
   return (
     <div className="p-4 space-y-4 bg-background text-foreground min-h-screen">
+      <style>{cleanCardShimmerStyles}</style>
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="text-emerald-500 text-3xl">
@@ -267,6 +339,20 @@ function Cleaning() {
               <Filter className="w-4 h-4 mr-2" />
               {t('cleaning.filters.active-tasks', 'Active Tasks')}
             </Button>
+
+            {/* Group by */}
+            <div className="w-full sm:w-48">
+              <Select value={groupBy} onValueChange={(v: 'none' | 'cleaning_status' | 'spot_type') => setGroupBy(v)}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder={t('cleaning.groupBy.placeholder', 'Group by')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t('cleaning.groupBy.none', 'No grouping')}</SelectItem>
+                  <SelectItem value="cleaning_status">{t('cleaning.groupBy.cleaningStatus', 'Cleaning status')}</SelectItem>
+                  <SelectItem value="spot_type">{t('cleaning.groupBy.spotType', 'Spot type')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* View Mode Toggle */}
             <div className="flex gap-1 border rounded-md p-1 shrink-0">
@@ -340,29 +426,52 @@ function Cleaning() {
         </div>
       )}
 
-      {/* Spots Grid */}
+      {/* Spots Grid - optionally grouped by status or spot type */}
       {!loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredSpots.map((spot: Spot) => {
+        <div className="space-y-6">
+          {groupedSpots.map((group) => (
+            <div key={group.key} className="space-y-3">
+              {group.label && (
+                <div className="flex items-center gap-2">
+                  {group.color && (
+                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: group.color }} />
+                  )}
+                  <h2 className="text-lg font-semibold text-foreground">{group.label}</h2>
+                  <span className="text-sm text-muted-foreground">({group.spots.length})</span>
+                </div>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {group.spots.map((spot: Spot) => {
             const cleaningStatus = getCleaningStatus(spot.cleaning_status_id);
             const statusColor = cleaningStatus?.color || '#6b7280';
             const statusName = cleaningStatus?.name || t('cleaning.status.none', 'No Status');
             const statusCode = cleaningStatus?.code || null;
+            const isCleanState = cleaningStatus?.is_clean_state === true;
             const backgroundColor = getBackgroundColor(statusColor);
 
             return (
+              <div key={spot.id} className="min-w-0">
               <Card
-                key={spot.id}
-                className="hover:shadow-lg transition-shadow relative"
+                className={`hover:shadow-lg transition-all relative min-w-0 overflow-hidden ${isCleanState ? 'shadow-[0_0_28px_rgba(16,185,129,0.25)]' : ''}`}
                 style={{
                   backgroundColor: backgroundColor,
                 }}
               >
-                <CardHeader className={viewMode === 'compact' ? 'pb-2 pt-2' : 'pb-1 pt-2'}>
+                {isCleanState && (
+                  <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-[var(--card-radius)]">
+                    <div
+                      className="cleaning-shimmer-band absolute top-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                      aria-hidden
+                    />
+                  </div>
+                )}
+                <CardHeader className={`relative z-10 ${viewMode === 'compact' ? 'pb-2 pt-2' : 'pb-1 pt-2'}`}>
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base font-bold mb-0 truncate">{spot.name}</CardTitle>
-                      <p className="text-xs text-gray-600">Suite VIP</p>
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <CardTitle className="text-base font-bold mb-0 truncate block" title={spot.name}>
+                        {spot.name?.length > 25 ? `${spot.name.slice(0, 25)}...` : (spot.name ?? '')}
+                      </CardTitle>
+                      <p className="text-xs text-gray-600">{getSpotTypeName(spot.spot_type_id)}</p>
                     </div>
                     <div className="shrink-0">
                       <Select
@@ -431,31 +540,45 @@ function Cleaning() {
                         Aprobada por supervisor
                       </div>
                     )}
-                    {!statusCode && (
-                      <div className="text-sm text-gray-600">
-                        Sin estado asignado
-                      </div>
-                    )}
-
-                    {/* Last Cleaned Section */}
+                    {/* Last cleaned / Active cleaning task - same block */}
                     <div className="pt-1.5 border-t border-gray-200">
-                      <p className="text-xs text-gray-600 mb-0.5">
-                        Última limpieza
-                      </p>
-                      <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <Clock className="w-3 h-3" />
-                        <span>
-                          {spot.last_cleaned_at
-                            ? dayjs(spot.last_cleaned_at).fromNow()
-                            : 'Nunca'}
-                        </span>
-                      </div>
+                      {spot.current_cleaning_task_id != null ? (
+                        <>
+                          <p className="text-xs text-gray-600 mb-0.5">
+                            {t('cleaning.activeTaskLabel', 'Active cleaning task')}
+                          </p>
+                          <div className="flex items-center gap-2 text-sm text-emerald-600 font-medium">
+                            <Clock className="w-3 h-3" />
+                            <span>
+                              {t('cleaning.cleaningInProgress', 'Cleaning in progress')} #{spot.current_cleaning_task_id}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-xs text-gray-600 mb-0.5">
+                            {t('cleaning.lastCleaned', 'Last cleaned')}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-gray-600">
+                            <Clock className="w-3 h-3" />
+                            <span>
+                              {spot.last_cleaned_at
+                                ? dayjs(spot.last_cleaned_at).fromNow()
+                                : t('cleaning.never', 'Never')}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </CardContent>
                 )}
               </Card>
+              </div>
             );
           })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

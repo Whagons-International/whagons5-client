@@ -540,25 +540,35 @@ function Cleaning() {
                         Aprobada por supervisor
                       </div>
                     )}
-                    {!statusCode && (
-                      <div className="text-sm text-gray-600">
-                        Sin estado asignado
-                      </div>
-                    )}
-
-                    {/* Last Cleaned Section */}
+                    {/* Last cleaned / Active cleaning task - same block */}
                     <div className="pt-1.5 border-t border-gray-200">
-                      <p className="text-xs text-gray-600 mb-0.5">
-                        Última limpieza
-                      </p>
-                      <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <Clock className="w-3 h-3" />
-                        <span>
-                          {spot.last_cleaned_at
-                            ? dayjs(spot.last_cleaned_at).fromNow()
-                            : 'Nunca'}
-                        </span>
-                      </div>
+                      {spot.current_cleaning_task_id != null ? (
+                        <>
+                          <p className="text-xs text-gray-600 mb-0.5">
+                            {t('cleaning.activeTaskLabel', 'Active cleaning task')}
+                          </p>
+                          <div className="flex items-center gap-2 text-sm text-emerald-600 font-medium">
+                            <Clock className="w-3 h-3" />
+                            <span>
+                              {t('cleaning.cleaningInProgress', 'Cleaning in progress')} #{spot.current_cleaning_task_id}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-xs text-gray-600 mb-0.5">
+                            {t('cleaning.lastCleaned', 'Last cleaned')}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-gray-600">
+                            <Clock className="w-3 h-3" />
+                            <span>
+                              {spot.last_cleaned_at
+                                ? dayjs(spot.last_cleaned_at).fromNow()
+                                : t('cleaning.never', 'Never')}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </CardContent>
                 )}

@@ -42,6 +42,10 @@ function PluginSettings() {
 	const [isAddingMapping, setIsAddingMapping] = useState(false);
 	const [newMappingStatusId, setNewMappingStatusId] = useState<string>('');
 	const [newMappingCleaningStatusId, setNewMappingCleaningStatusId] = useState<string>('');
+	// Category IDs (plugin column, not settings)
+	const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+	const [savedCategoryIds, setSavedCategoryIds] = useState<string[]>([]);
+	const [savingCategories, setSavingCategories] = useState(false);
 	
 	// Default to 'settings' tab
 	const activeTab = searchParams.get('tab') || 'settings';
@@ -130,10 +134,17 @@ function PluginSettings() {
 		return unsubscribe;
 	}, []);
 
-	// Load spotTypes, statuses and cleaningStatuses on mount
+	// Load plugins, spotTypes, statuses and cleaningStatuses on mount
 	useEffect(() => {
 		if (pluginId === 'cleaning') {
 			try {
+				// Load plugins (needed for category_ids and settings)
+				if (genericInternalActions?.plugins?.getFromIndexedDB) {
+					dispatch(genericInternalActions.plugins.getFromIndexedDB() as any);
+				}
+				if (genericInternalActions?.plugins?.fetchFromAPI) {
+					dispatch(genericInternalActions.plugins.fetchFromAPI() as any);
+				}
 				// Load spotTypes
 				if (genericInternalActions?.spotTypes?.getFromIndexedDB) {
 					dispatch(genericInternalActions.spotTypes.getFromIndexedDB() as any);
@@ -226,18 +237,40 @@ function PluginSettings() {
 				
 				setStatusToCleaningStatusMap(mappingsArray);
 				setSavedStatusToCleaningStatusMap(mappingsArray);
+
+				// Parse category_ids (plugin column) - handle array or JSON string
+				let categoryIds: number[] = [];
+				const raw = backendPlugin.category_ids;
+				if (raw != null) {
+					if (Array.isArray(raw)) {
+						categoryIds = raw.map((id: unknown) => Number(id)).filter((n) => !isNaN(n));
+					} else if (typeof raw === 'string') {
+						try {
+							const parsed = JSON.parse(raw);
+							categoryIds = Array.isArray(parsed) ? parsed.map((id: unknown) => Number(id)).filter((n) => !isNaN(n)) : [];
+						} catch {
+							categoryIds = [];
+						}
+					}
+				}
+				const categoryIdsString = categoryIds.map((id) => String(id));
+				setSelectedCategoryIds(categoryIdsString);
+				setSavedCategoryIds(categoryIdsString);
 			} catch (error) {
 				console.error('Error parsing plugin settings:', error);
 				setSelectedSpotTypeIds([]);
 				setSelectedTemplateIds([]);
 				setStatusToCleaningStatusMap([]);
-				setSavedStatusToCleaningStatusMap([]);
+				setSelectedCategoryIds([]);
+				setSavedCategoryIds([]);
 			}
 		} else if (pluginId === 'cleaning' && !backendPlugin) {
 			// Reset if plugin not found
 			setSelectedSpotTypeIds([]);
 			setSelectedTemplateIds([]);
 			setStatusToCleaningStatusMap([]);
+			setSelectedCategoryIds([]);
+			setSavedCategoryIds([]);
 		}
 	}, [backendPlugin, pluginId]);
 
@@ -290,6 +323,19 @@ function PluginSettings() {
 		return savedPlugin;
 	};
 
+	// Update plugin resource (e.g. category_ids column) via PATCH /plugins/{slug}
+	const updatePlugin = async (updates: Record<string, any>): Promise<any> => {
+		if (!backendPlugin) {
+			throw new Error('Backend plugin not found');
+		}
+		const response = await actionsApi.patch(`/plugins/${effectivePluginSlug}`, updates);
+		const savedPlugin = response?.data?.data;
+		if (savedPlugin) {
+			dispatch(genericActions.plugins.updateItem(savedPlugin));
+		}
+		return savedPlugin;
+	};
+
 	// Handle spot types selection change (only updates local state)
 	const handleSpotTypesChange = (values: string[]) => {
 		setSelectedSpotTypeIds(values);
@@ -298,6 +344,28 @@ function PluginSettings() {
 	// Handle templates selection change (only updates local state)
 	const handleTemplatesChange = (values: string[]) => {
 		setSelectedTemplateIds(values);
+	};
+
+	// Handle category IDs selection change (only updates local state)
+	const handleCategoryIdsChange = (values: string[]) => {
+		setSelectedCategoryIds(values);
+	};
+
+	// Handle saving category_ids (plugin column)
+	const handleSaveCategoryIds = async () => {
+		setSavingCategories(true);
+		try {
+			const categoryIds = selectedCategoryIds.map(v => parseInt(v, 10));
+			await updatePlugin({ category_ids: categoryIds });
+			setSavedCategoryIds([...selectedCategoryIds]);
+			toast.success(t('plugins.cleaning.categoriesSaved', 'Categories saved successfully'));
+		} catch (error: any) {
+			const errorMessage = error?.response?.data?.message || error?.message || t('plugins.cleaning.saveError', 'Failed to save settings');
+			toast.error(errorMessage);
+			setSelectedCategoryIds([...savedCategoryIds]);
+		} finally {
+			setSavingCategories(false);
+		}
 	};
 
 	// Handle saving spot_type_ids
@@ -419,6 +487,7 @@ function PluginSettings() {
 	// Check if there are unsaved changes
 	const hasUnsavedChanges = JSON.stringify(selectedSpotTypeIds.sort()) !== JSON.stringify(savedSpotTypeIds.sort());
 	const hasUnsavedTemplateChanges = JSON.stringify(selectedTemplateIds.sort()) !== JSON.stringify(savedTemplateIds.sort());
+	const hasUnsavedCategoryChanges = JSON.stringify([...selectedCategoryIds].sort()) !== JSON.stringify([...savedCategoryIds].sort());
 	const savedMappingArray = Array.isArray(savedStatusToCleaningStatusMap) ? savedStatusToCleaningStatusMap : [];
 	const hasUnsavedStatusMappingChanges = JSON.stringify(statusMappingArray.sort((a, b) => a.status_id - b.status_id)) !== JSON.stringify(savedMappingArray.sort((a, b) => a.status_id - b.status_id));
 
@@ -791,6 +860,67 @@ function PluginSettings() {
 									>
 										<Save className="h-4 w-4" />
 										{saving 
+											? t('plugins.cleaning.saving', 'Saving...')
+											: t('plugins.cleaning.save', 'Save')
+										}
+									</Button>
+								</div>
+							</CardContent>
+						</Card>
+					)}
+
+					{/* Applicable Categories (plugin column category_ids) */}
+					{Array.isArray(categories) && (
+						<Card>
+							<CardHeader>
+								<CardTitle className="flex items-center justify-between">
+									<span>{t('plugins.cleaning.categories', 'Applicable Categories')}</span>
+									{hasUnsavedCategoryChanges && (
+										<span className="text-xs text-amber-500 font-normal">
+											{t('plugins.cleaning.unsavedChanges', 'Unsaved changes')}
+										</span>
+									)}
+								</CardTitle>
+								<CardDescription>
+									{t('plugins.cleaning.categoriesDescription', 'Select which categories are applicable for the cleaning plugin. Leave empty for all categories.')}
+								</CardDescription>
+							</CardHeader>
+							<CardContent className="space-y-4">
+								<div className="space-y-2">
+									<label className="text-sm font-medium">
+										{t('plugins.cleaning.selectCategories', 'Select Categories')}
+									</label>
+									<MultiSelect
+										key={`categories-${backendPlugin?.id ?? 'none'}-${categories?.length ?? 0}`}
+										options={Array.isArray(categories) ? categories.map((c: any) => ({
+											value: String(c.id),
+											label: c.name || `Category ${c.id}`
+										})) : []}
+										onValueChange={handleCategoryIdsChange}
+										defaultValue={Array.isArray(categories) && categories.length > 0
+											? selectedCategoryIds.filter(id => categories.some((c: any) => String(c.id) === id))
+											: selectedCategoryIds}
+										placeholder={
+											!Array.isArray(categories) || categories.length === 0
+												? t('plugins.cleaning.loadingCategories', 'Loading categories...')
+												: t('plugins.cleaning.selectCategoriesPlaceholder', 'Select categories...')
+										}
+										maxCount={10}
+										disabled={savingCategories}
+										className="w-full"
+									/>
+									<p className="text-xs text-muted-foreground">
+										{t('plugins.cleaning.categoriesHint', 'When set, only tasks/spots from these categories will be considered for cleaning. Empty means all categories.')}
+									</p>
+								</div>
+								<div className="flex justify-end pt-2">
+									<Button
+										onClick={handleSaveCategoryIds}
+										disabled={savingCategories || !hasUnsavedCategoryChanges || !backendPlugin}
+										className="gap-2"
+									>
+										<Save className="h-4 w-4" />
+										{savingCategories
 											? t('plugins.cleaning.saving', 'Saving...')
 											: t('plugins.cleaning.save', 'Save')
 										}

@@ -29,6 +29,7 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
   const [content, setContent] = useState('');
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -86,7 +87,7 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
   };
 
   const handleSubmit = async () => {
-    if ((!content.trim() && selectedImages.length === 0) || isLoading) return;
+    if ((!content.trim() && selectedImages.length === 0) || isLoading || isUploading) return;
     
     try {
       // Step 1: Create the board message first (allow empty content if images exist)
@@ -133,6 +134,7 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
 
       // Step 2: Upload images and create attachments
       if (selectedImages.length > 0 && user) {
+        setIsUploading(true);
         const uploadPromises = selectedImages.map(async (file) => {
           let attachment: any = null;
           try {
@@ -188,6 +190,7 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
         }
         
         // Attachments are written via `addAsync` and will also sync via realtime/background validation.
+        setIsUploading(false);
       }
 
       // Step 3: Clear form
@@ -201,6 +204,7 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
       }
     } catch (error) {
       Logger.error('boards', 'Failed to post message:', error);
+      setIsUploading(false);
     }
   };
 
@@ -291,13 +295,15 @@ export function PostComposer({ user, boardId, onPost, placeholder, isLoading }: 
           
           <Button
             onClick={handleSubmit}
-            disabled={(!content.trim() && selectedImages.length === 0) || isLoading}
+            disabled={(!content.trim() && selectedImages.length === 0) || isLoading || isUploading}
             size="sm"
             className="rounded-full px-4 font-semibold"
           >
-            {isLoading 
-              ? t('boards.composer.posting', 'Posting...') 
-              : t('boards.composer.post', 'Post')
+            {isUploading
+              ? t('boards.composer.uploading', 'Uploading...')
+              : isLoading 
+                ? t('boards.composer.posting', 'Posting...') 
+                : t('boards.composer.post', 'Post')
             }
           </Button>
         </div>

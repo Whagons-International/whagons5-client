@@ -98,7 +98,7 @@ const TabsList = React.forwardRef<
         ref={ref}
         data-slot="tabs-list"
         className={cn(
-          "text-muted-foreground relative inline-flex h-10 w-fit items-center gap-1 border-b border-border/60",
+          "text-muted-foreground relative inline-flex h-auto min-h-10 w-fit items-center gap-1 border-b border-border/60 flex-wrap",
           className
         )}
         {...props}

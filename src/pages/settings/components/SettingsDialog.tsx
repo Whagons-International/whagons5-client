@@ -1,4 +1,4 @@
-import React, { ReactNode, useRef } from "react";
+import React, { ReactNode, useRef, useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -28,6 +28,7 @@ export interface SettingsDialogProps {
   renderEntityPreview?: (data: any) => ReactNode; // Custom preview for delete dialog
   footerActions?: ReactNode; // Optional extra buttons rendered near submit
   contentClassName?: string; // Optional className to adjust DialogContent width
+  tabCount?: number; // Number of tabs — dialog widens automatically when > 4
 }
 
 export function SettingsDialog({
@@ -49,10 +50,27 @@ export function SettingsDialog({
   entityData,
   renderEntityPreview,
   footerActions,
-  contentClassName
+  contentClassName,
+  tabCount
 }: SettingsDialogProps) {
   const { t } = useLanguage();
   const formRef = useRef<HTMLFormElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [detectedTabCount, setDetectedTabCount] = useState(0);
+
+  useEffect(() => {
+    if (!open || !contentRef.current) return;
+    // Count tab triggers inside the dialog
+    const timer = setTimeout(() => {
+      if (contentRef.current) {
+        const triggers = contentRef.current.querySelectorAll('[data-slot="tabs-list"] button, [role="tablist"] button');
+        setDetectedTabCount(triggers.length);
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [open, children]);
+
+  const effectiveTabCount = tabCount ?? detectedTabCount;
   const submitNow = () => {
     if (type === 'delete' && onConfirm) {
       onConfirm();
@@ -124,7 +142,7 @@ export function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={`overflow-visible ${type === 'delete' ? "sm:max-w-[425px]" : "max-w-5xl"} ${contentClassName || ''}`}>
+      <DialogContent ref={contentRef} className={`overflow-visible ${type === 'delete' ? "sm:max-w-[425px]" : effectiveTabCount > 5 ? "max-w-7xl" : effectiveTabCount > 3 ? "max-w-6xl" : "max-w-5xl"} ${contentClassName || ''}`}>
         <div className="flex flex-col max-h-[90vh] overflow-hidden">
           <DialogHeader className="flex-shrink-0 mb-6 space-y-2 pb-4 border-b border-border/40">
             <DialogTitle className={`${type === 'delete' ? "flex items-center space-x-2" : ""} text-2xl font-extrabold tracking-tight`}>

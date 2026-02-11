@@ -12,7 +12,7 @@
 //   "anthropic/claude-3.5-sonnet" - Anthropic Claude 3.5 Sonnet via OpenRouter
 //   "accounts/fireworks/models/glm-4p7" - Fireworks GLM-4 Plus 7B
 //export const PREFERRED_MODEL = "accounts/fireworks/models/qwen3-vl-30b-a3b-instruct";
-export const PREFERRED_MODEL = "moonshotai/kimi-k2-instruct-0905";
+export const PREFERRED_MODEL = "moonshotai/kimi-k2.5";
 
 /**
  * TTS (Text-to-Speech) voice defaults.

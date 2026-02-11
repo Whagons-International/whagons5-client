@@ -54,6 +54,9 @@ const MainLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
               {children}
             </div>
           </SidebarInset>
+          {/* AssistantWidget lives here at layout level so its lifecycle is
+              completely independent of sidebar collapse/expand state. */}
+          {!isWelcome && <AssistantWidget floating={false} />}
         </div>
       </SidebarProvider>
     </ThemeProvider>

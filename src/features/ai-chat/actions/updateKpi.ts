@@ -8,8 +8,10 @@
  */
 
 import type { FrontendToolResult, SendMessageCallback, NavigateCallback } from './frontend_tools';
-
+import { store } from '@/store/store';
+import { genericActions } from '@/store/genericSlices';
 import { Logger } from '@/utils/logger';
+
 // Re-use the same color/icon/type resolution helpers from createKpi
 // (imported inline to keep this file self-contained and avoid circular deps)
 
@@ -76,7 +78,7 @@ function resolveIcon(raw?: string): string | undefined {
   if (VALID_ICONS.has(raw)) return raw;
   const alias = ICON_ALIASES[raw.toLowerCase()] || ICON_ALIASES[raw];
   if (alias) return alias;
-  return undefined; // Don't default — keep existing icon if unrecognized
+  return undefined;
 }
 
 function resolveType(raw?: string): string | undefined {
@@ -227,7 +229,7 @@ export function handleUpdateKpi(
 
   // Look up existing card from Redux store
   const state = store.getState() as any;
-  const kpiCards = state.kpiCards?.value ?? [];
+  const kpiCards = state.generic?.kpiCards?.value ?? state.kpiCards?.value ?? [];
   const existingCard = kpiCards.find((c: any) => c.id === input.id);
 
   if (!existingCard) {
@@ -289,7 +291,7 @@ export async function handleUpdateKpiPrompt(
 
   // Look up existing card from Redux store
   const state = store.getState() as any;
-  const kpiCards = state.kpiCards?.value ?? [];
+  const kpiCards = state.generic?.kpiCards?.value ?? state.kpiCards?.value ?? [];
   const existingCard = kpiCards.find((c: any) => c.id === input.id);
 
   if (!existingCard) {

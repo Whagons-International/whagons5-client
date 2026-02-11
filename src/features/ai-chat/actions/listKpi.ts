@@ -7,8 +7,9 @@
  */
 
 import type { FrontendToolResult, SendMessageCallback, NavigateCallback } from './frontend_tools';
-
+import { store } from '@/store/store';
 import { Logger } from '@/utils/logger';
+
 // ─── Handler for the tool_result pathway (FRONTEND_TOOL_HANDLERS) ────────────
 
 export function handleListKpi(
@@ -22,7 +23,7 @@ export function handleListKpi(
   const workspaceId = rawInput.workspace_id ?? rawInput.workspaceId ?? rawInput.workspace ?? null;
 
   const state = store.getState() as any;
-  let cards = state.kpiCards?.value ?? [];
+  let cards = state.generic?.kpiCards?.value ?? state.kpiCards?.value ?? [];
 
   if (workspaceId != null) {
     cards = cards.filter((c: any) => c.workspace_id === workspaceId || c.workspace_id === null);
@@ -56,7 +57,7 @@ export async function handleListKpiPrompt(
 
   try {
     const state = store.getState() as any;
-    let cards = state.kpiCards?.value ?? [];
+    let cards = state.generic?.kpiCards?.value ?? state.kpiCards?.value ?? [];
 
     if (workspaceId != null) {
       cards = cards.filter((c: any) => c.workspace_id === workspaceId || c.workspace_id === null);

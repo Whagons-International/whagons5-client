@@ -145,7 +145,6 @@ export function useTeamUserAssignments(
         await dispatch((genericActions as any).userTeams.removeAsync(del.id)).unwrap();
       }
 
-      dispatch((genericActions as any).userTeams.getFromIndexedDB?.());
       handleCloseUsersDialog();
     } catch (err: any) {
       setUsersFormError(err?.message || translate('dialogs.manageUsers.errors.generic', 'Error updating team users'));

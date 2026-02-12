@@ -5,7 +5,6 @@ import path from 'path';
 import fs from 'fs';
 import { visualizer } from 'rollup-plugin-visualizer';
 import JavaScriptObfuscator from 'javascript-obfuscator';
-// import { VitePWA } from 'vite-plugin-pwa';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { execSync } from 'child_process';
@@ -165,42 +164,7 @@ export default defineConfig(({ mode }) => {
         sourceMap: false,
         compact: true
       }),
-      // PWA plugin temporarily disabled for debugging
-      // VitePWA({
-      //   registerType: 'autoUpdate',
-      //   injectRegister: null,
-      //   includeAssets: ['whagons.svg'],
-      //   manifest: {
-      //     name: 'WHagons',
-      //     short_name: 'WHagons',
-      //     start_url: '/',
-      //     display: 'standalone',
-      //     background_color: '#ffffff',
-      //     theme_color: '#ffffff'
-      //   },
-      //   workbox: {
-      //     // Default precaching of build assets; include large vendor chunks as well
-      //     globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-      //     maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
-      //     // Enable skipWaiting and clientsClaim for immediate updates
-      //     skipWaiting: true,
-      //     clientsClaim: true,
-      //     // Check for updates more frequently
-      //     cleanupOutdatedCaches: true,
-      //     runtimeCaching: [
-      //       {
-      //         urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
-      //         handler: 'NetworkFirst',
-      //         options: {
-      //           cacheName: 'api-cache',
-      //           expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 },
-      //           cacheableResponse: { statuses: [0, 200] }
-      //         }
-      //       }
-      //     ]
-      //   },
-      //   devOptions: { enabled: false }
-      // })
+
     ].filter(Boolean),
     define: {
       global: 'globalThis',

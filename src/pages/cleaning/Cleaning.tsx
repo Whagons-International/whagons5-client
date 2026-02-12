@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Search, Droplet, Clock, User, Filter, LayoutGrid, Grid3x3 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,7 @@ import { useLanguage } from '@/providers/LanguageProvider';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBroom } from '@fortawesome/free-solid-svg-icons';
 import { RootState, AppDispatch } from '@/store/store';
-import { genericActions, genericInternalActions } from '@/store/genericSlices';
+import { genericActions } from '@/store/genericSlices';
 import { Spot, CleaningStatus } from '@/store/types';
 import {
   Select,
@@ -59,23 +59,6 @@ function Cleaning() {
   const [showActiveTaskFilter, setShowActiveTaskFilter] = useState(false);
   const [viewMode, setViewMode] = useState<'full' | 'compact'>('full');
   const [groupBy, setGroupBy] = useState<'none' | 'cleaning_status' | 'spot_type'>('none');
-
-  // Load data on mount
-  useEffect(() => {
-    // Load spots and cleaning statuses from IndexedDB first (for fast initial render)
-    dispatch(genericInternalActions.spots.getFromIndexedDB() as any);
-    dispatch(genericInternalActions.cleaningStatuses.getFromIndexedDB() as any);
-    dispatch(genericInternalActions.users.getFromIndexedDB() as any);
-    dispatch(genericInternalActions.plugins.getFromIndexedDB() as any);
-    dispatch(genericInternalActions.spotTypes.getFromIndexedDB() as any);
-    
-    // Then fetch from API to ensure we have the latest data
-    dispatch(genericInternalActions.spots.fetchFromAPI() as any);
-    dispatch(genericInternalActions.cleaningStatuses.fetchFromAPI() as any);
-    dispatch(genericInternalActions.users.fetchFromAPI() as any);
-    dispatch(genericInternalActions.plugins.fetchFromAPI() as any);
-    dispatch(genericInternalActions.spotTypes.fetchFromAPI() as any);
-  }, [dispatch]);
 
   // Get cleaning status by ID
   const getCleaningStatus = (statusId: number | null | undefined): CleaningStatus | null => {
